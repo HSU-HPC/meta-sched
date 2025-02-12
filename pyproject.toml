@@ -1,0 +1,32 @@
+[project]
+name = "meta-sched"
+version = "0.1.0"
+description = "Meta Scheduler"
+authors = [{name="Ruben Horn"}]
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "fabric>=3.2.2",
+]
+
+[project.scripts]
+ms-submit  = "meta_sched.submit:run_cli"
+ms-submitd = "meta_sched.submit:run_daemon"
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
+[tool.uv]
+package = true
+
+dev-dependencies = [
+    # For static type checking
+    "types-paramiko>=3.5.0",
+    "mypy>=1.15.0",
+    "pyright>=1.1.393",
+]
+
+[tool.mypy]
+strict = true
+ignore_missing_imports = true
