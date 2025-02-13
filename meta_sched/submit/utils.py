@@ -1,13 +1,13 @@
-import os
 import sys
+from os import PathLike
 from typing import Any, Self
 
 
 class RedirectOutputToFile:
     def __init__(
         self,
-        stdout: str | os.PathLike[Any] | None = None,
-        stderr: str | os.PathLike[Any] | None = None,
+        stdout: str | PathLike[Any] | None = None,
+        stderr: str | PathLike[Any] | None = None,
     ) -> None:
         self.__stdout_redirect = stdout
         self.__stderr_redirect = stderr
@@ -23,9 +23,11 @@ class RedirectOutputToFile:
 
     def __exit__(self: Self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
         if self.__stdout_redirect:
+            sys.stdout.flush()
             sys.stdout.close()
             sys.stdout = self.__stdout
         if self.__stderr_redirect:
+            sys.stderr.flush()
             sys.stderr.close()
             sys.stderr = self.__stderr
 

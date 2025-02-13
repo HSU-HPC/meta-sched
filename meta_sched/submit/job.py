@@ -11,26 +11,31 @@ class JobSpec(dict[str, Any]):
     def __init__(self: Self, create_key: object, path: Path) -> None:
         if create_key != JobSpec.__create_key:
             raise InstantiationException(self)
-        if path.is_dir():
-            path /= "job.toml"
-        kvs = tomllib.loads(path.read_text())
+        if not path.is_dir():
+            raise ValueError("Job spec path must be a directory")
+        self.__name = path.name
+        kvs = tomllib.loads((path / "job.toml").read_text())
         for k, v in kvs.items():
             self[k] = v
         self["path"] = path
+
+    @property
+    def name(self: Self) -> str:
+        return self.__name
 
     @property
     def is_valid(self: Self) -> bool:
         raise NotImplementedError()
 
     @property
-    def output_dir(self: Self) -> Path | None:
+    def output(self: Self) -> Path | None:
         if "local_array_id" not in self or "array_idx" not in self:
             return None
-        return Path(
-            self["path"].parent
-            / "output"
-            / f"{self['local_array_id']}-{self['array_idx']}"
-        )
+        return Path(self.name) / f"output-{self['local_array_id']}-{self['array_idx']}"
+
+    @property
+    def input(self: Self) -> Path:
+        return Path(self.name) / "input"
 
     @staticmethod
     def get_user_jobs_dir() -> Path:

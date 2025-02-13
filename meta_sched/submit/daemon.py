@@ -2,13 +2,13 @@
 
 import os
 import subprocess
-import sys
 from multiprocessing import Process
 from pathlib import Path
-from typing import List, Self, Tuple
+from typing import Callable, List, Self, Tuple
 
 from meta_sched.submit import ipc
 from meta_sched.submit.executor import Executor
+from meta_sched.submit.lock_file import LockFile
 
 # TODO eventually replace with RestAPI
 from meta_sched.submit.scheduler_interface import Dummy as Scheduler
@@ -16,9 +16,12 @@ from meta_sched.submit.target import SlurmTarget
 
 
 class Daemon:
-    def __init__(self: Self) -> None:
+    def __init__(
+        self: Self, socket_path: Path, name_provider: Callable[[str], str]
+    ) -> None:
         self.__processes: List[Process] = []
-        self.__next_array_id = 1  # TODO maybe resume from last if restarted
+        self.__socket_path = socket_path
+        self.__name_provider = name_provider
 
     @staticmethod
     def __switch_user(uid: int) -> None:
@@ -48,7 +51,7 @@ class Daemon:
             scheduler,
             local_array_id,
             array_idx,
-            redirect_output=False,  # TODO only for debugging
+            redirect_output=True,
         ).run()
 
     def __handler(self: Self, request: str, ids: Tuple[int, int, int]) -> str:
@@ -63,28 +66,29 @@ class Daemon:
             print("Invalid!")
             return "INVALID"
         uid = ids[1]
-        array_id = self.__next_array_id
-        self.__next_array_id += 1
+        array_id = ""
+        try:
+            array_id = self.__name_provider("job")
+        except Exception:
+            print("Failed!")
+            return "FAILED"
         print("OK!")
         for i in range(1, array_size + 1):
             p = Process(target=self.__run_executor, args=(job_spec, uid, array_id, i))
             p.start()
             self.__processes.append(p)
-        return f"JOBS {job_spec}/output/{array_id}-*"
+        return f"JOBS {job_spec}/output-{array_id}-*"
 
     def run(self: Self) -> int:
-        if os.getuid() != 0:
-            if "--sudo" in sys.argv:
-                argv = [] + Path(f"/proc/{os.getpid()}/cmdline").read_text().split("\0")
-                os.execv("/usr/bin/sudo", argv)
-            print("Must be run as root")
-            return 1
+        lock_file_dir = LockFile.get_base_path() / "meta-sched"
+        lock_file_dir.mkdir(exist_ok=True)
+        os.chmod(lock_file_dir, 0o777)
 
-        with ipc.Server() as server:
+        with ipc.Server(self.__socket_path) as server:
             while True:
                 print("Awaiting request...")
                 server.accept(self.__handler)
                 # Clean up finished processes
-                self.__processes = [p for p in self.__processes if p.exitcode is None]
+                self.__processes = [p for p in self.__processes if p.is_alive()]
 
         return 0

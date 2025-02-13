@@ -5,8 +5,6 @@ import struct
 from pathlib import Path
 from typing import Any, Callable, Self, Tuple
 
-_SOCKET_PATH = Path("/tmp/dibs_executor.sock")
-
 
 def _socket_send_prefixed(connection: socket.socket, data: bytes) -> None:
     data_len_prefix = (len(data)).to_bytes(4, byteorder="little", signed=False)
@@ -29,7 +27,7 @@ def _socket_recv_prefixed(connection: socket.socket) -> bytes | None:
 class Server(object):
     def __init__(
         self,
-        socket_path: Path = _SOCKET_PATH,
+        socket_path: Path,
     ) -> None:
         self.__socket_path = Path(socket_path)
         self.__server: socket.socket | None = None
@@ -93,7 +91,7 @@ class Server(object):
 
 
 class Client(object):
-    def __init__(self: Self, socket_path: Path = _SOCKET_PATH) -> None:
+    def __init__(self: Self, socket_path: Path) -> None:
         self.__socket_path = socket_path
         self.__client: socket.socket | None = None
 

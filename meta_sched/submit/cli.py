@@ -1,4 +1,5 @@
 import sys
+from pathlib import Path
 from typing import Self
 
 from meta_sched.submit import ipc
@@ -6,6 +7,9 @@ from meta_sched.submit.job import JobSpec
 
 
 class CLI:
+    def __init__(self: Self, socket_path: Path) -> None:
+        self.__socket_path = socket_path
+
     def run(self: Self) -> int:
         argv = sys.argv[1:]
         job_spec = ""
@@ -20,7 +24,7 @@ class CLI:
         except FileNotFoundError:
             print("No such job spec:", job_spec)
             return 2
-        with ipc.Client() as client:
+        with ipc.Client(self.__socket_path) as client:
             response = client.request(f"SUBMIT {job_spec} {array_size}")
             print(response)
         return 0
