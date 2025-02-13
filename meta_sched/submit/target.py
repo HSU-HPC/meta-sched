@@ -51,17 +51,15 @@ class Target(abc.ABC):
                 Path(dst).parent.mkdir(parents=True, exist_ok=True)
                 src = f"{str(self.id)}:{src}"
         rsync_flags = ["--archive", "--progress", "--verbose"]
-        cmd = f"rsync {' '.join(rsync_flags)} {src} {dst}"
+        cmd = f"rsync {' '.join(rsync_flags)} {src} {dst} 1>&2"
         result = invoke.run(cmd)
         assert result
         return result.exited
 
     def clean_up(self: Self, job_spec: JobSpec) -> int:
         with self._connect() as connection:
-            output_name = job_spec.output
-            assert output_name
-            output_dir = Path("meta-sched/jobs") / output_name
-            status: int = connection.run(f"rm -rf {output_dir}").exited
+            assert job_spec.output
+            status: int = connection.run(f"rm -rf {job_spec.output}").exited
             return status
 
     def _connect(self: Self) -> Connection:
@@ -76,10 +74,8 @@ class Target(abc.ABC):
 class SlurmTarget(Target):
     def execute(self: Self, job_spec: JobSpec) -> int:
         with self._connect() as connection:
-            output_name = job_spec.output
-            assert output_name
-            output_dir = Path("meta-sched/jobs") / output_name
-            connection.run(f"mkdir -p {output_dir}")
-            with connection.cd(output_dir):
+            assert job_spec.output
+            connection.run(f"mkdir -p {job_spec.output}")
+            with connection.cd(job_spec.output):
                 status: int = connection.run(f"srun {job_spec['executable']}").exited
                 return status

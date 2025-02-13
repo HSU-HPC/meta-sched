@@ -8,7 +8,7 @@ from typing import Any, Self
 class LockFile:
     @staticmethod
     def get_base_path() -> Path:
-        return Path("/") / "tmp"
+        return Path("/tmp")
 
     def __init__(self: Self, name: str) -> None:
         self.__path = LockFile.get_base_path() / name

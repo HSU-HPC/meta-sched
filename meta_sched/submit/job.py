@@ -17,35 +17,35 @@ class JobSpec(dict[str, Any]):
         kvs = tomllib.loads((path / "job.toml").read_text())
         for k, v in kvs.items():
             self[k] = v
-        self["path"] = path
-
-    @property
-    def name(self: Self) -> str:
-        return self.__name
+        self.__path = self.get_jobs_dir() / self.__name
 
     @property
     def is_valid(self: Self) -> bool:
         raise NotImplementedError()
 
     @property
+    def name(self: Self) -> str:
+        return self.__name
+
+    @property
     def output(self: Self) -> Path | None:
         if "local_array_id" not in self or "array_idx" not in self:
             return None
-        return Path(self.name) / f"output-{self['local_array_id']}-{self['array_idx']}"
+        return self.__path / f"output-{self['local_array_id']}-{self['array_idx']}"
 
     @property
     def input(self: Self) -> Path:
-        return Path(self.name) / "input"
+        return self.__path / "input"
 
     @staticmethod
-    def get_user_jobs_dir() -> Path:
-        return Path.home() / "meta-sched" / "jobs"
+    def get_jobs_dir() -> Path:
+        return Path("meta-sched/jobs")
 
     @staticmethod
     def list() -> List[str]:
-        return [p.name for p in JobSpec.get_user_jobs_dir().iterdir() if p.is_dir()]
+        return [p.name for p in JobSpec.get_jobs_dir().iterdir() if p.is_dir()]
 
     @classmethod
     def load(cls, spec: str) -> Self:
-        job_path = JobSpec.get_user_jobs_dir() / spec
+        job_path = cls.get_jobs_dir() / spec
         return cls(cls.__create_key, job_path)

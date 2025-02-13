@@ -1,3 +1,4 @@
+import os
 import sys
 from pathlib import Path
 from typing import Self
@@ -15,6 +16,7 @@ class CLI:
         job_spec = ""
         try:
             job_spec = argv[0]
+            os.chdir(Path.home())
             JobSpec.load(job_spec)
             array_size = int(argv[1])
             assert array_size > 0

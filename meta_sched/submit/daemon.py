@@ -34,6 +34,7 @@ class Daemon:
         for k, v in env_copy.items():
             os.environ[k] = v
         os.setuid(uid)
+        os.chdir(Path.home())
 
     def __run_executor(
         self: Self, job_spec: str, uid: int, local_array_id: int, array_idx: int
@@ -80,6 +81,7 @@ class Daemon:
         return f"JOBS {job_spec}/output-{array_id}-*"
 
     def run(self: Self) -> int:
+        # Ensure that other users can create lock files
         lock_file_dir = LockFile.get_base_path() / "meta-sched"
         lock_file_dir.mkdir(exist_ok=True)
         os.chmod(lock_file_dir, 0o777)

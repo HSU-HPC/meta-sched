@@ -2,7 +2,6 @@ import os
 import sys
 import time
 import traceback
-from pathlib import Path
 from typing import Self
 
 from meta_sched.submit import scheduler_interface
@@ -56,8 +55,8 @@ class Executor:
         with LockFile(
             f"meta-sched/{os.getuid()}/{target.id}:{self.__job_spec.name}.lock"
         ):
-            src = JobSpec.get_user_jobs_dir() / self.__job_spec.input
-            dst = Path(f"meta-sched/jobs/{self.__job_spec.input.parent}")  # TODO ?
+            src = self.__job_spec.input
+            dst = self.__job_spec.input.parent
             if 0 != target.transfer(src, dst, Target.TransferMode.UPLOAD):
                 return
         # 4. Run job on target
@@ -68,10 +67,9 @@ class Executor:
         # * Update the scheduler about the job state
         target.execute(self.__job_spec)
         # 5. Copy back results
-        output_name = self.__job_spec.output
-        assert output_name
-        src = Path(f"meta-sched/jobs/{output_name}")  # TODO ?
-        dst = (JobSpec.get_user_jobs_dir() / output_name).parent
+        assert self.__job_spec.output
+        src = self.__job_spec.output
+        dst = self.__job_spec.output.parent
         target.transfer(src, dst, Target.TransferMode.DOWNLOAD)
         # 6. Clean up on target
         target.clean_up(self.__job_spec)
@@ -82,14 +80,12 @@ class Executor:
 
     def run(self: Self) -> None:
         # TODO continue here
-        output = self.__job_spec.output
-        assert output
-        output_dir = JobSpec.get_user_jobs_dir() / output
-        output_dir.mkdir(parents=True, exist_ok=True)
+        assert self.__job_spec.output
+        self.__job_spec.output.mkdir(parents=True, exist_ok=True)
         kwargs = (
             dict(
-                stdout=output_dir / "stdout",
-                stderr=output_dir / "stderr",
+                stdout=self.__job_spec.output / "stdout",
+                stderr=self.__job_spec.output / "stderr",
             )
             if self.__redirect_output
             else {}
