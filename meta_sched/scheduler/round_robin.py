@@ -1,13 +1,14 @@
-from typing import Any, List, Self
+from typing import List, Self
 
-from meta_sched.schedule.scheduler.base import Scheduler
+from meta_sched.config import Config
+from meta_sched.scheduler.base import Scheduler
 from meta_sched.submit.job import JobSpec
 from meta_sched.submit.scheduler_interface import SchedulingDecision
 
 
 class RRScheduler(Scheduler):
-    def __init__(self: Self, **kwargs: Any) -> None:
-        self.__job_count = {t["id"]: 0 for t in kwargs["targets"]}
+    def __init__(self: Self, config: Config) -> None:
+        self.__job_count = {t.id: 0 for t in config.targets}
 
     def request_schedule(
         self: Self, job_spec: JobSpec, suitable_targets: List[str]

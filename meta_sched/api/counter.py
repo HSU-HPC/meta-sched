@@ -1,4 +1,3 @@
-import abc
 import json
 from multiprocessing import Lock
 from os import PathLike
@@ -6,13 +5,7 @@ from pathlib import Path
 from typing import Any, Dict, Self
 
 
-class NameProvider(abc.ABC):
-    @abc.abstractmethod
-    def get_new_name(self: Self, prefix: str = "") -> str:
-        raise NotImplementedError
-
-
-class UniqueNameProvider(NameProvider):
+class PersistentCounter:
     def __init__(self) -> None:
         self.__counters: Dict[str, int] = dict()
         self.__lock = Lock()
@@ -33,7 +26,7 @@ class UniqueNameProvider(NameProvider):
         with self.__lock:
             self.__counters = counters
 
-    def get_new_name(self: Self, prefix: str = "") -> str:
+    def get_next(self: Self, prefix: str = "") -> str:
         with self.__lock:
             if prefix not in self.__counters:
                 self.__counters[prefix] = 0

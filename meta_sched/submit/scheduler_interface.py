@@ -38,7 +38,7 @@ class SchedulingDecision:
 
     def __init__(self: Self, **kwargs: Any) -> None:
         if self.__class__ == SchedulingDecision:
-            raise Exception(f"Cannot create instance of {self.__class__.__name__}")
+            raise Exception(f"Cannot create instance of {self.__class__.__qualname__}")
 
 
 SchedulingDecision.Impossible.__bases__ = (SchedulingDecision,)

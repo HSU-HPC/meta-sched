@@ -117,7 +117,7 @@ class Client(object):
 
     def request(self: Self, message: str) -> str | None:
         if not self.__client:
-            raise socket.error(f"{self.__class__.__name__} ist not connected.")
+            raise socket.error(f"{self.__class__.__qualname__} ist not connected.")
         _socket_send_prefixed(self.__client, message.encode())
         response = _socket_recv_prefixed(self.__client)
         if response:

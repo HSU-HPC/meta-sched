@@ -1,9 +1,9 @@
 [project]
-name = "meta-sched"
-version = "0.1.0"
-description = "Meta Scheduler"
-authors = [{name="Ruben Horn"}]
-readme = "README.md"
+name            = "meta-sched"
+version         = "0.1.0"
+description     = "Meta Scheduler"
+authors         = [{name="Ruben Horn"}]
+readme          = "README.md"
 requires-python = ">=3.12"
 dependencies = [
     "fabric>=3.2.2",
@@ -14,11 +14,10 @@ dependencies = [
 [project.scripts]
 ms-submit  = "meta_sched.submit:run_cli"
 ms-submitd = "meta_sched.submit:run_daemon"
-ms-namesd = "meta_sched.names:run_daemon"
-ms-schedd = "meta_sched.schedule:run_daemon"
+ms-api     = "meta_sched.api:run_server"
 
 [build-system]
-requires = ["poetry-core"]
+requires      = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.uv]
@@ -33,5 +32,5 @@ dev-dependencies = [
 ]
 
 [tool.mypy]
-strict = true
+strict                 = true
 ignore_missing_imports = true

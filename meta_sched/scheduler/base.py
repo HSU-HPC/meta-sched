@@ -1,11 +1,12 @@
-from typing import Any, List, Self
+from typing import List, Self
 
+from meta_sched.config import Config
 from meta_sched.submit.job import JobSpec
 from meta_sched.submit.scheduler_interface import SchedulingDecision
 
 
 class Scheduler:
-    def __init__(self: Self, **kwargs: Any):
+    def __init__(self: Self, config: Config):
         if self.__class__ == Scheduler:
             raise NotImplementedError()
 

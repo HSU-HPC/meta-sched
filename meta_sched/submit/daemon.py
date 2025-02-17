@@ -17,11 +17,11 @@ from meta_sched.submit.target import SlurmTarget
 
 class Daemon:
     def __init__(
-        self: Self, socket_path: Path, name_provider: Callable[[str], str]
+        self: Self, socket_path: Path, create_array_id: Callable[[], str]
     ) -> None:
         self.__processes: List[Process] = []
         self.__socket_path = socket_path
-        self.__name_provider = name_provider
+        self.create_array_id = create_array_id
 
     @staticmethod
     def __switch_user(uid: int) -> None:
@@ -69,7 +69,7 @@ class Daemon:
         uid = ids[1]
         array_id = ""
         try:
-            array_id = self.__name_provider("job")
+            array_id = self.create_array_id()
         except Exception:
             print("Failed!")
             return "FAILED"
