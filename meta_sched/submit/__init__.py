@@ -14,7 +14,7 @@ def run_cli() -> int:
 def run_daemon() -> int:
     try_become_root(True)
     name_provider_client = NameProviderClient(
-        env.get("MS_NAMESD_HOST"), int(env.get("MS_NAMESD_PORT"))
+        env.get("MS_API_HOST"), int(env.get("MS_API_PORT"))
     )
     return Daemon(
         Path(env.get("MS_SUBMITD_SOCKET")),

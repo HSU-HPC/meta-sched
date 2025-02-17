@@ -1,6 +1,5 @@
 import abc
 import enum
-import uuid
 from os import PathLike
 from pathlib import Path
 from typing import Any, Self
@@ -14,13 +13,13 @@ from meta_sched.submit.job import JobSpec
 
 
 class Target(abc.ABC):
-    def __init__(self: Self, id: str | uuid.UUID, host: str, port: int = 22) -> None:
-        self.__id = id if isinstance(id, uuid.UUID) else uuid.UUID(id)
+    def __init__(self: Self, id: str, host: str, port: int = 22) -> None:
+        self.__id = id
         self.__host = host
         self.__port = port
 
     @property
-    def id(self: Self) -> uuid.UUID:
+    def id(self: Self) -> str:
         return self.__id
 
     @property

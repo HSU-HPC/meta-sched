@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from meta_sched import env
-from meta_sched.names.daemon import Daemon
+from meta_sched.schedule.daemon import Daemon
 from meta_sched.utils import try_become_root
 
 
@@ -10,5 +10,5 @@ def run_daemon() -> int:
     return Daemon(
         env.get("MS_API_HOST"),
         int(env.get("MS_API_PORT")),
-        Path(env.get("MS_NAMESD_FILE")).absolute(),
+        Path(env.get("MS_SCHEDD_CONFIG")).absolute(),
     ).run()

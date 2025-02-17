@@ -48,7 +48,7 @@ class Executor:
                     print(f"Scheduling deferred (Re-attempting in {wait_seconds} sec)")
                     time.sleep(wait_seconds)
                 case SchedulingDecision.Assigned():
-                    target = scheduling_decision.target
+                    target = suitable_targets[scheduling_decision.target_id]
                 case _:
                     raise NotImplementedError()
         # 3. Copy to target

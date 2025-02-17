@@ -16,8 +16,9 @@ handle_sigint() {
     done
 }
 
-uv run ms-namesd --sudo & PIDS+=($!)
+uv run ms-namesd  --sudo & PIDS+=($!)
 uv run ms-submitd --sudo & PIDS+=($!)
+uv run ms-schedd  --sudo & PIDS+=($!)
 
 trap "handle_sigint" SIGINT
 for PID in "${PIDS[@]}"; do
