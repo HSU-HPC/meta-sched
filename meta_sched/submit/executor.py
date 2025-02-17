@@ -101,11 +101,11 @@ class Executor:
         cls,
         spec: str,
         scheduler: scheduler_interface.Base,
-        local_array_id: int,
+        array_id: int,
         array_idx: int,
         redirect_output: bool = False,
     ) -> Self:
         job_spec = JobSpec.load(spec)
-        job_spec["local_array_id"] = local_array_id
+        job_spec["array_id"] = array_id
         job_spec["array_idx"] = array_idx
         return cls(cls.__create_key, job_spec, scheduler, redirect_output)

@@ -11,7 +11,10 @@ class Client:
         self.__port = port
 
     def get_new_name(self: Self, prefix: str = "") -> str:
-        response = requests.get(f"http://{self.__host}:{self.__port}/{prefix}")
+        response = requests.get(f"http://{self.__host}:{self.__port}/?prefix={prefix}")
         if http.HTTPStatus.OK != response.status_code:
             raise http.client.error()
-        return response.text
+        content = response.json()
+        if content["status"] != "success":
+            raise RuntimeError(content)
+        return str(content["data"])

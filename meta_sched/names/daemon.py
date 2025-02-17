@@ -1,44 +1,17 @@
 import http
-import signal
-from http.server import BaseHTTPRequestHandler, HTTPServer
+import re
 from pathlib import Path
-from threading import Thread
-from typing import Any, Self
+from typing import Self, Tuple
 
-from meta_sched.names.name_provider import NameProvider, UniqueNameProvider
+from flask import Flask, Response, jsonify, request
+
+from meta_sched.names.name_provider import UniqueNameProvider
 
 
 class Daemon:
-    class _Server(HTTPServer):
-        def __init__(
-            self: Self,
-            server_address: Any,
-            name_provider: NameProvider,
-            handler_class: Any,
-            bind_and_activate: bool = True,
-        ) -> None:
-            self.__name_provider = name_provider
-            super().__init__(server_address, handler_class, bind_and_activate)
-
-        @property
-        def name_provider(self: Self) -> NameProvider:
-            return self.__name_provider
-
-    class _Handler(BaseHTTPRequestHandler):
-        def do_GET(self: Self) -> None:
-            key = str(self.path)[1:]
-            if len(key) > 50 or any(not (c.isalnum() or c in ["-_"]) for c in key):
-                self.send_error(http.HTTPStatus.BAD_REQUEST, "Path is not a valid key!")
-                return
-            server = self.server
-            assert isinstance(server, Daemon._Server)
-            name = server.name_provider.get_new_name(key)
-            self.send_response(http.HTTPStatus.OK)
-            self.send_header("Content-type", "text/plain")
-            self.end_headers()
-            self.wfile.write(name.encode())
-
     def __init__(self: Self, host: str, port: int, path: Path) -> None:
+        self.__host = host
+        self.__port = port
         print(f"Starting {__name__}.{self.__class__.__name__} at http://{host}:{port}")
         self.__path = path
         print(f"State stored at {self.__path}")
@@ -46,17 +19,25 @@ class Daemon:
         self.__name_provider = UniqueNameProvider()
         self.__path.touch()
         self.__name_provider.load(self.__path)
-        self.__server = self._Server((host, port), self.__name_provider, self._Handler)
+        self.__app = Flask(f"{__package__}.{self.__class__.__name__}")
+        self.__app.route("/", methods=["GET"])(self.get_new_name)
 
-    def shutdown(self: Self, signum: int = signal.SIGINT, frame: Any = None) -> None:
-        self.__server.shutdown()
+    def get_new_name(self: Self) -> Tuple[Response, http.HTTPStatus]:
+        prefix = request.args.get("prefix", default="", type=str)
+        pattern = "^[a-zA-Z0-9-_]+$"
+        max_prefix_len = 50
+        if not re.match(pattern, prefix) or len(prefix) > max_prefix_len:
+            return jsonify(
+                dict(
+                    status="fail",
+                    data=dict(
+                        prefix=f'Argument "prefix" must not exceed a length of {max_prefix_len} and match {pattern}'
+                    ),
+                )
+            ), http.HTTPStatus.BAD_REQUEST
+        name = self.__name_provider.get_new_name(prefix)
+        return jsonify(dict(status="success", data=name)), http.HTTPStatus.OK
 
     def run(self: Self) -> int:
-        thread = Thread(target=self.__server.serve_forever)
-        thread.daemon = True
-        thread.start()
-        signal.signal(signal.SIGINT, self.shutdown)
-        signal.signal(signal.SIGTERM, self.shutdown)
-        thread.join()
-        self.__name_provider.save(self.__path)
+        self.__app.run(host=self.__host, port=self.__port)
         return 0

@@ -37,7 +37,7 @@ class Daemon:
         os.chdir(Path.home())
 
     def __run_executor(
-        self: Self, job_spec: str, uid: int, local_array_id: int, array_idx: int
+        self: Self, job_spec: str, uid: int, array_id: int, array_idx: int
     ) -> None:
         Daemon.__switch_user(uid)
         # TODO only for debugging
@@ -50,7 +50,7 @@ class Daemon:
         Executor.from_job_spec(
             job_spec,
             scheduler,
-            local_array_id,
+            array_id,
             array_idx,
             redirect_output=True,
         ).run()
@@ -78,7 +78,7 @@ class Daemon:
             p = Process(target=self.__run_executor, args=(job_spec, uid, array_id, i))
             p.start()
             self.__processes.append(p)
-        return f"JOBS {job_spec}/output-{array_id}-*"
+        return f"JOBS {job_spec}/{array_id}-*"
 
     def run(self: Self) -> int:
         # Ensure that other users can create lock files

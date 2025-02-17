@@ -1,0 +1,12 @@
+{
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Daemons",
+            "type": "node-terminal",
+            "preLaunchTask": "Sync project",
+            "command": "scripts/run_daemons.sh",
+            "request": "launch"
+        }
+    ]
+}

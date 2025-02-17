@@ -29,9 +29,9 @@ class JobSpec(dict[str, Any]):
 
     @property
     def output(self: Self) -> Path | None:
-        if "local_array_id" not in self or "array_idx" not in self:
+        if "array_id" not in self or "array_idx" not in self:
             return None
-        return self.__path / f"output-{self['local_array_id']}-{self['array_idx']}"
+        return self.__path / f"{self['array_id']}-{self['array_idx']}"
 
     @property
     def input(self: Self) -> Path:
