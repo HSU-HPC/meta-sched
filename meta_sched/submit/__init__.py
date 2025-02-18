@@ -14,7 +14,8 @@ def run_cli() -> int:
 def run_daemon() -> int:
     try_become_root(True)
     client = Client(env.get("MS_API_HOST"), int(env.get("MS_API_PORT")))
-    return Daemon(
+    Daemon(
         Path(env.get("MS_SUBMITD_SOCKET")),
         client.create_array_id,
     ).run()
+    return 0

@@ -39,6 +39,7 @@ class Server(object):
             return  # Already listening
         # Remove any old socket file
         self.__socket_path.unlink(missing_ok=True)
+        self.__socket_path.parent.mkdir(parents=True, exist_ok=True)
         server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
         server.bind(str(self.__socket_path.absolute()))
         # Make the socket accessible to all users

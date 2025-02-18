@@ -80,7 +80,7 @@ class Daemon:
             self.__processes.append(p)
         return f"JOBS {job_spec}/{array_id}-*"
 
-    def run(self: Self) -> int:
+    def run(self: Self) -> None:
         # Ensure that other users can create lock files
         lock_file_dir = LockFile.get_base_path() / "meta-sched"
         lock_file_dir.mkdir(exist_ok=True)
@@ -93,4 +93,7 @@ class Daemon:
                 # Clean up finished processes
                 self.__processes = [p for p in self.__processes if p.is_alive()]
 
-        return 0
+    def start_process(self: Self) -> Process:
+        process = Process(target=self.run)
+        process.start()
+        return process

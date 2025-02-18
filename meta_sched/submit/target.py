@@ -13,10 +13,11 @@ from meta_sched.submit.job import JobSpec
 
 
 class Target(abc.ABC):
-    def __init__(self: Self, id: str, host: str, port: int = 22) -> None:
+    def __init__(self: Self, id: str, host: str, port: int = 22, **kwargs: Any) -> None:
         self.__id = id
-        self.__host = host
-        self.__port = port
+        self.__host = host  # TODO unused (Use in paramiko query?)
+        self.__port = port  # TODO unused (Use in paramiko query?)
+        print("Got unused kwargs", kwargs)  # TODO
 
     @property
     def id(self: Self) -> str:

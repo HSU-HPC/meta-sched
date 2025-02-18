@@ -5,7 +5,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, List, Self, Type
 
-from meta_sched.scheduler.base import Scheduler
+from meta_sched.scheduler import Scheduler
 from meta_sched.submit.target import Target
 
 
@@ -76,9 +76,7 @@ class Config:
         scheduler_class = Scheduler
         module_name, class_name = config["scheduler_class"].split(".")
         try:
-            module = importlib.import_module(
-                f"meta_sched.schedule.scheduler.{module_name}"
-            )
+            module = importlib.import_module(f"meta_sched.scheduler.{module_name}")
             scheduler_class = getattr(module, class_name)
         except (ModuleNotFoundError, AttributeError):
             raise ValueError(f'Could not load scheduler "{config["scheduler_class"]}"')
@@ -101,7 +99,8 @@ class Config:
                 )
         require_config(config, ["targets", None, "host"], str)
         require_config(config, ["targets", None, "batch"], str, ["slurm"])
+        targets = [Target(**kwargs) for kwargs in config["targets"]]
 
         return cls(
-            scheduler_class, Path(config["counter_file"]), config["targets"]
+            scheduler_class, Path(config["counter_file"]), targets
         )  # TODO parse targets as targets

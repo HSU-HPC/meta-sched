@@ -15,6 +15,7 @@ dependencies = [
 ms-submit  = "meta_sched.submit:run_cli"
 ms-submitd = "meta_sched.submit:run_daemon"
 ms-api     = "meta_sched.api:run_server"
+ms-service = "meta_sched:run_service"
 
 [build-system]
 requires      = ["poetry-core"]

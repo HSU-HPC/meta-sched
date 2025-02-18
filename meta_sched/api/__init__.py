@@ -1,4 +1,5 @@
 import http
+from multiprocessing import Process
 from os import PathLike
 from pathlib import Path
 from typing import Any, Self, Tuple
@@ -8,14 +9,11 @@ from flask import Flask, Response, jsonify, request
 from meta_sched import env
 from meta_sched.api.counter import PersistentCounter
 from meta_sched.config import Config
-from meta_sched.scheduler.base import Scheduler
+from meta_sched.scheduler import Scheduler
 from meta_sched.utils import try_become_root
 
 
 class API:
-    PATH_JOBS = "/jobs"
-    PATH_TARGETS = "/targets"
-
     def __init__(
         self: Self, host: str, port: int, config_path: str | PathLike[Any]
     ) -> None:
@@ -23,15 +21,17 @@ class API:
         self.__port = port
         self.__app = Flask(f"{self.__class__.__qualname__}")
         self.__config = Config.load(config_path)
-        self.__scheduler: Scheduler = self.__config.scheduler_class(self.__config)
+        self.__scheduler: Scheduler = self.__config.scheduler_class(
+            self.__config.targets
+        )
         self.__config.counter_file.parent.mkdir(parents=True, exist_ok=True)
         self.__counter = PersistentCounter()
         self.__config.counter_file.touch()
         self.__counter.load(self.__config.counter_file)
-        self.__app.route(API.PATH_TARGETS, methods=["GET"])(self.get_targets)
+        self.__app.route("/targets", methods=["GET"])(self.get_targets)
         # Globally unique job ids (TODO could use authentication to add meta-data/manipulate)
-        self.__app.route(API.PATH_JOBS, methods=["POST"])(self.create_array_id)
-        self.__app.route(API.PATH_JOBS, methods=["PUT"])(self.request_schedule)
+        self.__app.route("/jobs", methods=["POST"])(self.create_array_id)
+        self.__app.route("/jobs", methods=["PUT"])(self.request_schedule)
 
     def get_targets(self: Self) -> Tuple[Response, http.HTTPStatus]:
         return jsonify(
@@ -39,9 +39,9 @@ class API:
         ), http.HTTPStatus.OK
 
     def create_array_id(self: Self) -> Tuple[Response, http.HTTPStatus]:
-        return jsonify(
-            dict(status="success", data=self.__counter.get_next("job"))
-        ), http.HTTPStatus.CREATED
+        array_id = self.__counter.get_next("job")
+        self.__counter.save(self.__config.counter_file)
+        return jsonify(dict(status="success", data=array_id)), http.HTTPStatus.CREATED
 
     def request_schedule(self: Self) -> Tuple[Response, http.HTTPStatus]:
         data = request.json
@@ -72,19 +72,23 @@ class API:
         decision = self.__scheduler.request_schedule(job_spec, suitable_targets)
         return jsonify(dict(status="success", data=decision)), http.HTTPStatus.OK
 
-    def run(self: Self) -> int:
+    def run(self: Self) -> None:
         print(
             f"Starting {self.__class__.__qualname__} at http://{self.__host}:{self.__port}"
         )
         self.__app.run(host=self.__host, port=self.__port)
-        return 0
+
+    def start_process(self: Self) -> Process:
+        process = Process(target=self.run)
+        process.start()
+        return process
 
 
 def run_server() -> int:
-    try_become_root()
-    api = API(
+    try_become_root(True)
+    API(
         env.get("MS_API_HOST"),
         int(env.get("MS_API_PORT")),
         Path(env.get("MS_SCHEDD_CONFIG")).absolute(),
-    )
-    return api.run()  # TODO do not run forever (Ctrl+C -> store counter)
+    ).run()
+    return 0
