@@ -2,10 +2,10 @@
     "version": "0.2.0",
     "configurations": [
         {
-            "name": "Daemons",
+            "name": "Run service",
             "type": "node-terminal",
             "preLaunchTask": "Sync project",
-            "command": "scripts/run_daemons.sh",
+            "command": "scripts/run_service.sh",
             "request": "launch"
         }
     ]

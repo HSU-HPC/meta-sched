@@ -30,8 +30,3 @@ class RedirectOutputToFile:
             sys.stderr.flush()
             sys.stderr.close()
             sys.stderr = self.__stderr
-
-
-class InstantiationException(Exception):
-    def __init__(self: Self, obj: object) -> None:
-        super().__init__(obj.__class__)

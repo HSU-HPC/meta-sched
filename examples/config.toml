@@ -4,10 +4,10 @@ counter_file="/var/lib/meta-sched/namesd.json"
 [[targets]]
 id="ca0032c4-4573-4298-857e-6ba750883bb3"
 host="hsuper-login01.hsu-hh.de"
-batch="slurm"
+batch_system="slurm"
 partition="dev"
 
 [[targets]]
 id="256b4c0e-c6b7-41da-a35d-03382428528a"
 host="windhpc00.hsu-hh.de"
-batch="slurm"
+batch_system="slurm"

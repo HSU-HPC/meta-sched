@@ -1,6 +1,7 @@
 import os
 import sys
 from pathlib import Path
+from typing import Self
 
 
 def try_become_root(required: bool = False) -> None:
@@ -11,3 +12,8 @@ def try_become_root(required: bool = False) -> None:
         elif required:
             print("Must be run as root (Add argument --sudo)")
             sys.exit(1)
+
+
+class InstantiationException(Exception):
+    def __init__(self: Self, obj: object) -> None:
+        super().__init__(obj.__class__)

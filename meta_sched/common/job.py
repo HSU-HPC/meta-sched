@@ -2,19 +2,19 @@ import tomllib
 from pathlib import Path
 from typing import Any, List, Self
 
-from meta_sched.submit.utils import InstantiationException
+from meta_sched.common.utils import InstantiationException
 
 
-class JobSpec(dict[str, Any]):
+class Spec(dict[str, Any]):
     __create_key = object()
 
     def __init__(self: Self, create_key: object, path: Path) -> None:
-        if create_key != JobSpec.__create_key:
+        if create_key != Spec.__create_key:
             raise InstantiationException(self)
         if not path.is_dir():
             raise ValueError("Job spec path must be a directory")
         self.__name = path.name
-        kvs = tomllib.loads((path / "job.toml").read_text())
+        kvs = tomllib.loads((path / "spec.toml").read_text())
         for k, v in kvs.items():
             self[k] = v
         self.__path = self.get_jobs_dir() / self.__name
@@ -43,7 +43,7 @@ class JobSpec(dict[str, Any]):
 
     @staticmethod
     def list() -> List[str]:
-        return [p.name for p in JobSpec.get_jobs_dir().iterdir() if p.is_dir()]
+        return [p.name for p in Spec.get_jobs_dir().iterdir() if p.is_dir()]
 
     @classmethod
     def load(cls, spec: str) -> Self:

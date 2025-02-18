@@ -12,9 +12,9 @@ dependencies = [
 ]
 
 [project.scripts]
-ms-submit  = "meta_sched.submit:run_cli"
-ms-submitd = "meta_sched.submit:run_daemon"
-ms-api     = "meta_sched.api:run_server"
+ms-submit  = "meta_sched:run_submit"
+ms-submitd = "meta_sched:run_submitd"
+ms-api     = "meta_sched:serve_api"
 ms-service = "meta_sched:run_service"
 
 [build-system]

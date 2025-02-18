@@ -3,8 +3,8 @@ import sys
 from pathlib import Path
 from typing import Self
 
+from meta_sched.common.job import Spec
 from meta_sched.submit import ipc
-from meta_sched.submit.job import JobSpec
 
 
 class CLI:
@@ -17,7 +17,7 @@ class CLI:
         try:
             job_spec = argv[0]
             os.chdir(Path.home())
-            JobSpec.load(job_spec)
+            Spec.load(job_spec)
             array_size = int(argv[1])
             assert array_size > 0
         except (ValueError, IndexError, AssertionError):

@@ -5,8 +5,8 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, List, Self, Type
 
+from meta_sched.common.target import Target, TargetFactory
 from meta_sched.scheduler import Scheduler
-from meta_sched.submit.target import Target
 
 
 class Config:
@@ -98,9 +98,7 @@ class Config:
                     f"Targets must have unique ids, but found multiple occurances of {id}"
                 )
         require_config(config, ["targets", None, "host"], str)
-        require_config(config, ["targets", None, "batch"], str, ["slurm"])
-        targets = [Target(**kwargs) for kwargs in config["targets"]]
+        require_config(config, ["targets", None, "batch_system"], str, ["slurm"])
+        targets = [TargetFactory.create(**kwargs) for kwargs in config["targets"]]
 
-        return cls(
-            scheduler_class, Path(config["counter_file"]), targets
-        )  # TODO parse targets as targets
+        return cls(scheduler_class, Path(config["counter_file"]), targets)

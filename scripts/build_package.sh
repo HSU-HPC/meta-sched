@@ -5,9 +5,11 @@ set -e
 SCRIPT_PATH="$(readlink -f "$0")"
 cd "$(dirname "$(dirname "$SCRIPT_PATH")")"
 
-echo "=== Syncing project ==="
+echo "=== Sync project ==="
 uv sync
 uv lock
 
-echo "=== Building package ==="
+echo "=== Build package ==="
 uv build
+
+echo "=== Done ==="

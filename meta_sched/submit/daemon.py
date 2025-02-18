@@ -4,24 +4,19 @@ import os
 import subprocess
 from multiprocessing import Process
 from pathlib import Path
-from typing import Callable, List, Self, Tuple
+from typing import List, Self, Tuple
 
+from meta_sched.common.scheduler_interface import SchedulerInterface as Scheduler
 from meta_sched.submit import ipc
 from meta_sched.submit.executor import Executor
 from meta_sched.submit.lock_file import LockFile
 
-# TODO eventually replace with RestAPI
-from meta_sched.submit.scheduler_interface import Dummy as Scheduler
-from meta_sched.submit.target import SlurmTarget
-
 
 class Daemon:
-    def __init__(
-        self: Self, socket_path: Path, create_array_id: Callable[[], str]
-    ) -> None:
+    def __init__(self: Self, socket_path: Path, scheduler: Scheduler) -> None:
         self.__processes: List[Process] = []
         self.__socket_path = socket_path
-        self.create_array_id = create_array_id
+        self.__scheduler = scheduler
 
     @staticmethod
     def __switch_user(uid: int) -> None:
@@ -40,16 +35,9 @@ class Daemon:
         self: Self, job_spec: str, uid: int, array_id: int, array_idx: int
     ) -> None:
         Daemon.__switch_user(uid)
-        # TODO only for debugging
-        scheduler = Scheduler(
-            SlurmTarget(
-                id="256b4c0e-c6b7-41da-a35d-03382428528a",
-                host="windhpc00.hsu-hh.de",
-            )
-        )
         Executor.from_job_spec(
             job_spec,
-            scheduler,
+            self.__scheduler,
             array_id,
             array_idx,
             redirect_output=True,
@@ -69,7 +57,7 @@ class Daemon:
         uid = ids[1]
         array_id = ""
         try:
-            array_id = self.create_array_id()
+            array_id = self.__scheduler.create_array_id()
         except Exception:
             print("Failed!")
             return "FAILED"

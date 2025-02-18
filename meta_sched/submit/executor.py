@@ -4,12 +4,13 @@ import time
 import traceback
 from typing import Self
 
-from meta_sched.submit import scheduler_interface
-from meta_sched.submit.job import JobSpec
+from meta_sched.common import scheduling_decision
+from meta_sched.common.job import Spec
+from meta_sched.common.scheduler_interface import SchedulerInterface
+from meta_sched.common.target import Target
+from meta_sched.common.utils import InstantiationException
 from meta_sched.submit.lock_file import LockFile
-from meta_sched.submit.scheduler_interface import SchedulingDecision
-from meta_sched.submit.target import Target
-from meta_sched.submit.utils import InstantiationException, RedirectOutputToFile
+from meta_sched.submit.utils import RedirectOutputToFile
 
 
 class Executor:
@@ -18,8 +19,8 @@ class Executor:
     def __init__(
         self,
         create_key: object,
-        job_spec: JobSpec,
-        scheduler: scheduler_interface.Base,
+        job_spec: Spec,
+        scheduler: SchedulerInterface,
         redirect_output: bool = False,
     ) -> None:
         if create_key != Executor.__create_key:
@@ -29,29 +30,35 @@ class Executor:
         self.__redirect_output = redirect_output
 
     def __run(self: Self) -> None:
-        # 1. Select suitable targets
-        suitable_targets = self.__scheduler.targets
+        print("=== 1. Selecting suitable targets for job ===", file=sys.stderr)
+        suitable_targets = {t.id: t for t in self.__scheduler.targets}
         # Must be in config
         suitable_targets = {k: v for k, v in suitable_targets.items() if v.has_user}
-        # 2. Await/poll* meta scheduler scheduled
+        print(
+            "=== 2. Requesting scheduling for job using suitable targets ===",
+            file=sys.stderr,
+        )
         target: Target | None = None
         while not target:
-            scheduling_decision = self.__scheduler.request_schedule(
-                self.__job_spec, suitable_targets.keys()
+            decision = self.__scheduler.request_schedule(
+                self.__job_spec, list(suitable_targets.keys())
             )
-            match scheduling_decision:
-                case SchedulingDecision.Impossible():
+            match decision:
+                case scheduling_decision.Impossible():
                     print("Can't schedule", file=sys.stderr)
                     return
-                case SchedulingDecision.Deferred():
-                    wait_seconds = max(1, scheduling_decision.wait_seconds)
-                    print(f"Scheduling deferred (Re-attempting in {wait_seconds} sec)")
+                case scheduling_decision.Assigned():  # Must come before Deferred, because is child class
+                    target = suitable_targets[decision.target_id]
+                case scheduling_decision.Deferred():
+                    wait_seconds = max(1, decision.wait_seconds)
+                    print(
+                        f"Scheduling deferred (Re-attempting in {wait_seconds} sec)",
+                        file=sys.stderr,
+                    )
                     time.sleep(wait_seconds)
-                case SchedulingDecision.Assigned():
-                    target = suitable_targets[scheduling_decision.target_id]
                 case _:
                     raise NotImplementedError()
-        # 3. Copy to target
+        print(f"=== 3. Copying input files to target {target.id} ===", file=sys.stderr)
         with LockFile(
             f"meta-sched/{os.getuid()}/{target.id}:{self.__job_spec.name}.lock"
         ):
@@ -59,19 +66,23 @@ class Executor:
             dst = self.__job_spec.input.parent
             if 0 != target.transfer(src, dst, Target.TransferMode.UPLOAD):
                 return
-        # 4. Run job on target
+        print(f"=== 4. Executing job on target {target.id} ===", file=sys.stderr)
         # TODO Consider alternative:
         # Instead of running an interactive job on the target
         # * Create and submit a batch job
         # * Monitor the job state on the target
         # * Update the scheduler about the job state
-        target.execute(self.__job_spec)
-        # 5. Copy back results
+        status = target.execute(self.__job_spec)
+        if 0 != status:
+            return
+        print(f"=== 5. Fetching results from target {target.id} ===", file=sys.stderr)
         assert self.__job_spec.output
         src = self.__job_spec.output
         dst = self.__job_spec.output.parent
-        target.transfer(src, dst, Target.TransferMode.DOWNLOAD)
-        # 6. Clean up on target
+        status = target.transfer(src, dst, Target.TransferMode.DOWNLOAD)
+        if 0 != status:
+            return
+        print(f"=== 6. Cleaning up files on target {target.id} ===", file=sys.stderr)
         target.clean_up(self.__job_spec)
         #
         # TODO Use smart/exp. back-off when polling
@@ -79,7 +90,6 @@ class Executor:
         pass
 
     def run(self: Self) -> None:
-        # TODO continue here
         assert self.__job_spec.output
         self.__job_spec.output.mkdir(parents=True, exist_ok=True)
         kwargs = (
@@ -100,12 +110,12 @@ class Executor:
     def from_job_spec(
         cls,
         spec: str,
-        scheduler: scheduler_interface.Base,
+        scheduler: SchedulerInterface,
         array_id: int,
         array_idx: int,
         redirect_output: bool = False,
     ) -> Self:
-        job_spec = JobSpec.load(spec)
+        job_spec = Spec.load(spec)
         job_spec["array_id"] = array_id
         job_spec["array_idx"] = array_idx
         return cls(cls.__create_key, job_spec, scheduler, redirect_output)
