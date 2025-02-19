@@ -1,51 +1,68 @@
+import sys
 import tomllib
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List, Self
 
-from meta_sched.common.utils import InstantiationException
+from meta_sched.common.utils import time_to_seconds
 
 
-class Spec(dict[str, Any]):
-    __create_key = object()
+def _get_jobs_dir() -> Path:
+    return Path("meta-sched/jobs")
 
-    def __init__(self: Self, create_key: object, path: Path) -> None:
-        if create_key != Spec.__create_key:
-            raise InstantiationException(self)
-        if not path.is_dir():
-            raise ValueError("Job spec path must be a directory")
-        self.__name = path.name
-        kvs = tomllib.loads((path / "spec.toml").read_text())
-        for k, v in kvs.items():
-            self[k] = v
-        self.__path = self.get_jobs_dir() / self.__name
 
-    @property
-    def is_valid(self: Self) -> bool:
-        raise NotImplementedError()
-
-    @property
-    def name(self: Self) -> str:
-        return self.__name
-
-    @property
-    def output(self: Self) -> Path | None:
-        if "array_id" not in self or "array_idx" not in self:
-            return None
-        return self.__path / f"{self['array_id']}-{self['array_idx']}"
-
-    @property
-    def input(self: Self) -> Path:
-        return self.__path / "input"
-
-    @staticmethod
-    def get_jobs_dir() -> Path:
-        return Path("meta-sched/jobs")
+class Spec:
+    def __init__(
+        self: Self,
+        name: str,
+        executable: str,
+        time: str | int,
+        array_size: int = 1,
+        nodes: int = 1,
+        ranks: int = 1,
+        cores_per_rank: int = 1,
+        required_modules: List[str] = [],
+        **kwargs: Any,
+    ) -> None:
+        self.name = name
+        self.executable = executable
+        self.array_size = array_size
+        self.nodes = nodes
+        self.ranks = ranks
+        self.cores_per_rank = cores_per_rank
+        self.required_modules = required_modules
+        if array_size < 0:
+            raise ValueError('"array_size" must be at least 1')
+        self.time = time_to_seconds(time)
+        print(__file__, "Got unused kwargs", kwargs, file=sys.stderr)  # TODO
 
     @staticmethod
     def list() -> List[str]:
-        return [p.name for p in Spec.get_jobs_dir().iterdir() if p.is_dir()]
+        return [p.name for p in _get_jobs_dir().iterdir() if p.is_dir()]
 
     @classmethod
-    def load(cls, spec: str) -> Self:
-        job_path = cls.get_jobs_dir() / spec
-        return cls(cls.__create_key, job_path)
+    def load(cls, name: str) -> Self:
+        path = _get_jobs_dir() / name
+        if not path.is_dir():
+            raise ValueError("Job spec path must be a directory")
+        kwargs = tomllib.loads((path / "spec.toml").read_text())
+        return cls(name=name, **kwargs)
+
+
+@dataclass(frozen=True)
+class Instance:
+    spec: Spec
+    array_id: str
+    array_idx: int
+
+    @property
+    def output(self: Self) -> Path:
+        return self.__local_path / f"output/{self.array_id}/{self.array_idx}"
+
+    @property
+    def input(self: Self) -> Path:
+        return self.__local_path / "input"
+
+    @property
+    def __local_path(self: Self) -> Path:
+        return _get_jobs_dir() / self.spec.name

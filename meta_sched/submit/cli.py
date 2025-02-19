@@ -17,11 +17,9 @@ class CLI:
         try:
             job_spec = argv[0]
             os.chdir(Path.home())
-            Spec.load(job_spec)
-            array_size = int(argv[1])
-            assert array_size > 0
-        except (ValueError, IndexError, AssertionError):
-            print("Usage: ms-submit JOB_SPEC ARRAY_SIZE")
+            array_size = Spec.load(job_spec).array_size
+        except IndexError:
+            print("Usage: ms-submit JOB_SPEC")
             return 1
         except FileNotFoundError:
             print("No such job spec:", job_spec)

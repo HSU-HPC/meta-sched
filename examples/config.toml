@@ -2,12 +2,25 @@ scheduler_class="round_robin.RRScheduler"
 counter_file="/var/lib/meta-sched/namesd.json"
 
 [[targets]]
+# https://portal.hpc.hsu-hh.de/documentation/hsuper/partitions/
 id="ca0032c4-4573-4298-857e-6ba750883bb3"
 host="hsuper-login01.hsu-hh.de"
 batch_system="slurm"
-partition="dev"
+partition="small"
+# TODO make sure types are actually ints
+nodes=571
+cores_per_node=72
+max_time="72:00:00"
+max_nodes=5
+[targets.module_map]
+MPI = "intel-oneapi-mpi"
+
 
 [[targets]]
 id="256b4c0e-c6b7-41da-a35d-03382428528a"
 host="windhpc00.hsu-hh.de"
 batch_system="slurm"
+nodes=4
+cores_per_node=48
+[targets.module_map]
+MPI = "mpi"

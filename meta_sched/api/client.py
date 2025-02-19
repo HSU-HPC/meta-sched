@@ -35,7 +35,7 @@ class Client(SchedulerInterface):
         content = response.json()
         if content["status"] != "success":
             raise RuntimeError(content)
-        return str(content["data"])
+        return str(content["data"]["array_id"])
 
     def request_schedule(
         self: Self, job_spec: Spec, available_targets: List[str]
@@ -43,7 +43,7 @@ class Client(SchedulerInterface):
         response = requests.put(
             f"http://{self.__host}:{self.__port}/jobs",
             json=dict(
-                job_spec=job_spec,
+                job_spec=job_spec.__dict__,
                 available_targets=available_targets,
             ),
         )

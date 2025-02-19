@@ -6,6 +6,8 @@ from multiprocessing import Process
 from pathlib import Path
 from typing import List, Self, Tuple
 
+from meta_sched.common.job import Instance as Job
+from meta_sched.common.job import Spec
 from meta_sched.common.scheduler_interface import SchedulerInterface as Scheduler
 from meta_sched.submit import ipc
 from meta_sched.submit.executor import Executor
@@ -32,14 +34,13 @@ class Daemon:
         os.chdir(Path.home())
 
     def __run_executor(
-        self: Self, job_spec: str, uid: int, array_id: int, array_idx: int
+        self: Self, job_spec: str, uid: int, array_id: str, array_idx: int
     ) -> None:
         Daemon.__switch_user(uid)
-        Executor.from_job_spec(
-            job_spec,
+        job = Job(Spec.load(job_spec), array_id, array_idx)
+        Executor(
+            job,
             self.__scheduler,
-            array_id,
-            array_idx,
             redirect_output=True,
         ).run()
 
@@ -66,7 +67,7 @@ class Daemon:
             p = Process(target=self.__run_executor, args=(job_spec, uid, array_id, i))
             p.start()
             self.__processes.append(p)
-        return f"JOBS {job_spec}/{array_id}-*"
+        return f"JOBS {job_spec}/{array_id}-[1,{array_size})"
 
     def run(self: Self) -> None:
         # Ensure that other users can create lock files

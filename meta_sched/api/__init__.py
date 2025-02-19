@@ -7,6 +7,7 @@ from typing import Any, Self, Tuple
 from flask import Flask, Response, jsonify, request
 
 from meta_sched.api.counter import PersistentCounter
+from meta_sched.common.job import Spec
 from meta_sched.common.scheduler_interface import SchedulerInterface
 
 
@@ -37,9 +38,11 @@ class API:
         ), http.HTTPStatus.OK
 
     def create_array_id(self: Self) -> Tuple[Response, http.HTTPStatus]:
-        array_id = self.__counter.get_next("job")
+        counter_key = "job"
+        array_id = self.__counter.get_next(counter_key).split("-")[-1]
         self.__counter.save(self.__counter_file)
-        return jsonify(dict(status="success", data=array_id)), http.HTTPStatus.CREATED
+        data = dict(array_id=array_id)
+        return jsonify(dict(status="success", data=data)), http.HTTPStatus.CREATED
 
     def request_schedule(self: Self) -> Tuple[Response, http.HTTPStatus]:
         data = request.json
@@ -57,7 +60,7 @@ class API:
                     ),
                 )
             ), http.HTTPStatus.BAD_REQUEST
-        job_spec = data["job_spec"]
+        job_spec = Spec(**data["job_spec"])
         suitable_targets = data["available_targets"]
         target_ids = set([t.id for t in self.__scheduler.targets])
         if any([t not in target_ids for t in suitable_targets]):
