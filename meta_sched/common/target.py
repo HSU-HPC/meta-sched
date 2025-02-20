@@ -1,5 +1,4 @@
 import enum
-import sys
 from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, Self, Tuple
@@ -8,12 +7,12 @@ import invoke
 from fabric import Connection
 from fabric.config import Config
 
+from meta_sched.common import ssh
 from meta_sched.common.defaults import SSH_PORT
 from meta_sched.common.job import Instance as Job
 from meta_sched.common.job import Spec
 from meta_sched.common.serialization import Serializable
-from meta_sched.common.utils import seconds_to_time, time_to_seconds
-from meta_sched.common import ssh
+from meta_sched.common.utils import eprint, expect_ok, seconds_to_time, time_to_seconds
 
 
 class Target(Serializable):
@@ -42,7 +41,7 @@ class Target(Serializable):
         self.__max_time = None if max_time is None else time_to_seconds(max_time)
         self.__max_nodes = max_nodes
         self.__module_map = module_map
-        print(__file__, "Got unused kwargs", kwargs, file=sys.stderr)  # TODO
+        eprint(__file__, "Got unused kwargs", kwargs)  # TODO
 
     def to_dict(self: Self) -> Dict[str, Any]:
         return self.__dict | {"batch_system": self.batch_system}
@@ -50,6 +49,10 @@ class Target(Serializable):
     @property
     def id(self: Self) -> str:
         return self.__id
+
+    @property
+    def host(self: Self) -> str:
+        return self.__host
 
     @property
     def batch_system(self: Self) -> str:
@@ -88,13 +91,11 @@ class Target(Serializable):
         src: str | PathLike[Any],
         dst: str | PathLike[Any],
         mode: TransferMode,
-    ) -> int:
+    ) -> None:
         match mode:
             case self.TransferMode.UPLOAD:
                 with self._connect() as connection:
-                    status: int = connection.run(f"mkdir -p $(dirname {dst})").exited
-                    if 0 != status:
-                        return status
+                    expect_ok(connection.run(f"mkdir -p $(dirname {dst})").exited)
                 dst = f"{str(self.id)}:{dst}"
             case self.TransferMode.DOWNLOAD:
                 Path(dst).parent.mkdir(parents=True, exist_ok=True)
@@ -103,13 +104,12 @@ class Target(Serializable):
         cmd = f"rsync {' '.join(rsync_flags)} {src} {dst} 1>&2"
         result = invoke.run(cmd)
         assert result
-        return result.exited
+        expect_ok(result.exited)
 
-    def clean_up(self: Self, job: Job) -> int:
+    def clean_up(self: Self, job: Job) -> None:
         with self._connect() as connection:
             assert job.output
-            status: int = connection.run(f"rm -rf {job.output}").exited
-            return status
+            expect_ok(connection.run(f"rm -rf {job.output}").exited)
 
     def _connect(self: Self) -> Connection:
         connect_kwargs = dict(allow_agent=False, look_for_keys=False)
@@ -119,12 +119,8 @@ class Target(Serializable):
             target_ssh_config["hostname"] if "hostname" in target_ssh_config else None
         )
         if host != self.__host:
-            print(
-                f"Warning: Host missmatch for {self.id}:",
-                host,
-                "!=",
-                self.__host,
-                file=sys.stderr,
+            eprint(
+                f"Warning: HostName missmatch for {self.id}:", host, "!=", self.__host
             )
         if self.__port != SSH_PORT and (
             "port" not in target_ssh_config
@@ -138,10 +134,10 @@ class Target(Serializable):
 
     def _execute_batch_system(
         self: Self, connection: Connection, job_spec: Spec, env: Dict[str, Any] = {}
-    ) -> int:
+    ) -> None:
         raise NotImplementedError()
 
-    def execute(self: Self, job: Job) -> int:
+    def execute(self: Self, job: Job) -> None:
         with self._connect() as connection:
             assert job.output
             connection.run(f"mkdir -p {job.output}")
@@ -153,11 +149,9 @@ class Target(Serializable):
             )
             for module in job.spec.required_modules:
                 module = self.__module_map[module]
-                status: int = connection.run(f"ml {module}").exited
-                if 0 != status:
-                    return status
+                expect_ok(connection.run(f"ml {module}").exited)
             with connection.cd(job.output):
-                return self._execute_batch_system(connection, job.spec, env)
+                self._execute_batch_system(connection, job.spec, env)
 
 
 class SlurmTarget(Target):
@@ -171,14 +165,13 @@ class SlurmTarget(Target):
 
     def _execute_batch_system(
         self: Self, connection: Connection, job_spec: Spec, env: Dict[str, Any] = {}
-    ) -> int:
+    ) -> None:
         argv = ["srun"]
         if self.partition:
             argv.append(f"--partition={self.partition}")
         argv.append(f"--time={seconds_to_time(job_spec.time)}")
         argv.append(job_spec.executable)
-        status: int = connection.run(" ".join(argv), warn=True, env=env).exited
-        return status
+        expect_ok(connection.run(" ".join(argv), warn=True, env=env).exited)
 
 
 class TargetFactory:

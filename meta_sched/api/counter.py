@@ -4,6 +4,8 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, Self
 
+from meta_sched.common.utils import eprint
+
 
 class PersistentCounter:
     def __init__(self) -> None:
@@ -15,7 +17,7 @@ class PersistentCounter:
         try:
             counters = json.loads(Path(path).read_text())
         except json.decoder.JSONDecodeError:
-            print("Could not load JSON from", path)
+            eprint("Could not load JSON from", path)
             return
         if (
             not isinstance(counters, dict)

@@ -11,8 +11,9 @@ input_file = Path(sys.argv[1])
 shift = int(sys.argv[2])
 output_file = Path() / input_file.with_suffix(f".c{shift}{input_file.suffix}").name
 
-print(f"Encrypting {input_file} with shift {shift} to {output_file}...", end="")
+print(f"Encrypting {input_file} with shift {shift}...")
 text = input_file.read_text()
 text = "".join([chr(ord(c) + shift) for c in text])
+print(f"Writing encrypted text to {output_file}...")
 output_file.write_text(text)
 print("Done!")

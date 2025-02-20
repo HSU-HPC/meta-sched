@@ -1,14 +1,65 @@
-import sys
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, List, Self
 
-from meta_sched.common.utils import time_to_seconds
+import pandas as pd
+
+from meta_sched.common.utils import eprint, time_to_seconds
 
 
-def _get_jobs_dir() -> Path:
+def get_jobs_dir() -> Path:
     return Path("meta-sched/jobs")
+
+
+def _get_job_output(job_spec: str, array_id: str, array_idx: int) -> Path:
+    return get_jobs_dir() / f"{job_spec}/output/{array_id}/{array_idx}"
+
+
+def get_job_outputs() -> pd.DataFrame:
+    _columns = ["job_spec", "array_id", "array_idx"]
+    df = eval("pd.DataFrame(columns=_columns)")  # Workaround pyright argument type
+
+    def get_pid(job_output_path: Path) -> int | None:
+        pid_file = job_output_path / ".pid"
+        if not pid_file.exists():
+            return None
+        try:
+            return int(pid_file.read_text())
+        except Exception:
+            return None
+
+    def get_status(job_output_path: Path) -> str | None:
+        status_file = job_output_path / ".status"
+        if not status_file.exists():
+            return None
+        return status_file.read_text().strip()
+
+    for p_job in get_jobs_dir().iterdir():
+        if not p_job.is_dir():
+            continue
+        job_spec = p_job.name
+        output_base_path = p_job / "output"
+        if not output_base_path.is_dir():
+            continue
+        for p_array in output_base_path.iterdir():
+            if not p_array.is_dir():
+                continue
+            array_id = p_array.name
+            for p_job in p_array.iterdir():
+                if not p_job.is_dir():
+                    continue
+                try:
+                    array_idx = int(p_job.name)
+                except ValueError:
+                    continue
+                df.loc[len(df)] = [job_spec, array_id, array_idx]
+    df["path"] = df.apply(lambda r: _get_job_output(*r), axis=1)
+    df["pid"] = df["path"].apply(get_pid).astype(float)
+    df["status"] = df["path"].apply(get_status).astype(str)
+    df.set_index(["array_id", "array_idx"], inplace=True)
+    df.sort_index(inplace=True)
+    return df
 
 
 class Spec:
@@ -34,15 +85,17 @@ class Spec:
         if array_size < 0:
             raise ValueError('"array_size" must be at least 1')
         self.time = time_to_seconds(time)
-        print(__file__, "Got unused kwargs", kwargs, file=sys.stderr)  # TODO
+        eprint(__file__, "Got unused kwargs", kwargs)  # TODO
 
     @staticmethod
     def list() -> List[str]:
-        return [p.name for p in _get_jobs_dir().iterdir() if p.is_dir()]
+        if not get_jobs_dir().is_dir():
+            return []
+        return [p.name for p in get_jobs_dir().iterdir() if p.is_dir()]
 
     @classmethod
     def load(cls, name: str) -> Self:
-        path = _get_jobs_dir() / name
+        path = get_jobs_dir() / name
         if not path.is_dir():
             raise ValueError("Job spec path must be a directory")
         kwargs = tomllib.loads((path / "spec.toml").read_text())
@@ -57,12 +110,8 @@ class Instance:
 
     @property
     def output(self: Self) -> Path:
-        return self.__local_path / f"output/{self.array_id}/{self.array_idx}"
+        return _get_job_output(self.spec.name, self.array_id, self.array_idx)
 
     @property
     def input(self: Self) -> Path:
-        return self.__local_path / "input"
-
-    @property
-    def __local_path(self: Self) -> Path:
-        return _get_jobs_dir() / self.spec.name
+        return get_jobs_dir() / self.spec.name / "input"

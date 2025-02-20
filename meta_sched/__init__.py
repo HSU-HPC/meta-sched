@@ -1,3 +1,4 @@
+import os
 import signal
 from pathlib import Path
 
@@ -22,7 +23,7 @@ def __get_api() -> API:
 def serve_api() -> int:
     try_become_root(False)
     __get_api().run()
-    return 0
+    return os.EX_OK
 
 
 def __get_submitd() -> Daemon:
@@ -35,7 +36,7 @@ def __get_submitd() -> Daemon:
 def run_submitd() -> int:
     try_become_root(True)
     __get_submitd().run()
-    return 0
+    return os.EX_OK
 
 
 def run_service() -> int:
@@ -50,8 +51,11 @@ def run_service() -> int:
     process_submitd.join()
     process_api.kill()  # terminate does not work for flask
     process_api.join()
-    return 0
+    return os.EX_OK
 
 
-def run_submit() -> int:
-    return CLI(Path(env.get("MS_SUBMITD_SOCKET"))).run()
+def run_cli() -> int:
+    host = env.get("MS_API_HOST")
+    port = int(env.get("MS_API_PORT"))
+    socket_path = Path(env.get("MS_SUBMITD_SOCKET"))
+    return CLI(socket_path, Client(host, port)).run()

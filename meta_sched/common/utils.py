@@ -1,6 +1,22 @@
 import os
 import sys
 from pathlib import Path
+from typing import Any
+
+
+def eprint(*args: Any, **kwargs: Any) -> None:
+    print(*args, **kwargs, file=sys.stderr)
+
+
+# /usr/include/sysexits.h
+class StatusException(Exception):
+    def __init__(self, status: int) -> None:
+        self.status = status
+
+
+def expect_ok(status: int) -> None:
+    if status != os.EX_OK:
+        raise StatusException(status)
 
 
 def try_become_root(required: bool = False) -> None:
@@ -9,8 +25,8 @@ def try_become_root(required: bool = False) -> None:
             argv = [] + Path(f"/proc/{os.getpid()}/cmdline").read_text().split("\0")
             os.execv("/usr/bin/sudo", argv)
         elif required:
-            print("Must be run as root (Add argument --sudo)")
-            sys.exit(1)
+            eprint("Must be run as root (Add argument --sudo)")
+            sys.exit(os.EX_NOPERM)
 
 
 def time_to_seconds(time: str | int) -> int:

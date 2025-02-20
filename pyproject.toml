@@ -8,11 +8,12 @@ requires-python = ">=3.12"
 dependencies = [
     "fabric>=3.2.2",
     "flask>=3.1.0",
+    "pandas>=2.2.3",
     "requests>=2.32.3",
 ]
 
 [project.scripts]
-ms-submit  = "meta_sched:run_submit"
+ms-cli  = "meta_sched:run_cli"
 ms-submitd = "meta_sched:run_submitd"
 ms-api     = "meta_sched:serve_api"
 ms-service = "meta_sched:run_service"
@@ -20,6 +21,9 @@ ms-service = "meta_sched:run_service"
 [build-system]
 requires      = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.poetry]
+include = ["examples"]
 
 [tool.uv]
 package = true
