@@ -1,4 +1,4 @@
-scheduler_class="round_robin.RRScheduler"
+scheduler_class="round_robin.RR"
 counter_file="/var/lib/meta-sched/namesd.json"
 
 [[targets]]

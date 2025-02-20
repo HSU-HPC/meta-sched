@@ -8,7 +8,6 @@ from fabric import Connection
 from fabric.config import Config
 
 from meta_sched.common import ssh
-from meta_sched.common.defaults import SSH_PORT
 from meta_sched.common.job import Instance as Job
 from meta_sched.common.job import Spec
 from meta_sched.common.serialization import Serializable
@@ -22,7 +21,7 @@ class Target(Serializable):
         host: str,
         nodes: int,
         cores_per_node: int,
-        port: int = SSH_PORT,
+        port: int = ssh.DEFAULT_PORT,
         max_time: str | int | None = None,
         max_nodes: int | None = None,
         module_map: Dict[str, str] = {},
@@ -122,7 +121,7 @@ class Target(Serializable):
             eprint(
                 f"Warning: HostName missmatch for {self.id}:", host, "!=", self.__host
             )
-        if self.__port != SSH_PORT and (
+        if self.__port != ssh.DEFAULT_PORT and (
             "port" not in target_ssh_config
             or int(target_ssh_config["port"]) != self.__port
         ):

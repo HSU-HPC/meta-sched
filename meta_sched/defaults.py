@@ -6,5 +6,3 @@ MS_API_HOST = "localhost"
 MS_API_PORT = 8001
 
 MS_SCHEDD_CONFIG = data.get_examples_dir() / "config.toml"
-
-SSH_PORT = 22

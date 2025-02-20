@@ -8,7 +8,6 @@ def eprint(*args: Any, **kwargs: Any) -> None:
     print(*args, **kwargs, file=sys.stderr)
 
 
-# /usr/include/sysexits.h
 class StatusException(Exception):
     def __init__(self, status: int) -> None:
         self.status = status

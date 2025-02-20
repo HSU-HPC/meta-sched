@@ -4,7 +4,7 @@ from pathlib import Path
 
 from meta_sched.api import API
 from meta_sched.api.client import Client
-from meta_sched.common import env
+from meta_sched import env
 from meta_sched.common.utils import try_become_root
 from meta_sched.config import Config
 from meta_sched.scheduler import Scheduler

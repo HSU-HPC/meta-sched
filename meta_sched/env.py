@@ -1,6 +1,6 @@
 import os
 
-from meta_sched.common import defaults
+from meta_sched import defaults
 
 __defaults = {k: defaults.__dict__[k] for k in dir(defaults) if not k.startswith("__")}
 

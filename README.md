@@ -2,9 +2,9 @@
 
 ## To-Dos
 - [ ] Job management
-    - [ ] Create (config)
+    - [x] Create (config)
     - [x] Submit
-    - [ ] List
+    - [x] List
     - [ ] Cancel
 - [ ] Job attributes (cores, time, MPI etc.)
 - [ ] Slurm support (partially done)

@@ -1,3 +1,4 @@
+import random
 import uuid
 from typing import List, Self
 
@@ -13,7 +14,7 @@ from meta_sched.scheduler import Scheduler
 
 class Dummy(Scheduler):
     def __init__(self: Self, targets: List[Target] = []) -> None:
-        self._targets = targets[:1]
+        self._targets = targets[:1] # Always only the first target (Good for debugging)
 
     def create_array_id(self: Self) -> str:
         return str(uuid.uuid4())
@@ -21,6 +22,7 @@ class Dummy(Scheduler):
     def request_schedule(
         self, job_spec: Spec, available_targets: List[str]
     ) -> SchedulingDecision:
+        random.shuffle(available_targets)
         for target_id in available_targets:
             if target_id in [t.id for t in self.targets]:
                 return Assigned(wait_seconds=0, target_id=target_id)
