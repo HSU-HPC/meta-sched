@@ -15,6 +15,10 @@
 - [ ] Code documentation
 - [ ] User documentation
 
+## Requirements
+- [uv](https://docs.astral.sh/uv/)
+- [rsync](https://rsync.samba.org/) or [OpenSSH](https://www.openssh.com/) for `scp`
+
 ## Getting started
 This project uses [uv](https://docs.astral.sh/uv/) as a project/package manager.
 1. Set up the project using `./script/sync_project.sh`.

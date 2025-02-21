@@ -8,6 +8,10 @@ def eprint(*args: Any, **kwargs: Any) -> None:
     print(*args, **kwargs, file=sys.stderr)
 
 
+# https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html
+EX_BASH_COMMAND_NOT_FOUND = 127
+
+
 class StatusException(Exception):
     def __init__(self, status: int) -> None:
         self.status = status

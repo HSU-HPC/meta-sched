@@ -29,6 +29,7 @@ class RR(Scheduler):
         self.__job_count[target_ids[selected]] += 1
         return Assigned(wait_seconds=0, target_id=target_ids[selected])
 
+
 class StochasticRR(Scheduler):
     def __init__(self: Self, targets: List[Target] = []) -> None:
         self._targets = targets

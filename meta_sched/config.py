@@ -98,7 +98,9 @@ class Config:
                     f"Targets must have unique ids, but found multiple occurances of {id}"
                 )
         require_config(config, ["targets", None, "host"], str)
-        require_config(config, ["targets", None, "batch_system"], str, ["slurm"])
+        require_config(
+            config, ["targets", None, "batch_system"], str, ["slurm", "none"]
+        )
         targets = [TargetFactory.create(**kwargs) for kwargs in config["targets"]]
 
         return cls(scheduler_class, Path(config["counter_file"]), targets)

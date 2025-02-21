@@ -14,7 +14,7 @@ from meta_sched.scheduler import Scheduler
 
 class Dummy(Scheduler):
     def __init__(self: Self, targets: List[Target] = []) -> None:
-        self._targets = targets[:1] # Always only the first target (Good for debugging)
+        self._targets = targets[:1]  # Always only the first target (Good for debugging)
 
     def create_array_id(self: Self) -> str:
         return str(uuid.uuid4())

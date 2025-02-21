@@ -1,3 +1,4 @@
+import abc
 import enum
 from os import PathLike
 from pathlib import Path
@@ -11,7 +12,13 @@ from meta_sched.common import ssh
 from meta_sched.common.job import Instance as Job
 from meta_sched.common.job import Spec
 from meta_sched.common.serialization import Serializable
-from meta_sched.common.utils import eprint, expect_ok, seconds_to_time, time_to_seconds
+from meta_sched.common.utils import (
+    EX_BASH_COMMAND_NOT_FOUND,
+    eprint,
+    expect_ok,
+    seconds_to_time,
+    time_to_seconds,
+)
 
 
 class Target(Serializable):
@@ -43,7 +50,7 @@ class Target(Serializable):
         eprint(__file__, "Got unused kwargs", kwargs)  # TODO
 
     def to_dict(self: Self) -> Dict[str, Any]:
-        return self.__dict | {"batch_system": self.batch_system}
+        return self.__dict | {"batch_system": self.get_batch_system()}
 
     @property
     def id(self: Self) -> str:
@@ -53,8 +60,8 @@ class Target(Serializable):
     def host(self: Self) -> str:
         return self.__host
 
-    @property
-    def batch_system(self: Self) -> str:
+    @staticmethod
+    def get_batch_system() -> str:
         raise NotImplementedError()
 
     @property
@@ -94,21 +101,44 @@ class Target(Serializable):
         match mode:
             case self.TransferMode.UPLOAD:
                 with self._connect() as connection:
-                    expect_ok(connection.run(f"mkdir -p $(dirname {dst})").exited)
+                    expect_ok(
+                        connection.run(f"mkdir -p $(dirname {dst})", warn=True).exited
+                    )
                 dst = f"{str(self.id)}:{dst}"
             case self.TransferMode.DOWNLOAD:
                 Path(dst).parent.mkdir(parents=True, exist_ok=True)
                 src = f"{str(self.id)}:{src}"
-        rsync_flags = ["--archive", "--progress", "--verbose"]
+        ssh_options = ["StrictHostKeyChecking=no"]
+        ssh_options_str = " ".join(f"-o {o}" for o in ssh_options)
+        rsync_flags = [
+            "--archive",
+            "--progress",
+            "--verbose",
+            f'-e "ssh -p {self.__port} {ssh_options_str}"',
+        ]
         cmd = f"rsync {' '.join(rsync_flags)} {src} {dst} 1>&2"
-        result = invoke.run(cmd)
-        assert result
-        expect_ok(result.exited)
+        result = invoke.run(cmd, warn=True)
+        status = -1 if result is None else result.exited
+        if status == EX_BASH_COMMAND_NOT_FOUND:
+            eprint(
+                "rsync is not installed locally or on the target. (Falling back on scp.)"
+            )
+            scp_flags = [
+                "-P",
+                str(self.__port),
+                "-p",
+                "-r",
+                "-O",
+            ]
+            cmd = f"scp {' '.join(scp_flags)} {src} {dst} 1>&2"
+            result = invoke.run(cmd, warn=True, pty=False)
+        status = -1 if result is None else result.exited
+        expect_ok(status)
 
     def clean_up(self: Self, job: Job) -> None:
         with self._connect() as connection:
             assert job.output
-            expect_ok(connection.run(f"rm -rf {job.output}").exited)
+            expect_ok(connection.run(f"rm -rf {job.output}", warn=True).exited)
 
     def _connect(self: Self) -> Connection:
         connect_kwargs = dict(allow_agent=False, look_for_keys=False)
@@ -139,7 +169,7 @@ class Target(Serializable):
     def execute(self: Self, job: Job) -> None:
         with self._connect() as connection:
             assert job.output
-            connection.run(f"mkdir -p {job.output}")
+            expect_ok(connection.run(f"mkdir -p {job.output}", warn=True).exited)
             env = dict(
                 MS_ARRAY_ID=job.array_id,
                 MS_ARRAY_IDX=job.array_idx,
@@ -148,9 +178,28 @@ class Target(Serializable):
             )
             for module in job.spec.required_modules:
                 module = self.__module_map[module]
-                expect_ok(connection.run(f"ml {module}").exited)
+                expect_ok(connection.run(f"ml {module}", warn=True).exited)
             with connection.cd(job.output):
                 self._execute_batch_system(connection, job.spec, env)
+
+
+class DirectTarget(Target):
+    def __init__(self: Self, **kwargs: Any) -> None:
+        if "nodes" in kwargs and kwargs["nodes"] != 1:
+            eprint(
+                f"Target {self.id} of type {self.__class__.__name__} does not support multiple nodes"
+            )
+        super().__init__(**kwargs | {"nodes": 1})
+
+    @staticmethod
+    def get_batch_system() -> str:
+        return "none"
+
+    def _execute_batch_system(
+        self: Self, connection: Connection, job_spec: Spec, env: Dict[str, Any] = {}
+    ) -> None:
+        argv = [job_spec.executable]
+        expect_ok(connection.run(" ".join(argv), warn=True, env=env).exited)
 
 
 class SlurmTarget(Target):
@@ -158,8 +207,8 @@ class SlurmTarget(Target):
         self.partition = partition
         super().__init__(**kwargs)
 
-    @property
-    def batch_system(self: Self) -> str:
+    @staticmethod
+    def get_batch_system() -> str:
         return "slurm"
 
     def _execute_batch_system(
@@ -176,7 +225,11 @@ class SlurmTarget(Target):
 class TargetFactory:
     @staticmethod
     def create(batch_system: str, **kwargs: Any) -> Target:
-        target_cls = dict(
-            slurm=SlurmTarget,
-        )[batch_system]
-        return target_cls(**kwargs)
+        target_classes = [SlurmTarget, DirectTarget]
+        target_class: abc.ABCMeta = {
+            cls.get_batch_system(): cls
+            for cls in target_classes
+            if issubclass(cls, Target)
+        }[batch_system]
+        assert issubclass(target_class, Target)
+        return target_class(**kwargs)

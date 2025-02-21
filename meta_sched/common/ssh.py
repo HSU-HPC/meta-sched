@@ -6,6 +6,7 @@ from paramiko import SSHConfig
 
 DEFAULT_PORT = 22
 
+
 def get_config_paths() -> Tuple[Path, Path]:
     dir_path = Path.home() / ".ssh"
     base_config_path = dir_path / "config"
