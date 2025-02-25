@@ -12,6 +12,17 @@ def eprint(*args: Any, **kwargs: Any) -> None:
 EX_BASH_COMMAND_NOT_FOUND = 127
 
 
+def exponential_backoff(
+    count: int, offset: float = 0, maximum: float | None = 60, base: float = 2
+) -> float:
+    if count < 0:
+        raise ValueError()
+    time = offset + base**count
+    if maximum is not None:
+        time = min(time, maximum)
+    return time
+
+
 class StatusException(Exception):
     def __init__(self, status: int) -> None:
         self.status = status

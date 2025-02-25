@@ -30,6 +30,7 @@ class Daemon:
         os.environ["HOME"] = home
         for k, v in env_copy.items():
             os.environ[k] = v
+        os.setgid(uid)
         os.setuid(uid)
         os.chdir(Path.home())
 
@@ -64,10 +65,11 @@ class Daemon:
             return "FAILED"
         print("OK!")
         for i in range(1, array_size + 1):
+            # TODO consider fully daemonizing executor to avoid "orphan remote jobs" when the daemon process dies
             p = Process(target=self.__run_executor, args=(job_spec, uid, array_id, i))
             p.start()
             self.__processes.append(p)
-        return f"JOBS {job_spec}/{array_id}-[1,{array_size})"
+        return f"JOBS {job_spec} {array_id}.[1-{array_size}]"
 
     def run(self: Self) -> None:
         # Ensure that other users can create lock files
@@ -77,8 +79,7 @@ class Daemon:
 
         with ipc.Server(self.__socket_path) as server:
             while True:
-                print("Awaiting request...")
-                server.accept(self.__handler)
+                server.accept_non_blocking(self.__handler)
                 # Clean up finished processes
                 self.__processes = [p for p in self.__processes if p.is_alive()]
 

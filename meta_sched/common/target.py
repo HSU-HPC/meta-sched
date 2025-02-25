@@ -1,8 +1,11 @@
 import abc
 import enum
+import os
+import sys
+import time
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, Self, Tuple
+from typing import Any, Dict, List, Self, Tuple
 
 import invoke
 from fabric import Connection
@@ -11,11 +14,13 @@ from fabric.config import Config
 from meta_sched.common import ssh
 from meta_sched.common.job import Instance as Job
 from meta_sched.common.job import Spec
+from meta_sched.common.job import Status as JobStatus
 from meta_sched.common.serialization import Serializable
 from meta_sched.common.utils import (
     EX_BASH_COMMAND_NOT_FOUND,
     eprint,
     expect_ok,
+    exponential_backoff,
     seconds_to_time,
     time_to_seconds,
 )
@@ -31,6 +36,7 @@ class Target(Serializable):
         port: int = ssh.DEFAULT_PORT,
         max_time: str | int | None = None,
         max_nodes: int | None = None,
+        source_scripts: List[str] = [],
         module_map: Dict[str, str] = {},
         **kwargs: Any,
     ) -> None:
@@ -46,6 +52,7 @@ class Target(Serializable):
         self.__cores_per_node = cores_per_node
         self.__max_time = None if max_time is None else time_to_seconds(max_time)
         self.__max_nodes = max_nodes
+        self.__source_scripts = source_scripts
         self.__module_map = module_map
         eprint(__file__, "Got unused kwargs", kwargs)  # TODO
 
@@ -78,7 +85,7 @@ class Target(Serializable):
     def is_suitable(self: Self, job_spec: Spec) -> Tuple[bool, str]:
         if not self.has_user:
             return False, "Credentials missing"
-        if self.__max_time is not None and job_spec.time > self.__max_time:
+        if self.__max_time is not None and job_spec.seconds > self.__max_time:
             return False, "Too much time required"
         max_nodes = (
             min(self.__nodes, self.__max_nodes) if self.__max_nodes else self.__nodes
@@ -120,6 +127,7 @@ class Target(Serializable):
         result = invoke.run(cmd, warn=True)
         status = -1 if result is None else result.exited
         if status == EX_BASH_COMMAND_NOT_FOUND:
+            # TODO this may cause issues when another job is currently reading existing input files!
             eprint(
                 "rsync is not installed locally or on the target. (Falling back on scp.)"
             )
@@ -159,10 +167,15 @@ class Target(Serializable):
                 f"Cannot connect to target {self.id} (Non-default Port missing in SSH config)"
             )
         config = Config(ssh_config=ssh_config)
-        return Connection(str(self.id), config=config, connect_kwargs=connect_kwargs)
+        connection = Connection(
+            str(self.id), config=config, connect_kwargs=connect_kwargs
+        )
+        for script in self.__source_scripts:
+            expect_ok(connection.run(f"source {script}").exited)
+        return connection
 
     def _execute_batch_system(
-        self: Self, connection: Connection, job_spec: Spec, env: Dict[str, Any] = {}
+        self: Self, connection: Connection, job: Job, env: Dict[str, Any] = {}
     ) -> None:
         raise NotImplementedError()
 
@@ -177,10 +190,16 @@ class Target(Serializable):
                 MS_OUTPUT=f"~/{job.output}",
             )
             for module in job.spec.required_modules:
-                module = self.__module_map[module]
-                expect_ok(connection.run(f"ml {module}", warn=True).exited)
+                concrete_module = self.__module_map[module]
+                # TODO / FIXME Issue with module load on WindHPC?
+                # expect_ok(connection.run(f"ml {concrete_module}", warn=True).exited)
+                env[f"MS_MODULE_{module}"] = concrete_module
             with connection.cd(job.output):
-                self._execute_batch_system(connection, job.spec, env)
+                if job.spec.cmd_setup:
+                    expect_ok(
+                        connection.run(job.spec.cmd_setup, warn=True, env=env).exited
+                    )
+                self._execute_batch_system(connection, job, env)
 
 
 class DirectTarget(Target):
@@ -196,9 +215,10 @@ class DirectTarget(Target):
         return "none"
 
     def _execute_batch_system(
-        self: Self, connection: Connection, job_spec: Spec, env: Dict[str, Any] = {}
+        self: Self, connection: Connection, job: Job, env: Dict[str, Any] = {}
     ) -> None:
-        argv = [job_spec.executable]
+        job.set_status(JobStatus.Running(self.id))
+        argv = [job.spec.cmd_main]
         expect_ok(connection.run(" ".join(argv), warn=True, env=env).exited)
 
 
@@ -212,14 +232,91 @@ class SlurmTarget(Target):
         return "slurm"
 
     def _execute_batch_system(
-        self: Self, connection: Connection, job_spec: Spec, env: Dict[str, Any] = {}
+        self: Self, connection: Connection, job: Job, env: Dict[str, Any] = {}
     ) -> None:
-        argv = ["srun"]
+        eprint("--- a. Creating and watching output/error files ---")
+        output_files = dict(stdout=sys.stdout, stderr=sys.stderr)
+        for k, v in output_files.items():
+            connection.run(
+                f"touch {k} && tail -f {k} &",
+                warn=True,
+                asynchronous=True,
+                out_stream=v,
+            )
+        eprint("--- b. Submitting job ---")
+        argv = ["sbatch"]
         if self.partition:
             argv.append(f"--partition={self.partition}")
-        argv.append(f"--time={seconds_to_time(job_spec.time)}")
-        argv.append(job_spec.executable)
-        expect_ok(connection.run(" ".join(argv), warn=True, env=env).exited)
+        argv.append(f"--time={seconds_to_time(job.spec.seconds)}")
+        argv.append("--output=stdout")
+        argv.append("--error=stderr")
+        argv.append(f"--wrap='{job.spec.cmd_main}'")
+        argv.append(f"--job-name={job.spec.name}")
+        result = connection.run(
+            " ".join(argv), warn=True, env=env, out_stream=sys.stderr
+        )
+        expect_ok(result.exited)
+        slurm_job_id = result.stdout.strip().split()[-1]
+
+        backoff_count = 0
+        interrupted_error: InterruptedError | None = None
+
+        def sleep_or_cancel(seconds: float) -> None:
+            try:
+                time.sleep(seconds)
+            except InterruptedError as e:
+                nonlocal backoff_count, interrupted_error
+                if interrupted_error is not None:
+                    eprint("Job was already canceled. (Nothing to do.)")
+                    return
+                # Defer handling until Slurm job has been canceled completely
+                eprint(f"Canceling slurm job {slurm_job_id}.")
+                expect_ok(connection.run(f"scancel {slurm_job_id}", warn=True).exited)
+                job.set_status(JobStatus.Canceled())
+                backoff_count = 0
+                interrupted_error = e
+
+        eprint("--- c. Awaiting job start ---")
+        while True:
+            result = connection.run(
+                f"squeue -j {slurm_job_id} --format %T --noheader", warn=True, hide=True
+            )
+            if result.exited != os.EX_OK or result.stdout.strip() == "RUNNING":
+                break  # Job no longer in queue has started
+            sleep_or_cancel(exponential_backoff(backoff_count))
+            backoff_count += 1
+        eprint("--- d. Awaiting job completion ---")
+        if interrupted_error is None:
+            backoff_count = 0
+            job.set_status(JobStatus.Running(self.id))
+            sleep_or_cancel(job.spec.seconds)
+        exit_code = 0
+        while True:
+            result = connection.run(
+                f"squeue -j {slurm_job_id} --noheader", warn=True, hide=True
+            )
+            if result.exited != os.EX_OK or len(result.stdout.strip()) == 0:
+                break  # Job no longer in queue
+            sleep_or_cancel(exponential_backoff(backoff_count))
+            backoff_count += 1
+        eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
+        time.sleep(1)  # Wait a bit for the output/error to be received
+        sys.stdout.flush()
+        sys.stderr.flush()
+        result = connection.run(
+            f'sacct -j {slurm_job_id} --format "State,ExitCode" --noheader',
+            warn=True,
+            hide=True,
+        )
+        expect_ok(result.exited)
+        sacct_state, sacct_exit_code = result.stdout.splitlines()[0].split()
+        exit_code = int(sacct_exit_code.split(":")[0])
+        expect_ok(
+            connection.run(f"rm -f {' '.join(output_files.keys())}", warn=True).exited
+        )
+        if interrupted_error is not None:
+            raise interrupted_error
+        expect_ok(exit_code)
 
 
 class TargetFactory:

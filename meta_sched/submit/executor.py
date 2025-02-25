@@ -1,9 +1,11 @@
 import os
+import signal
 import time
 import traceback
+from types import FrameType
 from typing import Dict, Self
 
-from meta_sched.common import scheduling_decision
+from meta_sched.common import job, scheduling_decision
 from meta_sched.common.job import Instance as Job
 from meta_sched.common.scheduler_interface import SchedulerInterface
 from meta_sched.common.target import Target
@@ -23,11 +25,13 @@ class Executor:
         self.__scheduler = scheduler
         self.__redirect_output = redirect_output
 
-    def __store_status(self: Self, status: str) -> None:
-        status_file = self.__job.output / ".status"
-        status_file.write_text(status)
+    def __signal_handler(self: Self, signalnum: int, frame: FrameType | None) -> None:
+        eprint(f"{self.__class__.__name__} received signal {signalnum}.", flush=True)
+        raise InterruptedError(signalnum)
 
     def __run(self: Self) -> None:
+        signal.signal(signal.SIGINT, self.__signal_handler)
+        signal.signal(signal.SIGTERM, self.__signal_handler)
         eprint("=== 1. Selecting suitable targets for job ===")
         suitable_targets: Dict[str, Target] = {}
         try:
@@ -58,7 +62,7 @@ class Executor:
                     eprint(
                         f"Sheduler assigned {target.id} ({target.host}) in T minus {decision.wait_seconds} seconds"
                     )
-                    # TODO sleep by decision.wait_seconds
+                    time.sleep(decision.wait_seconds)
                 case scheduling_decision.Deferred():
                     wait_seconds = max(1, decision.wait_seconds)
                     eprint(
@@ -75,12 +79,7 @@ class Executor:
             dst = self.__job.input.parent
             target.transfer(src, dst, Target.TransferMode.UPLOAD)
         eprint(f"=== 4. Executing job on target {target.id} ===")
-        # TODO Consider alternative:
-        # Instead of running an interactive job on the target
-        # * Create and submit a batch job
-        # * Monitor the job state on the target
-        # * Update the scheduler about the job state
-        self.__store_status(f"running on {target.id}")
+        self.__job.set_status(job.Status.Scheduled(target.id))
         target.execute(self.__job)
         eprint(f"=== 5. Fetching results from target {target.id} ===")
         assert self.__job.output
@@ -88,18 +87,16 @@ class Executor:
         dst = self.__job.output.parent
         target.transfer(src, dst, Target.TransferMode.DOWNLOAD)
         eprint(f"=== 6. Cleaning up files on target {target.id} ===")
+        # TODO consider always cleaning up (even if job failed/was canceled)
         target.clean_up(self.__job)
-        #
-        # TODO Use smart/exp. back-off when polling
-        # TODO Handle sigint (cancel job), sigterm (stop process), sigkill (?)
-        self.__store_status("completed")
+        self.__job.set_status(job.Status.Completed())
 
     def run(self: Self) -> None:
         assert self.__job.output
         self.__job.output.mkdir(parents=True, exist_ok=True)
         pid_file = self.__job.output / ".pid"
         pid_file.write_text(str(os.getpid()))
-        self.__store_status("pending")
+        self.__job.set_status(job.Status.Pending())
         kwargs = (
             dict(
                 stdout=self.__job.output / "stdout",
@@ -111,10 +108,12 @@ class Executor:
         with RedirectOutputToFile(**kwargs):
             try:
                 self.__run()
+            except InterruptedError:
+                self.__job.set_status(job.Status.Canceled())
             except Exception as e:
                 status = -1
                 if isinstance(e, StatusException):
                     status = e.status
                 eprint(traceback.format_exc())
-                self.__store_status(f"failed {status}")
+                self.__job.set_status(job.Status.Failed(status))
         pid_file.unlink()

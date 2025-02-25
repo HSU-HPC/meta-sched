@@ -79,7 +79,6 @@ class Server(object):
             if response:
                 _socket_send_prefixed(connection, response.encode())
 
-    # TODO unused
     def accept_non_blocking(
         self: Self,
         handler: Handler,

@@ -1,10 +1,15 @@
 import argparse
+import errno
 import inspect
 import os
 import shutil
+import signal
 import sys
+import time
 from pathlib import Path
-from typing import Self
+from typing import Any, Dict, Self
+
+import pandas as pd
 
 from meta_sched import data
 from meta_sched.common import ssh
@@ -14,6 +19,7 @@ from meta_sched.common.utils import eprint
 from meta_sched.submit import ipc
 
 
+# TODO split into Client and CLI
 class CLI:
     def __init__(self: Self, submitd_socket_path: Path, scheduler: Scheduler) -> None:
         self.__socket_path = submitd_socket_path
@@ -57,13 +63,17 @@ class CLI:
     def submit(self: Self, job_spec: str) -> int:
         "Submit a job array for an existing job spec"
         os.chdir(Path.home())
-        try:
-            array_size = Spec.load(job_spec).array_size
-        except ValueError:
+        if job_spec not in Spec.list():
             eprint("No such job spec:", job_spec)
             eprint(f"\nAvailable under {get_jobs_dir().absolute()}:")
             for job_spec in Spec.list():
                 eprint("-", job_spec)
+            return os.EX_NOINPUT
+        try:
+            array_size = Spec.load(job_spec).array_size
+        except ValueError as e:
+            eprint("Could not load job spec:", job_spec)
+            print(e)
             return os.EX_NOINPUT
         try:
             with ipc.Client(self.__socket_path) as client:
@@ -74,17 +84,92 @@ class CLI:
             return os.EX_UNAVAILABLE
         return os.EX_OK
 
-    def status(self: Self) -> int:
+    def status(
+        self: Self,
+        count: int = 10,
+        completed: bool = False,
+        failed: bool = False,
+        canceled: bool = False,
+        all: bool = False,
+    ) -> int:
         "Get the status of submitted jobs"
         os.chdir(Path.home())
-        df = get_job_outputs()
-        print(df.to_string(index=True))
+        df: pd.DataFrame = get_job_outputs()
+        df.drop(columns=["path", "pid"], inplace=True)
+        pending_scheduled_running = all or not (completed or failed or canceled)
+
+        def filter_status(status: str) -> bool:
+            if all:
+                return True
+            match status.lower().split()[0]:
+                case "completed":
+                    return completed
+                case "failed":
+                    return failed
+                case "canceled":
+                    return canceled
+                case _:
+                    return pending_scheduled_running
+
+        df["status"] = df["status"].apply(lambda x: x if filter_status(x) else None)
+        df = pd.DataFrame(df[~df["status"].isnull()])
+        df = df.tail(n=max(0, count))
+        if len(df) == 0:
+            eprint("No jobs.")
+            return os.EX_TEMPFAIL
+        print(df.to_string(index=False))
         return os.EX_OK
 
-    def cancel(self: Self, pattern: str) -> int:
+    def cancel(self: Self, pattern: str, no_confirm: bool = False) -> int:
         "Cancel submitted jobs"
         os.chdir(Path.home())
-        raise NotImplementedError()
+        df = get_job_outputs()
+        if any(not (c.isalnum() or c in "-_.*") for c in pattern):
+            eprint(
+                "Bad job pattern. (Supports only valid job_id characters and wildcard *.)"
+            )
+            return os.EX_USAGE
+        pattern.replace(".", "\\.")
+        pattern = pattern.replace("*", ".*")
+        if "\\." not in pattern:
+            pattern += "\\..*"  # Any array_idx (since not given)
+        df = pd.DataFrame(df[df["job_id"].str.contains(f"^{pattern}$", regex=True)])
+        df = pd.DataFrame(df[~df["pid"].isna()])
+        if len(df) == 0:
+            eprint("No jobs.")
+            return os.EX_TEMPFAIL
+        was_confirmed = False
+        if not no_confirm:
+            print(f"Confirm cancelation of jobs:\n{', '.join(df['job_id'].values)}")
+            try:
+                was_confirmed = input('\nType "yes": ').strip() == "yes"
+            except KeyboardInterrupt:
+                pass
+        if not (no_confirm or was_confirmed):
+            print("Aborted.")
+            return os.EX_OK
+        pids = df["pid"].astype(int).values
+        for pid in pids:
+            os.kill(pid, signal.SIGINT)
+
+        def wait_pid(pid: int, check_interval: float = 1) -> None:
+            SIG_CHECK_PID_EXISTS = 0
+            while True:
+                try:
+                    os.kill(pid, SIG_CHECK_PID_EXISTS)
+                    time.sleep(check_interval)
+                except OSError as e:
+                    if e.errno == errno.ESRCH:
+                        return
+
+        print("Waiting for canceled jobs to terminate...", end="", flush=True)
+        try:
+            for pid in pids:
+                wait_pid(pid)
+            print("Done!")
+        except KeyboardInterrupt:
+            pass
+        return os.EX_OK
 
     def run(self: Self) -> int:
         argv = sys.argv
@@ -101,17 +186,29 @@ class CLI:
         for command, f in commands.items():
             subparser = subparsers.add_parser(command, help=f.__doc__)
             full_arg_spec = inspect.getfullargspec(f)
-            for arg in full_arg_spec.args:
-                arg_type = full_arg_spec.annotations[arg]
-                if arg_type == Self:
-                    continue
-                subparser.add_argument(
-                    arg, metavar=arg.replace("_", "-"), type=arg_type
-                )
-        args = argparser.parse_args(argv[1:])
-        kwargs = {k: v for k, v in args._get_kwargs()}
+            args = full_arg_spec.args
+            annotations = full_arg_spec.annotations
+            defaults = [] if full_arg_spec.defaults is None else full_arg_spec.defaults
+            for i, arg in enumerate(args):
+                dest = arg.replace("_", "-")
+                kwargs: Dict[str, Any] = dict()
+                default = None
+                if i >= len(args) - len(defaults):
+                    default = defaults[i - (len(args) - len(defaults))]
+                    dest = f"--{dest}"
+                if arg in annotations:
+                    arg_type = annotations[arg]
+                    if arg_type == Self:
+                        continue
+                    if arg_type is bool and default is not None:
+                        kwargs["action"] = "store_false" if default else "store_true"
+                    else:
+                        kwargs["type"] = arg_type
+                subparser.add_argument(dest, default=default, **kwargs)
+        cmd_args = argparser.parse_args(argv[1:])
+        kwargs = {k.replace("-", "_"): v for k, v in cmd_args._get_kwargs()}
         del kwargs["command"]
         status = int(
-            eval("commands[args.command](**kwargs)")
+            eval("commands[cmd_args.command](**kwargs)")
         )  # Workaround unknown return type
         return status

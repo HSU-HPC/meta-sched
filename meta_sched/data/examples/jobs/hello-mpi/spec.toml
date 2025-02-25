@@ -1,0 +1,5 @@
+cmd_setup = "cd $MS_INPUT && module load $MS_MODULE_MPI && make"
+cmd_main = "module load $MS_MODULE_MPI && mpiexec $MS_INPUT/count"
+array_size = 1
+required_modules = ["MPI"]
+time       = "0-00:10:00" # d-hh:MM:ss

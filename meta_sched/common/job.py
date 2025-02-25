@@ -1,3 +1,4 @@
+import abc
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
@@ -57,7 +58,13 @@ def get_job_outputs() -> pd.DataFrame:
     df["path"] = df.apply(lambda r: _get_job_output(*r), axis=1)
     df["pid"] = df["path"].apply(get_pid).astype(float)
     df["status"] = df["path"].apply(get_status).astype(str)
+    # Try to interpret array_id as int to allow for correct sorting
+    try:
+        df["array_id"] = df["array_id"].astype(int)
+    except Exception:
+        eprint("Non integer array_id may result in incorrect sorting")
     df.set_index(["array_id", "array_idx"], inplace=True)
+    df.insert(0, "job_id", [f"{i[0]}.{i[1]}" for i in df.index.values])
     df.sort_index(inplace=True)
     return df
 
@@ -66,8 +73,10 @@ class Spec:
     def __init__(
         self: Self,
         name: str,
-        executable: str,
-        time: str | int,
+        cmd_main: str,
+        time: str | None = None,
+        seconds: int | None = None,
+        cmd_setup: str | None = None,
         array_size: int = 1,
         nodes: int = 1,
         ranks: int = 1,
@@ -75,8 +84,11 @@ class Spec:
         required_modules: List[str] = [],
         **kwargs: Any,
     ) -> None:
+        if any(not (c.isalnum() or c in "-_") for c in name):
+            raise ValueError("Job spec name contains illegal characters")
         self.name = name
-        self.executable = executable
+        self.cmd_setup = cmd_setup
+        self.cmd_main = cmd_main
         self.array_size = array_size
         self.nodes = nodes
         self.ranks = ranks
@@ -84,7 +96,15 @@ class Spec:
         self.required_modules = required_modules
         if array_size < 0:
             raise ValueError('"array_size" must be at least 1')
-        self.time = time_to_seconds(time)
+        if (time is None and seconds is None) or (
+            time is not None and seconds is not None
+        ):
+            raise ValueError('Either "time" or "seconds" must be provided')
+        if seconds is None:
+            assert time is not None
+            self.seconds = time_to_seconds(time)
+        else:
+            self.seconds = seconds
         eprint(__file__, "Got unused kwargs", kwargs)  # TODO
 
     @staticmethod
@@ -102,6 +122,40 @@ class Spec:
         return cls(name=name, **kwargs)
 
 
+class Status(abc.ABC):
+    class _Enum:
+        def __init__(self: Self) -> None:
+            if self.__class__ == Status._Enum:
+                raise NotImplementedError()
+            self._data: Any = []
+
+        def __str__(self: Self) -> str:
+            return " ".join(
+                [self.__class__.__name__.lower()] + [str(x) for x in self._data]
+            )
+
+    class Scheduled(_Enum):
+        def __init__(self: Self, target_id: str) -> None:
+            self._data = [target_id]
+
+    class Running(_Enum):
+        def __init__(self: Self, target_id: str) -> None:
+            self._data = [target_id]
+
+    class Completed(_Enum):
+        pass
+
+    class Pending(_Enum):
+        pass
+
+    class Failed(_Enum):
+        def __init__(self: Self, status: int) -> None:
+            self._data = [status]
+
+    class Canceled(_Enum):
+        pass
+
+
 @dataclass(frozen=True)
 class Instance:
     spec: Spec
@@ -115,3 +169,6 @@ class Instance:
     @property
     def input(self: Self) -> Path:
         return get_jobs_dir() / self.spec.name / "input"
+
+    def set_status(self: Self, status: Status._Enum) -> None:
+        (self.output / ".status").write_text(str(status))
