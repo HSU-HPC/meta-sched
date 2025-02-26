@@ -13,7 +13,7 @@ dependencies = [
 ]
 
 [project.scripts]
-ms-cli  = "meta_sched:run_cli"
+ms-cli     = "meta_sched:run_cli"
 ms-submitd = "meta_sched:run_submitd"
 ms-api     = "meta_sched:serve_api"
 ms-service = "meta_sched:run_service"
@@ -39,3 +39,8 @@ dev-dependencies = [
 [tool.mypy]
 strict                 = true
 ignore_missing_imports = true
+
+[tool.pyright]
+# For using pandas objects without excessive checking
+reportOptionalMemberAccess = false
+reportOptionalSubscript    = false

@@ -94,7 +94,7 @@ class CLI:
     ) -> int:
         "Get the status of submitted jobs"
         os.chdir(Path.home())
-        df: pd.DataFrame = get_job_outputs()
+        df = get_job_outputs()
         df.drop(columns=["path", "pid"], inplace=True)
         pending_scheduled_running = all or not (completed or failed or canceled)
 
@@ -112,7 +112,7 @@ class CLI:
                     return pending_scheduled_running
 
         df["status"] = df["status"].apply(lambda x: x if filter_status(x) else None)
-        df = pd.DataFrame(df[~df["status"].isnull()])
+        df = df[~df["status"].isnull()]
         df = df.tail(n=max(0, count))
         if len(df) == 0:
             eprint("No jobs.")
@@ -123,7 +123,7 @@ class CLI:
     def cancel(self: Self, pattern: str, no_confirm: bool = False) -> int:
         "Cancel submitted jobs"
         os.chdir(Path.home())
-        df = get_job_outputs()
+        df: pd.DataFrame = get_job_outputs()
         if any(not (c.isalnum() or c in "-_.*") for c in pattern):
             eprint(
                 "Bad job pattern. (Supports only valid job_id characters and wildcard *.)"

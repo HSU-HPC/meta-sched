@@ -170,14 +170,24 @@ class Target(Serializable):
         connection = Connection(
             str(self.id), config=config, connect_kwargs=connect_kwargs
         )
-        for script in self.__source_scripts:
-            expect_ok(connection.run(f"source {script}").exited)
         return connection
 
     def _execute_batch_system(
-        self: Self, connection: Connection, job: Job, env: Dict[str, Any] = {}
+        self: Self,
+        connection: Connection,
+        job: Job,
+        env: Dict[str, Any] = {},
     ) -> None:
         raise NotImplementedError()
+
+    def _prefix_cmd(self: Self, cmd: str, modules: List[str] = []) -> str:
+        specific_modules = [self.__module_map[m] for m in modules]
+        cmd = " && ".join(
+            [f"source {script}" for script in self.__source_scripts]
+            + [f"module load {module}" for module in specific_modules]
+            + [cmd]
+        )
+        return cmd
 
     def execute(self: Self, job: Job) -> None:
         with self._connect() as connection:
@@ -189,16 +199,12 @@ class Target(Serializable):
                 MS_INPUT=f"~/{job.input}",
                 MS_OUTPUT=f"~/{job.output}",
             )
-            for module in job.spec.required_modules:
-                concrete_module = self.__module_map[module]
-                # TODO / FIXME Issue with module load on WindHPC?
-                # expect_ok(connection.run(f"ml {concrete_module}", warn=True).exited)
-                env[f"MS_MODULE_{module}"] = concrete_module
             with connection.cd(job.output):
                 if job.spec.cmd_setup:
-                    expect_ok(
-                        connection.run(job.spec.cmd_setup, warn=True, env=env).exited
+                    cmd = self._prefix_cmd(
+                        job.spec.cmd_setup, job.spec.required_modules
                     )
+                    expect_ok(connection.run(cmd, warn=True, env=env).exited)
                 self._execute_batch_system(connection, job, env)
 
 
@@ -215,11 +221,14 @@ class DirectTarget(Target):
         return "none"
 
     def _execute_batch_system(
-        self: Self, connection: Connection, job: Job, env: Dict[str, Any] = {}
+        self: Self,
+        connection: Connection,
+        job: Job,
+        env: Dict[str, Any] = {},
     ) -> None:
         job.set_status(JobStatus.Running(self.id))
-        argv = [job.spec.cmd_main]
-        expect_ok(connection.run(" ".join(argv), warn=True, env=env).exited)
+        cmd = self._prefix_cmd(job.spec.cmd_main, job.spec.required_modules)
+        expect_ok(connection.run(cmd, warn=True, env=env).exited)
 
 
 class SlurmTarget(Target):
@@ -232,7 +241,10 @@ class SlurmTarget(Target):
         return "slurm"
 
     def _execute_batch_system(
-        self: Self, connection: Connection, job: Job, env: Dict[str, Any] = {}
+        self: Self,
+        connection: Connection,
+        job: Job,
+        env: Dict[str, Any] = {},
     ) -> None:
         eprint("--- a. Creating and watching output/error files ---")
         output_files = dict(stdout=sys.stdout, stderr=sys.stderr)
@@ -252,9 +264,8 @@ class SlurmTarget(Target):
         argv.append("--error=stderr")
         argv.append(f"--wrap='{job.spec.cmd_main}'")
         argv.append(f"--job-name={job.spec.name}")
-        result = connection.run(
-            " ".join(argv), warn=True, env=env, out_stream=sys.stderr
-        )
+        cmd = self._prefix_cmd(" ".join(argv), job.spec.required_modules)
+        result = connection.run(cmd, warn=True, env=env, out_stream=sys.stderr)
         expect_ok(result.exited)
         slurm_job_id = result.stdout.strip().split()[-1]
 
