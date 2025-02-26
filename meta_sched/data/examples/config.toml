@@ -1,5 +1,5 @@
 scheduler_class="round_robin.RR"
-counter_file="/var/lib/meta-sched/namesd.json"
+counter_file="/var/lib/meta-sched/counter_file.json"
 
 [[targets]]
 # https://portal.hpc.hsu-hh.de/documentation/hsuper/partitions/
@@ -13,7 +13,7 @@ cores_per_node=72
 max_time="72:00:00"
 max_nodes=5
 [targets.module_map]
-MPI = "openmpi"
+MPI = "intel-oneapi-mpi"
 
 
 [[targets]]

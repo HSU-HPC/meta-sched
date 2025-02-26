@@ -6,6 +6,7 @@
     - [x] Submit
     - [x] List
     - [x] Cancel
+- [x] Job spec examples
 - [ ] Job attributes (cores, time, MPI etc.)
 - [ ] Slurm support (partially done)
 - [ ] PBS support

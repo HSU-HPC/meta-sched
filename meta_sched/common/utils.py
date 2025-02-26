@@ -62,6 +62,7 @@ def time_to_seconds(time: str | int) -> int:
             case "-":
                 seconds += int(cs[::-1]) * seconds_per_unit
                 seconds_per_unit *= 24
+                cs = ""
             case _:
                 cs += c
     seconds += int(cs[::-1]) * seconds_per_unit

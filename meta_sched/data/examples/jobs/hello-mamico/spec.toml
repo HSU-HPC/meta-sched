@@ -1,0 +1,6 @@
+cmd_setup = "MPI_RANKS=32 $MS_INPUT/setup.sh >&2"
+cmd_main  = "MPI_RANKS=32 $MS_INPUT/main.sh"
+array_size = 1
+# MPI not required (falls back on sequential version)
+# required_modules = ["MPI"]
+time       = "0-05:00:00" # d-hh:MM:ss

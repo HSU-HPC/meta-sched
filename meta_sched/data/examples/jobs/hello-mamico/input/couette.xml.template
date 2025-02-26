@@ -1,0 +1,104 @@
+<?xml version="1.0"?>
+<couette-test>
+    <domain
+        channelheight="100"
+        wall-init-velocity="0.0 ; 0.0 ; 0.0"
+        wall-init-cycles="0"
+        wall-velocity="1.5 ; 0.0 ; 0.0"
+        wall-oscillations="0"
+    />
+    <coupling
+        coupling-cycles="750"
+        two-way-coupling="no"
+        send-from-md-to-macro="yes"
+        filter-init-cycles="0"
+        write-csv-every-timestep="10"
+        send-from-macro-to-md="yes"
+        compute-snr="no"
+    />
+    <macroscopic-solver
+        type="lb"
+        viscosity="2.14"
+        number-of-processes="1 ; 1 ; 1"
+        plot-every-timestep="10"
+        init-advance-cycles="0"
+        boundaries-with-MD="0; 0; 0; 0; 0; 0; 1; 1; 1; 1; 1; 1"
+    />
+    <microscopic-solver
+        type="ls1"
+        temperature="1.1"
+        equilibration-steps="10000"
+        number-md-simulations="1"
+        density="0.813037037"
+    />
+</couette-test>
+
+<mamico>
+    <macroscopic-cell-configuration
+        cell-size="CELL_SIZE ; CELL_SIZE ; CELL_SIZE"
+        linked-cells-per-macroscopic-cell="1 ; 1 ; 1"
+        write-every-microscopic-timestep="0"
+        microscopic-filename="MacroscopicCell_micro"
+        write-every-macroscopic-timestep="0"
+        macroscopic-filename="MacroscopicCell_macro"
+    />
+    <particle-insertion type="none" />
+    <momentum-insertion type="nie-velocity-imposition" outermost-overlap-layer="2"
+        innermost-overlap-layer="3" />
+    <transfer-strategy type="nie-transfer" mass-flux-west="yes" mass-flux-east="yes"
+        mass-flux-north="no" mass-flux-south="no" mass-flux-bottom="no" mass-flux-top="no"
+        shift-by-timesteps="0.5" />
+    <boundary-force type="none" west="no" east="no" north="no" south="no" bottom="no" top="no"
+        density="0.81" temperature="1.1" />
+    <parallel-topology type="zyx" />
+    <thermostat type='all' />
+</mamico>
+
+<molecular-dynamics>
+    <molecule-configuration
+        mass="1.0"
+        temperature="1.1"
+        sigma="1.0"
+        epsilon="1.0"
+        mean-velocity="0.0 ; 0.0 ; 0.0"
+    ></molecule-configuration>
+    <mpi-configuration number-of-processes="MD_MPI_SIZE_X ; MD_MPI_SIZE_Y ; MD_MPI_SIZE_Z"></mpi-configuration>
+
+    <simulation-configuration
+        dt="0.005"
+        number-of-timesteps="100"
+        reorganise-memory-every-timestep="20"
+        compute-macroscopic-quantities-every-timestep="0"
+        fix-seed="no"
+    ></simulation-configuration>
+    <!--TODO
+    <vtk-configuration filename="Molecules" write-every-timestep="0"></vtk-configuration>
+  <checkpoint-configuration filename="CheckpointSimpleMD"
+    write-every-timestep="0"></checkpoint-configuration>-->
+
+    <!--TODO
+        qinit-from-sequential-checkpoint="ls1_CheckpointSimpleMDForAmartyaPeriodic_0__10000_0"
+    -->
+    <domain-configuration
+        molecules-per-direction="28 ; 28 ; 28"
+        domain-size="MD_SIZE ; MD_SIZE ; MD_SIZE"
+        domain-offset="10 ; 10 ; 5"
+        cutoff-radius="2.2"
+        linked-cell-size="5 ; 5 ; 5"
+        k_B="1.0"
+        block-size="100"
+        bottom-south-west="reflecting" bottom-south="reflecting" bottom-south-east="reflecting"
+        bottom-west="reflecting" bottom="reflecting" bottom-east="reflecting"
+        bottom-north-west="reflecting" bottom-north="reflecting" bottom-north-east="reflecting"
+        south-west="reflecting" south="reflecting" south-east="reflecting"
+        west="reflecting" east="reflecting"
+        north-west="reflecting" north="reflecting" north-east="reflecting"
+        top-south-west="reflecting" top-south="reflecting" top-south-east="reflecting"
+        top-west="reflecting" top="reflecting" top-east="reflecting"
+        top-north-west="reflecting" top-north="reflecting" top-north-east="reflecting"
+    ></domain-configuration>
+</molecular-dynamics>
+<filter-pipeline>
+    <per-instance output="md"></per-instance>
+    <post-multi-instance output="md"></post-multi-instance>
+</filter-pipeline>

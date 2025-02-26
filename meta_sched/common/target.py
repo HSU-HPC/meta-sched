@@ -138,6 +138,12 @@ class Target(Serializable):
                 "-r",
                 "-O",
             ]
+            # scp uses src = A:/path/to/dir/* dst = B:/path/to/dir so dir is in path/to/
+            dst = Path(dst) / Path(src).name
+            src = f"{str(src)}/*"
+            with self._connect() as connection:
+                remote_dst = str(dst).split(":")[-1]
+                expect_ok(connection.run(f"mkdir -p {remote_dst}", warn=True).exited)
             cmd = f"scp {' '.join(scp_flags)} {src} {dst} 1>&2"
             result = invoke.run(cmd, warn=True, pty=False)
         status = -1 if result is None else result.exited
@@ -198,13 +204,15 @@ class Target(Serializable):
                 MS_ARRAY_IDX=job.array_idx,
                 MS_INPUT=f"~/{job.input}",
                 MS_OUTPUT=f"~/{job.output}",
+                TERM="dumb",  # See man "term(7)"
             )
             with connection.cd(job.output):
                 if job.spec.cmd_setup:
                     cmd = self._prefix_cmd(
                         job.spec.cmd_setup, job.spec.required_modules
                     )
-                    expect_ok(connection.run(cmd, warn=True, env=env).exited)
+                    result = connection.run(cmd, warn=True, env=env)
+                    expect_ok(result.exited)
                 self._execute_batch_system(connection, job, env)
 
 

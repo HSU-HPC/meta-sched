@@ -62,6 +62,7 @@ class Executor:
                     eprint(
                         f"Sheduler assigned {target.id} ({target.host}) in T minus {decision.wait_seconds} seconds"
                     )
+                    self.__job.set_status(job.Status.Scheduled(target.id))
                     time.sleep(decision.wait_seconds)
                 case scheduling_decision.Deferred():
                     wait_seconds = max(1, decision.wait_seconds)
@@ -79,7 +80,6 @@ class Executor:
             dst = self.__job.input.parent
             target.transfer(src, dst, Target.TransferMode.UPLOAD)
         eprint(f"=== 4. Executing job on target {target.id} ===")
-        self.__job.set_status(job.Status.Scheduled(target.id))
         target.execute(self.__job)
         eprint(f"=== 5. Fetching results from target {target.id} ===")
         assert self.__job.output
@@ -89,7 +89,6 @@ class Executor:
         eprint(f"=== 6. Cleaning up files on target {target.id} ===")
         # TODO consider always cleaning up (even if job failed/was canceled)
         target.clean_up(self.__job)
-        self.__job.set_status(job.Status.Completed())
 
     def run(self: Self) -> None:
         assert self.__job.output
@@ -106,14 +105,22 @@ class Executor:
             else {}
         )
         with RedirectOutputToFile(**kwargs):
+            final_job_status: job.Status._Enum = job.Status.Completed()
             try:
                 self.__run()
             except InterruptedError:
-                self.__job.set_status(job.Status.Canceled())
+                final_job_status = job.Status.Canceled()
             except Exception as e:
                 status = -1
                 if isinstance(e, StatusException):
                     status = e.status
                 eprint(traceback.format_exc())
-                self.__job.set_status(job.Status.Failed(status))
-        pid_file.unlink()
+                final_job_status = job.Status.Failed(status)
+            finally:
+                try:
+                    self.__job.set_status(final_job_status)
+                except FileNotFoundError:
+                    eprint(
+                        f"Status file for job {self.__job.array_id}.{self.__job.array_idx} was deleted."
+                    )
+        pid_file.unlink(missing_ok=True)
