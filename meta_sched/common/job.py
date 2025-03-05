@@ -9,12 +9,14 @@ import pandas as pd
 from meta_sched.common.utils import eprint, time_to_seconds
 
 
-def get_jobs_dir() -> Path:
-    return Path("meta-sched/jobs")
+def get_jobs_dir(hidden: bool = False) -> Path:
+    return Path(("." if hidden else "") + "meta-sched/jobs")
 
 
-def _get_job_output(job_spec: str, array_id: str, array_idx: int) -> Path:
-    return get_jobs_dir() / f"{job_spec}/output/{array_id}/{array_idx}"
+def _get_job_output(
+    job_spec: str, array_id: str, array_idx: int, hidden: bool = False
+) -> Path:
+    return get_jobs_dir(hidden=hidden) / f"{job_spec}/output/{array_id}/{array_idx}"
 
 
 def get_job_outputs() -> pd.DataFrame:
@@ -36,25 +38,26 @@ def get_job_outputs() -> pd.DataFrame:
             return None
         return status_file.read_text().strip()
 
-    for p_job in get_jobs_dir().iterdir():
-        if not p_job.is_dir():
-            continue
-        job_spec = p_job.name
-        output_base_path = p_job / "output"
-        if not output_base_path.is_dir():
-            continue
-        for p_array in output_base_path.iterdir():
-            if not p_array.is_dir():
+    if get_jobs_dir().is_dir():
+        for p_job in get_jobs_dir().iterdir():
+            if not p_job.is_dir():
                 continue
-            array_id = p_array.name
-            for p_job in p_array.iterdir():
-                if not p_job.is_dir():
+            job_spec = p_job.name
+            output_base_path = p_job / "output"
+            if not output_base_path.is_dir():
+                continue
+            for p_array in output_base_path.iterdir():
+                if not p_array.is_dir():
                     continue
-                try:
-                    array_idx = int(p_job.name)
-                except ValueError:
-                    continue
-                df.loc[len(df)] = [job_spec, array_id, array_idx]
+                array_id = p_array.name
+                for p_job in p_array.iterdir():
+                    if not p_job.is_dir():
+                        continue
+                    try:
+                        array_idx = int(p_job.name)
+                    except ValueError:
+                        continue
+                    df.loc[len(df)] = [job_spec, array_id, array_idx]
     df["path"] = df.apply(lambda r: _get_job_output(*r), axis=1)
     df["pid"] = df["path"].apply(get_pid).astype(float)
     df["status"] = df["path"].apply(get_status).astype(str)
@@ -163,12 +166,24 @@ class Instance:
     array_idx: int
 
     @property
-    def output(self: Self) -> Path:
-        return _get_job_output(self.spec.name, self.array_id, self.array_idx)
+    def local_output(self: Self) -> Path:
+        return _get_job_output(
+            self.spec.name, self.array_id, self.array_idx, hidden=False
+        )
 
     @property
-    def input(self: Self) -> Path:
-        return get_jobs_dir() / self.spec.name / "input"
+    def local_input(self: Self) -> Path:
+        return get_jobs_dir(hidden=False) / self.spec.name / "input"
+
+    @property
+    def remote_output(self: Self) -> Path:
+        return _get_job_output(
+            self.spec.name, self.array_id, self.array_idx, hidden=True
+        )
+
+    @property
+    def remote_input(self: Self) -> Path:
+        return get_jobs_dir(hidden=True) / self.spec.name / "input"
 
     def set_status(self: Self, status: Status._Enum) -> None:
-        (self.output / ".status").write_text(str(status))
+        (self.local_output / ".status").write_text(str(status))

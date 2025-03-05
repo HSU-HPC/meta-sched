@@ -151,8 +151,7 @@ class Target(Serializable):
 
     def clean_up(self: Self, job: Job) -> None:
         with self._connect() as connection:
-            assert job.output
-            expect_ok(connection.run(f"rm -rf {job.output}", warn=True).exited)
+            expect_ok(connection.run(f"rm -rf {job.remote_output}", warn=True).exited)
 
     def _connect(self: Self) -> Connection:
         connect_kwargs = dict(allow_agent=False, look_for_keys=False)
@@ -200,17 +199,16 @@ class Target(Serializable):
         env = dict(
             MS_ARRAY_ID=job.array_id,
             MS_ARRAY_IDX=job.array_idx,
-            MS_INPUT=f"~/{job.input}",
-            MS_OUTPUT=f"~/{job.output}",
+            MS_INPUT=f"~/{job.remote_input}",
+            MS_OUTPUT=f"~/{job.remote_output}",
             TERM="dumb",  # See man "term(7)"
         )
         return env
 
     def setup(self: Self, job: Job) -> None:
         with self._connect() as connection:
-            assert job.output
-            expect_ok(connection.run(f"mkdir -p {job.output}", warn=True).exited)
-            with connection.cd(job.output):
+            expect_ok(connection.run(f"mkdir -p {job.remote_output}", warn=True).exited)
+            with connection.cd(job.remote_output):
                 if job.spec.cmd_setup:
                     cmd = self._prefix_cmd(
                         job.spec.cmd_setup, job.spec.required_modules
@@ -220,9 +218,8 @@ class Target(Serializable):
 
     def execute(self: Self, job: Job) -> None:
         with self._connect() as connection:
-            assert job.output
-            expect_ok(connection.run(f"mkdir -p {job.output}", warn=True).exited)
-            with connection.cd(job.output):
+            expect_ok(connection.run(f"mkdir -p {job.remote_output}", warn=True).exited)
+            with connection.cd(job.remote_output):
                 self._execute_batch_system(connection, job, Target.__get_env(job))
 
 
@@ -265,7 +262,8 @@ class SlurmTarget(Target):
         env: Dict[str, Any] = {},
     ) -> None:
         eprint("--- a. Creating and watching output/error files ---")
-        output_files = dict(stdout=sys.stdout, stderr=sys.stderr)
+        # TODO consider NOT streaming the output/error files
+        output_files = dict(output=sys.stdout, error=sys.stderr)
         for k, v in output_files.items():
             connection.run(
                 f"touch {k} && tail -f {k} &",
@@ -278,8 +276,8 @@ class SlurmTarget(Target):
         if self.partition:
             argv.append(f"--partition={self.partition}")
         argv.append(f"--time={seconds_to_time(job.spec.seconds)}")
-        argv.append("--output=stdout")
-        argv.append("--error=stderr")
+        argv.append("--output=output")
+        argv.append("--error=error")
         argv.append(f"--wrap='{job.spec.cmd_main}'")
         argv.append(f"--job-name={job.spec.name}")
         cmd = self._prefix_cmd(" ".join(argv), job.spec.required_modules)

@@ -78,31 +78,29 @@ class Executor:
         with LockFile(
             f"meta-sched/{os.getuid()}/{target.id}:{self.__job.spec.name}.lock"
         ):
-            src = self.__job.input
-            dst = self.__job.input.parent
+            src = self.__job.local_input
+            dst = self.__job.remote_input.parent
             target.transfer(src, dst, Target.TransferMode.UPLOAD)
             target.setup(self.__job)
         eprint(f"=== 4. Executing job on target {target.id} ===")
         target.execute(self.__job)
         eprint(f"=== 5. Fetching results from target {target.id} ===")
-        assert self.__job.output
-        src = self.__job.output
-        dst = self.__job.output.parent
+        src = self.__job.remote_output
+        dst = self.__job.local_output.parent
         target.transfer(src, dst, Target.TransferMode.DOWNLOAD)
         eprint(f"=== 6. Cleaning up files on target {target.id} ===")
         # TODO consider always cleaning up (even if job failed/was canceled)
         target.clean_up(self.__job)
 
     def run(self: Self) -> None:
-        assert self.__job.output
-        self.__job.output.mkdir(parents=True, exist_ok=True)
-        pid_file = self.__job.output / ".pid"
+        self.__job.local_output.mkdir(parents=True, exist_ok=True)
+        pid_file = self.__job.local_output / ".pid"
         pid_file.write_text(str(os.getpid()))
         self.__job.set_status(job.Status.Pending())
         kwargs = (
             dict(
-                stdout=self.__job.output / "stdout",
-                stderr=self.__job.output / "stderr",
+                stdout=self.__job.local_output / "stdout",
+                stderr=self.__job.local_output / "stderr",
             )
             if self.__redirect_output
             else {}
