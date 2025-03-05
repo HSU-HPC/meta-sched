@@ -10,11 +10,11 @@ class Scheduler(SchedulerInterface):
     def __init__(self: Self, targets: List[Target]):
         if self.__class__ == Scheduler:
             raise NotImplementedError()
-        self._targets = targets
+        self._targets = {t.id: t for t in targets}
 
     @property
     def targets(self: Self) -> List[Target]:
-        return self._targets
+        return list(self._targets.values())
 
     def create_array_id(self: Self) -> str:
         raise NotImplementedError()

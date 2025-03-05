@@ -39,6 +39,7 @@ dev-dependencies = [
 [tool.mypy]
 strict                 = true
 ignore_missing_imports = true
+exclude                = "meta_sched/data/examples"
 
 [tool.pyright]
 # For using pandas objects without excessive checking

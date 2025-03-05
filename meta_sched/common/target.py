@@ -195,25 +195,35 @@ class Target(Serializable):
         )
         return cmd
 
-    def execute(self: Self, job: Job) -> None:
+    @staticmethod
+    def __get_env(job: Job) -> Dict[str, Any]:
+        env = dict(
+            MS_ARRAY_ID=job.array_id,
+            MS_ARRAY_IDX=job.array_idx,
+            MS_INPUT=f"~/{job.input}",
+            MS_OUTPUT=f"~/{job.output}",
+            TERM="dumb",  # See man "term(7)"
+        )
+        return env
+
+    def setup(self: Self, job: Job) -> None:
         with self._connect() as connection:
             assert job.output
             expect_ok(connection.run(f"mkdir -p {job.output}", warn=True).exited)
-            env = dict(
-                MS_ARRAY_ID=job.array_id,
-                MS_ARRAY_IDX=job.array_idx,
-                MS_INPUT=f"~/{job.input}",
-                MS_OUTPUT=f"~/{job.output}",
-                TERM="dumb",  # See man "term(7)"
-            )
             with connection.cd(job.output):
                 if job.spec.cmd_setup:
                     cmd = self._prefix_cmd(
                         job.spec.cmd_setup, job.spec.required_modules
                     )
-                    result = connection.run(cmd, warn=True, env=env)
+                    result = connection.run(cmd, warn=True, env=Target.__get_env(job))
                     expect_ok(result.exited)
-                self._execute_batch_system(connection, job, env)
+
+    def execute(self: Self, job: Job) -> None:
+        with self._connect() as connection:
+            assert job.output
+            expect_ok(connection.run(f"mkdir -p {job.output}", warn=True).exited)
+            with connection.cd(job.output):
+                self._execute_batch_system(connection, job, Target.__get_env(job))
 
 
 class DirectTarget(Target):

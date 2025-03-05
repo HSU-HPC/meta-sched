@@ -1,4 +1,4 @@
-scheduler_class="round_robin.RR"
+scheduler_class="stateful.LeastUsed"
 counter_file="/var/lib/meta-sched/counter_file.json"
 
 [[targets]]

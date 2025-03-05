@@ -1,6 +1,5 @@
 import random
-import uuid
-from typing import List, Self
+from typing import List
 
 from meta_sched.common.job import Spec
 from meta_sched.common.scheduling_decision import (
@@ -8,19 +7,10 @@ from meta_sched.common.scheduling_decision import (
     Impossible,
     SchedulingDecision,
 )
-from meta_sched.common.target import Target
 from meta_sched.scheduler import Scheduler
 
 
-class Dummy(Scheduler):
-    def __init__(self: Self, targets: List[Target] = []) -> None:
-        super().__init__(
-            targets[:1]
-        )  # Always only the first target (Good for debugging)
-
-    def create_array_id(self: Self) -> str:
-        return str(uuid.uuid4())
-
+class Uniform(Scheduler):
     def request_schedule(
         self, job_spec: Spec, available_targets: List[str]
     ) -> SchedulingDecision:

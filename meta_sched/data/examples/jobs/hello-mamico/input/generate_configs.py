@@ -33,7 +33,7 @@ for ax_ranks, ax in zip(md_mpi_size, "xyz"):
         )
         exit(1)
 
-# 3. Apply substitute for template files
+# 3. Apply substitution for template files
 subsitutions = dict(
     MD_SIZE=10,
     MD_MPI_SIZE_X=md_mpi_size[0],

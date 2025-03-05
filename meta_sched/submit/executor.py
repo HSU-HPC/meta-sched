@@ -72,13 +72,16 @@ class Executor:
                     time.sleep(wait_seconds)
                 case _:
                     raise NotImplementedError()
-        eprint(f"=== 3. Copying input files to target {target.id} ===")
+        eprint(
+            f"=== 3. Copying input files to target {target.id} and run optional setup step ==="
+        )
         with LockFile(
             f"meta-sched/{os.getuid()}/{target.id}:{self.__job.spec.name}.lock"
         ):
             src = self.__job.input
             dst = self.__job.input.parent
             target.transfer(src, dst, Target.TransferMode.UPLOAD)
+            target.setup(self.__job)
         eprint(f"=== 4. Executing job on target {target.id} ===")
         target.execute(self.__job)
         eprint(f"=== 5. Fetching results from target {target.id} ===")
