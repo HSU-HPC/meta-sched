@@ -308,8 +308,8 @@ class SlurmTarget(Target):
             result = connection.run(
                 f"squeue -j {slurm_job_id} --format %T --noheader", warn=True, hide=True
             )
-            if result.exited != os.EX_OK or result.stdout.strip() == "RUNNING":
-                break  # Job no longer in queue has started
+            if len(result.stdout.strip()) == 0 or result.stdout.strip() == "RUNNING":
+                break  # Job no longer in queue or has started
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
         eprint("--- d. Awaiting job completion ---")
@@ -322,7 +322,7 @@ class SlurmTarget(Target):
             result = connection.run(
                 f"squeue -j {slurm_job_id} --noheader", warn=True, hide=True
             )
-            if result.exited != os.EX_OK or len(result.stdout.strip()) == 0:
+            if len(result.stdout.strip()) == 0:
                 break  # Job no longer in queue
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1

@@ -1,3 +1,3 @@
 cmd_main = "$MS_INPUT/caesar_cipher.py $MS_INPUT/lorem_ipsum.txt $MS_ARRAY_IDX"
 array_size = 3
-time       = "0-00:02:00" # d-hh:MM:ss
+time       = "0-00:00:10" # d-hh:MM:ss
