@@ -7,6 +7,9 @@ set -e
 
 clear || :
 
+# Try to load cmake module (required on some systems)
+ml cmake || :
+
 CWD=$(pwd)
 cd "$(dirname "$0")"
 ROOT=$(pwd)
