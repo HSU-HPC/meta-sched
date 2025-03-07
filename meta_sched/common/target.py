@@ -316,7 +316,8 @@ class SlurmTarget(Target):
         if interrupted_error is None:
             backoff_count = 0
             job.set_status(JobStatus.Running(self.id))
-            sleep_or_cancel(job.spec.seconds)
+            # Do not wait requested time in case job completes earlier
+            # sleep_or_cancel(job.spec.seconds)
         exit_code = 0
         while True:
             result = connection.run(
