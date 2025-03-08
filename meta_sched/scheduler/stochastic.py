@@ -20,11 +20,12 @@ class Uniform(Scheduler):
             if target_id in self._targets:
                 return Assigned(wait_seconds=0, target_id=target_id)
         return Impossible()
-    
-class WeightedCores(Scheduler):
+
+
+class WeightedByCores(Scheduler):
     def __init__(self: Self, targets: List[Target]) -> None:
         super().__init__(targets)
-        self.__weights = {t.id: t.__nodes * t.__cores_per_node for t in targets}
+        self.__weights = {t.id: t._nodes * t._cores_per_node for t in targets}
 
     def request_schedule(
         self, job_spec: Spec, available_targets: List[str]

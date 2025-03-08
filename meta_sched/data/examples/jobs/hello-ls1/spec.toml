@@ -1,4 +1,6 @@
 cmd_setup = "$MS_INPUT/build_ls1.sh >&2"
 cmd_main  = "$MS_INPUT/run_scenario.py --width $MS_ARRAY_IDX"
 array_size = 10
+# Only use OpenMP:
+# required_modules = ["MPI"]
 time       = "0-05:30:00" # d-hh:MM:ss

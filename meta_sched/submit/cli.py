@@ -133,8 +133,9 @@ class CLI:
         pattern = pattern.replace("*", ".*")
         if "\\." not in pattern:
             pattern += "\\..*"  # Any array_idx (since not given)
-        df = pd.DataFrame(df[df["job_id"].str.contains(f"^{pattern}$", regex=True)])
-        df = pd.DataFrame(df[~df["pid"].isna()])
+        if len(df) > 0:
+            df = pd.DataFrame(df[df["job_id"].str.contains(f"^{pattern}$", regex=True)])
+            df = pd.DataFrame(df[~df["pid"].isna()])
         if len(df) == 0:
             eprint("No jobs.")
             return os.EX_TEMPFAIL
@@ -162,7 +163,7 @@ class CLI:
                     if e.errno == errno.ESRCH:
                         return
 
-        print("Waiting for canceled jobs to terminate...", end="", flush=True)
+        print("Waiting for canceled job(s) to terminate...", end=" ", flush=True)
         try:
             for pid in pids:
                 wait_pid(pid)

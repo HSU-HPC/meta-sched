@@ -1,6 +1,5 @@
 import abc
 import enum
-import os
 import sys
 import time
 from os import PathLike
@@ -48,8 +47,8 @@ class Target(Serializable):
         self.__id = id
         self.__host = host
         self.__port = port
-        self.__nodes = nodes
-        self.__cores_per_node = cores_per_node
+        self._nodes = nodes
+        self._cores_per_node = cores_per_node
         self.__max_time = None if max_time is None else time_to_seconds(max_time)
         self.__max_nodes = max_nodes
         self.__source_scripts = source_scripts
@@ -88,12 +87,12 @@ class Target(Serializable):
         if self.__max_time is not None and job_spec.seconds > self.__max_time:
             return False, "Too much time required"
         max_nodes = (
-            min(self.__nodes, self.__max_nodes) if self.__max_nodes else self.__nodes
+            min(self._nodes, self.__max_nodes) if self.__max_nodes else self._nodes
         )
         if job_spec.nodes > max_nodes:
             return False, "Too many nodes required"
         cores = job_spec.ranks * job_spec.cores_per_rank
-        if cores > self.__cores_per_node:
+        if cores > self._cores_per_node:
             return False, "Too many cores required"
         if any(m not in self.__module_map for m in job_spec.required_modules):
             return False, "Required module missing"
