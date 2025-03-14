@@ -1,4 +1,5 @@
 import http
+import threading
 from multiprocessing import Process
 from os import PathLike
 from pathlib import Path
@@ -31,6 +32,7 @@ class API:
         self.__app.route("/targets", methods=["GET"])(self.get_targets)
         self.__app.route("/jobs", methods=["POST"])(self.create_array_id)
         self.__app.route("/jobs", methods=["PUT"])(self.request_schedule)
+        self.__lock = threading.Lock()
 
     def get_targets(self: Self) -> Tuple[Response, http.HTTPStatus]:
         return jsonify(
@@ -70,7 +72,8 @@ class API:
                     data=dict(prefix="Unknown target(s)"),
                 )
             ), http.HTTPStatus.BAD_REQUEST
-        decision = self.__scheduler.request_schedule(job_spec, suitable_targets)
+        with self.__lock:  # For multi-threaded WSGI servers
+            decision = self.__scheduler.request_schedule(job_spec, suitable_targets)
         return jsonify(
             dict(status="success", data=decision.to_dict())
         ), http.HTTPStatus.OK
