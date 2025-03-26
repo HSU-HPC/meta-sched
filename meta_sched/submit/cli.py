@@ -1,3 +1,5 @@
+"""Module containing the client application for job control."""
+
 import argparse
 import errno
 import inspect
@@ -21,17 +23,39 @@ from meta_sched.submit import ipc
 
 # TODO split into Client and CLI
 class CLI:
+    """
+    Command line application for creating job specifications, submitting, listing, and canceling jobs.
+    """
+
     def __init__(self: Self, submitd_socket_path: Path, scheduler: Scheduler) -> None:
+        """
+        Create a new instance of the CLI.
+
+        Parameters
+        ----------
+        submitd_socket_path : Path
+            Path to the socket file used to send submit requests to the daemon
+        scheduler : Scheduler
+            Interface to the scheduler policy
+        """
         self.__socket_path = submitd_socket_path
         self.__scheduler = scheduler
 
     def ssh_config(self: Self) -> int:
-        "Update SSH configuration"
+        """
+        Update SSH configuration.
+        (Fetches targets from scheduler first.)
+
+        Returns
+        -------
+        int
+            The exit status of the operation
+        """
         try:
             targets = self.__scheduler.targets
         except Exception:
             eprint("Could not connect to scheduler")
-            return os.EX_OK
+            return os.EX_UNAVAILABLE
         targets_missing_user = ssh.update_config({t.id: t.host for t in targets})
         print("Updated", ssh.get_config_paths()[0], end=".\n")
         print(
@@ -40,7 +64,21 @@ class CLI:
         return os.EX_OK
 
     def create(self: Self, template: str, name: str) -> int:
-        "Create a new job spec"
+        """
+        Create a new job spec
+
+        Parameters
+        ----------
+        template : str
+            The name of the template from meta_sched.data.examples.jobs to instantiate
+        name : str
+            The name of the new job spec (folder name)
+
+        Returns
+        -------
+        int
+            The exit status of the operation
+        """
         os.chdir(Path.home())
         examples = {p.name: p for p in (data.get_examples_dir() / "jobs").iterdir()}
         if template not in examples:
@@ -61,7 +99,19 @@ class CLI:
         return os.EX_OK
 
     def submit(self: Self, job_spec: str) -> int:
-        "Submit a job array for an existing job spec"
+        """
+        Submit a job array for an existing job spec
+
+        Parameters
+        ----------
+        job_spec : str
+            The name of the job spec (folder name) to use
+
+        Returns
+        -------
+        int
+            The exit status of the operation
+        """
         os.chdir(Path.home())
         if job_spec not in Spec.list():
             eprint("No such job spec:", job_spec)
@@ -92,13 +142,46 @@ class CLI:
         canceled: bool = False,
         all: bool = False,
     ) -> int:
-        "Get the status of submitted jobs"
+        """
+        Get the status of submitted jobs"
+
+        Parameters
+        ----------
+        count : int
+            The maximum number of jobs to list
+        completed : bool
+            If true, output jobs that have successfully completed
+        failed : bool
+            If true, output jobs that have failed
+        canceled : bool
+            If true, output jobs that have been canceled
+        all : bool
+            If true, output jobs with any state
+
+        Returns
+        -------
+        int
+            The exit status of the operation
+        """
         os.chdir(Path.home())
         df = get_job_outputs()
         df.drop(columns=["path", "pid"], inplace=True)
         pending_scheduled_running = all or not (completed or failed or canceled)
 
         def filter_status(status: str) -> bool:
+            """
+            Filter jobs based on their status.
+
+            Parameters
+            ----------
+            status : str
+                The status of the job
+
+            Returns
+            -------
+            bool
+                True, if the job should be included
+            """
             if all:
                 return True
             match status.lower().split()[0]:
@@ -121,7 +204,22 @@ class CLI:
         return os.EX_OK
 
     def cancel(self: Self, pattern: str, no_confirm: bool = False) -> int:
-        "Cancel submitted jobs"
+        """
+        Cancel submitted jobs
+
+        Parameters
+        ----------
+        pattern : str
+            Pattern to match against all jobs to check if they should be canceled
+            (This is NOT RegEx, only * is supported as a wildcard)
+        no_config : bool
+            If true, the jobs will be canceled without prompting the user to confirm
+
+        Returns
+        -------
+        int
+            The exit status of the operation
+        """
         os.chdir(Path.home())
         df: pd.DataFrame = get_job_outputs()
         if any(not (c.isalnum() or c in "-_.*") for c in pattern):
@@ -141,7 +239,7 @@ class CLI:
             return os.EX_TEMPFAIL
         was_confirmed = False
         if not no_confirm:
-            print(f"Confirm cancelation of jobs:\n{', '.join(df['job_id'].values)}")
+            print(f"Confirm cancellation of jobs:\n{', '.join(df['job_id'].values)}")
             try:
                 was_confirmed = input('\nType "yes": ').strip() == "yes"
             except KeyboardInterrupt:
@@ -154,6 +252,16 @@ class CLI:
             os.kill(pid, signal.SIGINT)
 
         def wait_pid(pid: int, check_interval: float = 1) -> None:
+            """
+            Wait until the process with a given pid terminates using a semi-busy loop.
+
+            Parameters
+            ----------
+            pid : int
+                The PID of the process to wait for
+            check_interval : float
+                Time in seconds between checking the status of the process
+            """
             SIG_CHECK_PID_EXISTS = 0
             while True:
                 try:
@@ -173,6 +281,14 @@ class CLI:
         return os.EX_OK
 
     def run(self: Self) -> int:
+        """
+        Execute the CLI in the current process (blocking).
+
+        Returns
+        -------
+        int
+            The exit status of the CLI (0 indicates success/no error).
+        """
         argv = sys.argv
         argparser = argparse.ArgumentParser()
         command_functions = [
@@ -185,7 +301,10 @@ class CLI:
         commands = {f.__name__.replace("_", "-"): f for f in command_functions}
         subparsers = argparser.add_subparsers(dest="command", required=True)
         for command, f in commands.items():
-            subparser = subparsers.add_parser(command, help=f.__doc__)
+            docstring = f.__doc__
+            subparser = subparsers.add_parser(
+                command, help=(docstring if docstring else "").strip().splitlines()[0]
+            )
             full_arg_spec = inspect.getfullargspec(f)
             args = full_arg_spec.args
             annotations = full_arg_spec.annotations

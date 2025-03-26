@@ -25,7 +25,11 @@ echo "=== Perform static type checking for modules ==="
 source .venv/bin/activate
 
 echo -n "mypy " && mypy -p $PACKAGE
-# echo -n "pyright " && PYRIGHT_PYTHON_FORCE_VERSION=latest pyright -p $PACKAGE
+echo -n "pyright " && PYRIGHT_PYTHON_FORCE_VERSION=latest pyright -p $PACKAGE
+
+echo "=== Check docstring coverage ==="
+uvx docstr-coverage $PACKAGE \
+    --skip-magic
 
 echo "=== Done ==="
 

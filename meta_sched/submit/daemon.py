@@ -1,4 +1,4 @@
-#! /usr/bin/env python3
+"""Module for creating job processes for requests through CLI client."""
 
 import os
 import subprocess
@@ -15,13 +15,36 @@ from meta_sched.submit.lock_file import LockFile
 
 
 class Daemon:
+    """
+    This class creates executer processes for jobs started through the CLI.
+    """
+
     def __init__(self: Self, socket_path: Path, scheduler: Scheduler) -> None:
+        """
+        Create a new instance of the daemon.
+
+        Parameters
+        ----------
+        socket_path : Path
+            Path to the socket file used for incoming requests by CLI clients
+        scheduler : Scheduler
+            Interface to the scheduler policy
+        """
         self.__processes: List[Process] = []
         self.__socket_path = socket_path
         self.__scheduler = scheduler
 
     @staticmethod
     def __switch_user(uid: int) -> None:
+        """
+        Change from the user of the current process and update the environment accordingly.
+        (Only HOME, PATH, PYTHONPATH variables are set.)
+
+        Parameters
+        ----------
+        uid : int
+            The UID/GID of the linux user under which the process should continue
+        """
         cmd = ["getent", "passwd", str(uid)]
         output = subprocess.check_output(cmd).decode()
         home = output.split(":")[-2]
@@ -37,6 +60,20 @@ class Daemon:
     def __run_executor(
         self: Self, job_spec: str, uid: int, array_id: str, array_idx: int
     ) -> None:
+        """
+        Create a job and corresponding executor and run it as the specified user in the current process (blocking).
+
+        Parameters
+        ----------
+        job_spec : str
+            The name of the job specification to load and use to create the job
+        uid : int
+            The linux UID under which this process should continue executing
+        array_id : str
+            The ID of the job array to which this job belongs
+        array_idx : int
+            The unique index of the job in the job array
+        """
         Daemon.__switch_user(uid)
         job = Job(Spec.load(job_spec), array_id, array_idx)
         Executor(
@@ -46,6 +83,16 @@ class Daemon:
         ).run()
 
     def __handler(self: Self, request: str, ids: Tuple[int, int, int]) -> str:
+        """
+        Handler for the IPC server of the daemon for incoming job submission requests by a CLI client.
+
+        Parameters
+        ----------
+        request : str
+            The contents of the IPC request sent by the client (Must be SUBMIT <job_spec>)
+        ids : Tuple[int, int, int]
+            PID, UID, GID of the linux process from which the request originates
+        """
         print("Got", request, "...", end="")
         argv = request.split()
         try:
@@ -65,13 +112,14 @@ class Daemon:
             return "FAILED"
         print("OK!")
         for i in range(1, array_size + 1):
-            # TODO consider fully daemonizing executor to avoid "orphan remote jobs" when the daemon process dies
+            # TODO consider fully demonizing executor to avoid "orphan remote jobs" when the daemon process dies unexpectedly
             p = Process(target=self.__run_executor, args=(job_spec, uid, array_id, i))
             p.start()
             self.__processes.append(p)
         return f"JOBS {job_spec} {array_id}.[1-{array_size}]"
 
     def run(self: Self) -> None:
+        """Execute the daemon in the current process (blocking)."""
         # Ensure that other users can create lock files
         lock_file_dir = LockFile.get_base_path() / "meta-sched"
         lock_file_dir.mkdir(exist_ok=True)
@@ -84,6 +132,7 @@ class Daemon:
                 self.__processes = [p for p in self.__processes if p.is_alive()]
 
     def start_process(self: Self) -> Process:
+        """Start executing the daemon as a new process."""
         process = Process(target=self.run)
         process.start()
         return process

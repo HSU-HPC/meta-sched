@@ -1,8 +1,11 @@
 # Meta-Scheduler
+This project facilitates executing arbitrary batch jobs across multiple target systems in an HPC context.  
+Root access is **not** required for target systems and local SSH credentials of the users is used.   
+_TODO: Insert diagram_
 
 ## To-Dos
-- [ ] Job management
-    - [x] Create (config)
+- [x] Job management
+    - [x] Create (spec)
     - [x] Submit
     - [x] List
     - [x] Cancel

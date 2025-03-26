@@ -3,7 +3,7 @@
 """
 Renders particle data from XYZ file as PNG image.
 
-Usage: ./plot.py <xyz path>
+Usage: ./pvplot.py <xyz path>
 """
 
 import math

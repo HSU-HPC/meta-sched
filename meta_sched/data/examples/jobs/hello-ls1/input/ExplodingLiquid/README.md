@@ -1,4 +1,4 @@
-# Exploding Liquid
+# [Exploding Liquid](https://github.com/ls1mardyn/ls1-mardyn/tree/5bf913db4e9d4e5873c34b84dacc6d226a9efee0/examples/ExplodingLiquid)
 
 ## Description
 A liquid film (=xz-plane) is placed in an elongated, otherwise empty domain. Due to the high density the liquid instantly "explodes" along the y-axis. As periodic boundaries are used this simulates an infinitely large liquid plane. Because the plane is placed in the middle of the domain the shock-front of the explosion will collide with its counterpart travelling in the opposite direction upon hitting the periodic boundary in y-direction. 

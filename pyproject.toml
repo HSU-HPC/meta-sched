@@ -22,9 +22,6 @@ ms-service = "meta_sched:run_service"
 requires      = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
-[tool.poetry]
-include = ["examples"]
-
 [tool.uv]
 package = true
 

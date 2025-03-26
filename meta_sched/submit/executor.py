@@ -1,3 +1,5 @@
+"""Module implementing job execution."""
+
 import os
 import signal
 import time
@@ -15,21 +17,50 @@ from meta_sched.submit.utils import RedirectOutputToFile
 
 
 class Executor:
+    """
+    This class handles the execution of a single job.
+    """
+
     def __init__(
-        self,
+        self: Self,
         job: Job,
         scheduler: SchedulerInterface,
         redirect_output: bool = False,
     ) -> None:
+        """
+        Create a new instance for executing a job.
+
+        Parameters
+        ----------
+        job : Job
+            The job to be executed
+        scheduler : SchedulerInterface
+            Interface to the component determining execution time and target
+        redirect_output : bool
+            If true (default), all output to sys.stdout/sys.stderr will be redirected to a corresponding file in the job output folder (disable for debugging)
+        """
         self.__job = job
         self.__scheduler = scheduler
         self.__redirect_output = redirect_output
 
     def __signal_handler(self: Self, signalnum: int, frame: FrameType | None) -> None:
+        """
+        Handle a signal sent to the process (raising an InterruptedError).
+
+        Parameters
+        ----------
+        signalnum : int
+            The signal that was received
+        frame : FrameType | None
+            (Unused)
+        """
         eprint(f"{self.__class__.__name__} received signal {signalnum}.", flush=True)
         raise InterruptedError(signalnum)
 
     def __run(self: Self) -> None:
+        """
+        Execute the job (blocking the calling thread).
+        """
         signal.signal(signal.SIGINT, self.__signal_handler)
         signal.signal(signal.SIGTERM, self.__signal_handler)
         eprint("=== 1. Selecting suitable targets for job ===")
@@ -60,7 +91,7 @@ class Executor:
                 case scheduling_decision.Assigned():  # Must come before Deferred, because is child class
                     target = suitable_targets[decision.target_id]
                     eprint(
-                        f"Sheduler assigned {target.id} ({target.host}) in T minus {decision.wait_seconds} seconds"
+                        f"Scheduler assigned {target.id} ({target.host}) in T minus {decision.wait_seconds} seconds"
                     )
                     self.__job.set_status(job.Status.Scheduled(target.id))
                     time.sleep(decision.wait_seconds)
@@ -89,10 +120,13 @@ class Executor:
         dst = self.__job.local_output.parent
         target.transfer(src, dst, Target.TransferMode.DOWNLOAD)
         eprint(f"=== 6. Cleaning up files on target {target.id} ===")
-        # TODO consider always cleaning up (even if job failed/was canceled)
+        # TODO: Consider always cleaning up (even if job failed/was canceled)
         target.clean_up(self.__job)
 
     def run(self: Self) -> None:
+        """
+        Execute the job (blocking the calling thread) and manage output files.
+        """
         self.__job.local_output.mkdir(parents=True, exist_ok=True)
         pid_file = self.__job.local_output / ".pid"
         pid_file.write_text(str(os.getpid()))

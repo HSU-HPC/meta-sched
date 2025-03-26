@@ -3,7 +3,7 @@
 """
 Renders particle data from XYZ files as PNG images (and also make GIF animation).
 
-Usage: ./plot.py <output folder name>
+Usage: ./plot_all.pvpy <output folder name>
 """
 
 import os
@@ -15,7 +15,7 @@ os.chdir(Path(__file__).parent)
 
 
 def render(xyz_path: Path) -> int:
-    return os.system(f"{Path(__file__).parent / 'plot.py'} {xyz_path}")
+    return os.system(f"{Path(__file__).parent / 'plot.pvpy'} {xyz_path}")
 
 
 output_path = Path(sys.argv[1])
