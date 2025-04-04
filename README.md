@@ -16,8 +16,9 @@ _TODO: Insert diagram_
 - [ ] (Green) scheduling algorithms
 - [ ] Energy reporting (RAPL)
 - [ ] API authentication (optional if only using localhost)
-- [ ] Code documentation
+- [ ] Code documentation (partially done)
 - [ ] User documentation
+- [ ] Refactoring: Daemon-less client using disowned process ignoring SIGHUP
 
 ## Requirements
 - [uv](https://docs.astral.sh/uv/) as project/package manager

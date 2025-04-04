@@ -45,7 +45,7 @@ class Executor:
 
     def __signal_handler(self: Self, signalnum: int, frame: FrameType | None) -> None:
         """
-        Handle a signal sent to the process (raising an InterruptedError).
+        Handle a signal sent to the process.
 
         Parameters
         ----------
@@ -53,6 +53,11 @@ class Executor:
             The signal that was received
         frame : FrameType | None
             (Unused)
+
+        Raises
+        ------
+        InterruptedError
+            Error containing the signal that was sent to the process
         """
         eprint(f"{self.__class__.__name__} received signal {signalnum}.", flush=True)
         raise InterruptedError(signalnum)

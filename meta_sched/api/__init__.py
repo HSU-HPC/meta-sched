@@ -1,3 +1,5 @@
+"""Module containing the meta scheduler HTTP API."""
+
 import http
 import threading
 from multiprocessing import Process
@@ -13,6 +15,10 @@ from meta_sched.common.scheduler_interface import SchedulerInterface
 
 
 class API:
+    """
+    Flask-based HTTP API for the meta-scheduler.
+    """
+
     def __init__(
         self: Self,
         host: str,
@@ -20,6 +26,20 @@ class API:
         counter_file: str | PathLike[Any],
         scheduler: SchedulerInterface,
     ) -> None:
+        """
+        Create a new instance of the HTTP API.
+
+        Parameters
+        ----------
+        host : str
+            The hostname of the HTTP server (use "0.0.0.0" for public and "localhost" for private API)
+        port : str
+            The port of the HTTP server
+        counter_file: str | PathLike[Any]
+            The path at which to store the state of the job array counter for unique, sequential identifiers
+        scheduler : SchedulerInterface
+            The scheduling policy implementation to be applied
+        """
         self.__host = host
         self.__port = port
         self.__app = Flask(f"{self.__class__.__qualname__}")
@@ -35,11 +55,27 @@ class API:
         self.__lock = threading.Lock()
 
     def get_targets(self: Self) -> Tuple[Response, http.HTTPStatus]:
+        """
+        Get all targets which jobs may be assigned to. (API endpoint)
+
+        Returns
+        -------
+        Tuple[Response, http.HTTPStatus]
+            HTTP response and status containing the list of all targets which jobs may be assigned to
+        """
         return jsonify(
             dict(status="success", data=[t.to_dict() for t in self.__scheduler.targets])
         ), http.HTTPStatus.OK
 
     def create_array_id(self: Self) -> Tuple[Response, http.HTTPStatus]:
+        """
+        Create a new unique identifier for a new job array. (API endpoint)
+
+        Returns
+        -------
+        Tuple[Response, http.HTTPStatus]
+            HTTP response and status containing the new new unique identifier for a job array
+        """
         counter_key = "job"
         array_id = self.__counter.get_next(counter_key).split("-")[-1]
         self.__counter.save(self.__counter_file)
@@ -47,6 +83,14 @@ class API:
         return jsonify(dict(status="success", data=data)), http.HTTPStatus.CREATED
 
     def request_schedule(self: Self) -> Tuple[Response, http.HTTPStatus]:
+        """
+        Apply scheduling policy. (API endpoint)
+
+        Returns
+        -------
+        Tuple[Response, http.HTTPStatus]
+            HTTP response and status containing the new new unique identifier for a job array
+        """
         data = request.json
         # TODO check if the array_id is known (has been created, has not been scheduled already)
         if (
@@ -79,12 +123,20 @@ class API:
         ), http.HTTPStatus.OK
 
     def run(self: Self) -> None:
+        """Run the HTTP API using the built-in server (blocking)."""
         print(
             f"Starting {self.__class__.__qualname__} at http://{self.__host}:{self.__port}"
         )
         self.__app.run(host=self.__host, port=self.__port)
 
     def start_process(self: Self) -> Process:
+        """Start the HTTP API using the built-in server (non blocking).
+
+        Returns
+        -------
+        Process
+            The process executing the API
+        """
         process = Process(target=self.run)
         process.start()
         return process
