@@ -1,3 +1,5 @@
+"""Module for parsing config files."""
+
 import importlib
 import tomllib
 import uuid
@@ -10,34 +12,98 @@ from meta_sched.scheduler import Scheduler
 
 
 class Config:
+    """Class holding the configuration for the meta-scheduler."""
+
     def __init__(
         self: Self,
         scheduler_class: Type[Scheduler],
         counter_file: Path,
         targets: List[Target],
     ) -> None:
+        """
+        Create a new instance of the meta-scheduler configuration.
+
+        Parameters
+        ----------
+        scheduler_class : Type[Scheduler]
+            The scheduling policy to be applied
+        counter_file : Path
+            The path used for persistent, sequential identifiers
+        targets : List[Target]
+            All targets available to execute jobs
+        """
         self.__scheduler_class = scheduler_class
         self.__counter_file = counter_file
         self.__targets = targets
 
     @property
     def targets(self: Self) -> List[Target]:
+        """
+        Get all targets which jobs may be assigned to.
+
+        Returns
+        -------
+        List[Target]
+            The list of all targets which jobs may be assigned to
+        """
         return self.__targets
 
     @property
     def scheduler_class(self: Self) -> Type[Scheduler]:
+        """
+        Get the scheduling policy to be applied.
+
+        Returns
+        -------
+        Type[Scheduler]
+            The type of scheduling policy to be applied
+        """
         return self.__scheduler_class
 
     @property
     def counter_file(self: Self) -> Path:
+        """
+        Get the path used for persistent, sequential identifiers.
+
+        Returns
+        -------
+        Path
+            The path used for persistent, sequential identifiers
+        """
         return self.__counter_file
 
     @classmethod
     def load(cls, path: str | PathLike[Any]) -> Self:
+        """
+        Load a configuration from a file.
+
+        Parameters
+        ----------
+        path : str | PathLike[Any]
+            The path to the file containing the configuration
+
+        Returns
+        -------
+        Self
+            The loaded configuration
+        """
         return cls.parse(Path(path).read_text())
 
     @classmethod
     def parse(cls, config_str: str) -> Self:
+        """
+        Parse the raw contents of a configuration file.
+
+        Parameters
+        ----------
+        config_str : str
+            The raw contents of the configuration file
+
+        Returns
+        -------
+        Self
+            The parsed configuration
+        """
         config = tomllib.loads(config_str)
 
         def require_config(
@@ -47,6 +113,27 @@ class Config:
             options: List[Any] = [],
             path_str: str = "<root>",
         ) -> None:
+            """
+            Assert that a certain configuration value is present in the configuration.
+
+            Parameters
+            ----------
+            config : Any
+                The current configuration
+            path : List[str | None]
+                Property path of the configuration value in the configuration
+            value_type : Any
+                Expected type of the configuration value, but if None (default) the no type is enforced
+            options : List[Any]
+                Possible values for the configuration value, but if empty (default) any value is allowed
+            path_str : str
+                Property path for debugging purposes (<root> by default)
+
+            Raises
+            ------
+            ValueError
+                The error encountered when trying to verify the specified configuration value
+            """
             if len(path) == 0:
                 if value_type and not isinstance(config, value_type):
                     raise ValueError(

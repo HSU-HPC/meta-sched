@@ -1,3 +1,5 @@
+"""Main module of the meta-scheduler application."""
+
 import os
 import signal
 from pathlib import Path
@@ -13,6 +15,14 @@ from meta_sched.submit.daemon import Daemon
 
 
 def __get_api() -> API:
+    """
+    Create an instance of the HTTP API with parameters from the environment or default values.
+
+    Returns
+    -------
+    API
+        A new instance of the HTTP API
+    """
     host = env.get("MS_API_HOST")
     port = int(env.get("MS_API_PORT"))
     config = Config.load(Path(env.get("MS_SCHEDD_CONFIG")))
@@ -21,12 +31,28 @@ def __get_api() -> API:
 
 
 def serve_api() -> int:
+    """
+    Execute HTTP API as root with parameters from the environment or default values.
+
+    Returns
+    -------
+    int
+        The exit code (Always 0, but server runs forever and does not return)
+    """
     try_become_root(False)
     __get_api().run()
     return os.EX_OK
 
 
 def __get_submitd() -> Daemon:
+    """
+    Create an instance of the submit daemon with parameters from the environment or default values.
+
+    Returns
+    -------
+    Daemon
+        A new instance of the submit daemon
+    """
     host = env.get("MS_API_HOST")
     port = int(env.get("MS_API_PORT"))
     socket_path = Path(env.get("MS_SUBMITD_SOCKET"))
@@ -34,12 +60,28 @@ def __get_submitd() -> Daemon:
 
 
 def run_submitd() -> int:
+    """
+    Execute submit daemon as root with parameters from the environment or default values.
+
+    Returns
+    -------
+    int
+        The exit code (Always 0, but daemon runs forever and does not return)
+    """
     try_become_root(True)
     __get_submitd().run()
     return os.EX_OK
 
 
 def run_service() -> int:
+    """
+    Execute submit daemon and HTTP API as root with parameters from the environment or default values.
+
+    Returns
+    -------
+    int
+        The exit code (Always 0, but daemon and server run forever and do not return)
+    """
     try_become_root(True)
     host = env.get("MS_API_HOST")
     port = int(env.get("MS_API_PORT"))
@@ -55,6 +97,14 @@ def run_service() -> int:
 
 
 def run_cli() -> int:
+    """
+    Execute client with parameters from the environment or default values.
+
+    Returns
+    -------
+    int
+        The exit code
+    """
     host = env.get("MS_API_HOST")
     port = int(env.get("MS_API_PORT"))
     socket_path = Path(env.get("MS_SUBMITD_SOCKET"))

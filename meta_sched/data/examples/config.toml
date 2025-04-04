@@ -26,9 +26,10 @@ source_scripts=["/etc/profile"]
 [targets.module_map]
 MPI = "mpi"
 
-# Temporary test system
 [[targets]]
 id="ed388155-bc45-4b59-95da-a2e9e578948d"
-host="wwit-windhpc" # See /etc/hosts
-batch_system="none"
-cores_per_node=4
+host="windpark.windhpc.de"
+batch_system="slurm"
+nodes=5
+cores_per_node=48
+MPI = "mpi/openmpi"

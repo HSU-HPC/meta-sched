@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+"""Script for generating MaMiCo/ls1 configuration files."""
+
 import argparse
 from functools import reduce
 from pathlib import Path
@@ -44,6 +46,14 @@ subsitutions = dict(
 
 
 def apply_template_substitution(name: str) -> None:
+    """
+    Create a concrete configuration file based on the template and apply values from command line arguments.
+
+    Parameters
+    ----------
+    name : str
+        The name of the template file without ".template" extension
+    """
     text = (Path(__file__).parent / f"{name}.template").read_text()
     print(name, end=":\n")
     lines = text.splitlines(keepends=True)

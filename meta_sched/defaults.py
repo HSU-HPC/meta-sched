@@ -1,3 +1,5 @@
+"""Module containing default environment variables."""
+
 from meta_sched import data
 
 MS_SUBMITD_SOCKET = "/var/run/meta-sched/ms-submitd.sock"

@@ -1,5 +1,7 @@
 #! /usr/bin/env python3
 
+"""Script for generating ls1 configuration and running simulation."""
+
 import argparse
 import os
 import shutil
