@@ -1,3 +1,5 @@
+"""Module containing functionality related to SSH."""
+
 import getpass
 from pathlib import Path
 from typing import Dict, Tuple
@@ -8,6 +10,14 @@ DEFAULT_PORT = 22
 
 
 def get_config_paths() -> Tuple[Path, Path]:
+    """
+    Get the paths of the main SSH configuration file and the meta-scheduler SSH configuration file of the current user.
+
+    Returns
+    -------
+    Tuple[Path, Path]
+        the paths of the main and meta-scheduler SSH configuration file of the current user
+    """
     dir_path = Path.home() / ".ssh"
     base_config_path = dir_path / "config"
     config_path = dir_path / "config.d" / "meta-sched"
@@ -15,6 +25,14 @@ def get_config_paths() -> Tuple[Path, Path]:
 
 
 def get_config() -> SSHConfig:
+    """
+    Get the main SSH configuration of the current user.
+
+    Returns
+    -------
+    SSHConfig
+        The SSH configuration
+    """
     try:
         return SSHConfig.from_path(get_config_paths()[0])
     except FileNotFoundError:
@@ -22,6 +40,19 @@ def get_config() -> SSHConfig:
 
 
 def update_config(include_targets_hostnames: Dict[str, str]) -> int:
+    """
+    Update the SSH configuration files of the current user.
+
+    Parameters
+    ----------
+    include_targets_hostnames : Dict[str, str]
+        The mapping of target identifiers to hostnames for the targets available for executing jobs through the meta-scheduler
+
+    Returns
+    -------
+    int
+        The number of targets for which no credentials have been added to the SSH configuration yet
+    """
     # Add meta-sched SSH config and include it in SSH config
     config_path, base_config_path = get_config_paths()
     config_path.parent.mkdir(parents=True, exist_ok=True)

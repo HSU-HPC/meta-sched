@@ -4,19 +4,12 @@ Root access is **not** required for target systems and local SSH credentials of 
 _TODO: Insert diagram_
 
 ## To-Dos
-- [x] Job management
-    - [x] Create (spec)
-    - [x] Submit
-    - [x] List
-    - [x] Cancel
-- [x] Job spec examples
 - [ ] Job attributes (cores, time, MPI etc.)
 - [ ] Slurm support (partially done)
 - [ ] PBS support
 - [ ] (Green) scheduling algorithms
 - [ ] Energy reporting (RAPL)
 - [ ] API authentication (optional if only using localhost)
-- [ ] Code documentation (partially done)
 - [ ] User documentation
 - [ ] Refactoring: Daemon-less client using disowned process ignoring SIGHUP
 

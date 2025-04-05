@@ -14,7 +14,7 @@ def eprint(*args: Any, **kwargs: Any) -> None:
     ----------
     *args : Any
         Positional arguments forwarded to built-in print function
-    *kwargs : Any
+    **kwargs : Any
         Named arguments forwarded to built-in print function
     """
     print(*args, **kwargs, file=sys.stderr)
