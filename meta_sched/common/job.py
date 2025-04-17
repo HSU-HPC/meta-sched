@@ -156,6 +156,7 @@ class Spec:
         ranks: int = 1,
         cores_per_rank: int = 1,
         required_modules: List[str] = [],
+        exclusive: bool = False,
         **kwargs: Any,
     ) -> None:
         """
@@ -183,6 +184,8 @@ class Spec:
             The number of cores required (defaults to 1)
         required_modules : List[str]
             The list of required abstract environment modules (e.g. "MPI" instead of "openmpi" or "mpi/openmpi")
+        exclusive : bool
+            If true, the allocated nodes should only be used by this job
         **kwargs : Any
             Any additional parameters that are not implemented yet
         """
@@ -196,6 +199,7 @@ class Spec:
         self.ranks = ranks
         self.cores_per_rank = cores_per_rank
         self.required_modules = required_modules
+        self.exclusive = exclusive
         if array_size < 0:
             raise ValueError('"array_size" must be at least 1')
         if (time is None and seconds is None) or (

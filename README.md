@@ -4,6 +4,7 @@ Root access is **not** required for target systems and local SSH credentials of 
 _TODO: Insert diagram_
 
 ## To-Dos
+- [ ] **FIXME:** Call MPI applications directly with sbatch -n <ranks> (Also fix MPI example)
 - [ ] Job attributes (cores, time, MPI etc.)
 - [ ] Slurm support (partially done)
 - [ ] PBS support

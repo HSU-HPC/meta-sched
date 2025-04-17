@@ -34,4 +34,5 @@ host="windpark.windhpc.de"
 batch_system="slurm"
 nodes=5
 cores_per_node=48
+source_scripts=["/etc/profile"]
 MPI = "mpi/openmpi"

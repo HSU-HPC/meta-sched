@@ -4,3 +4,5 @@ array_size = 10
 # Only use OpenMP:
 # required_modules = ["MPI"]
 time       = "0-05:30:00" # d-hh:MM:ss
+# Force using all cores of the node:
+exclusive  = true

@@ -530,6 +530,10 @@ class SlurmTarget(Target):
         argv = ["sbatch"]
         if self.partition:
             argv.append(f"--partition={self.partition}")
+        if job.spec.exclusive:
+            argv.append("--exclusive")
+            # FIXME: What about using multiple tasks for MPI?
+            argv.append(f"--cpus-per-task={self._cores_per_node}")
         argv.append(f"--time={seconds_to_time(job.spec.seconds)}")
         argv.append("--output=output")
         argv.append("--error=error")
@@ -592,16 +596,20 @@ class SlurmTarget(Target):
             backoff_count += 1
         eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
         time.sleep(1)  # Wait a bit for the output/error to be received
-        sys.stdout.flush()
-        sys.stderr.flush()
+        exit_code = -1
         result = connection.run(
             f'sacct -j {slurm_job_id} --format "State,ExitCode" --noheader',
             warn=True,
             hide=True,
         )
-        expect_ok(result.exited)
-        sacct_state, sacct_exit_code = result.stdout.splitlines()[0].split()
-        exit_code = int(sacct_exit_code.split(":")[0])
+        try:
+            expect_ok(result.exited)
+            sacct_state, sacct_exit_code = result.stdout.splitlines()[0].split()
+            exit_code = int(sacct_exit_code.split(":")[0])
+        except Exception:
+            eprint("Job completed, but could not determine exit code:")
+        sys.stdout.flush()
+        sys.stderr.flush()
         expect_ok(
             connection.run(f"rm -f {' '.join(output_files.keys())}", warn=True).exited
         )
