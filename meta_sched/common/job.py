@@ -211,7 +211,8 @@ class Spec:
             self.seconds = time_to_seconds(time)
         else:
             self.seconds = seconds
-        eprint(__file__, "Got unused kwargs", kwargs)  # TODO
+        if len(kwargs) > 0:
+            eprint(__file__, "Got unused kwargs", kwargs)  # TODO
 
     @staticmethod
     def list() -> List[str]:

@@ -9,9 +9,9 @@ from typing import Any, Self, Tuple
 
 from flask import Flask, Response, jsonify, request
 
-from meta_sched.api.counter import PersistentCounter
 from meta_sched.common.job import Spec
 from meta_sched.common.scheduler_interface import SchedulerInterface
+from meta_sched.service.counter import PersistentCounter
 
 
 class API:

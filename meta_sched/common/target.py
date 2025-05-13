@@ -86,7 +86,8 @@ class Target(Serializable):
         self.__max_nodes = max_nodes
         self.__source_scripts = source_scripts
         self.__module_map = module_map
-        eprint(__file__, "Got unused kwargs", kwargs)  # TODO
+        if len(kwargs) > 0:
+            eprint(__file__, "Got unused kwargs", kwargs)  # TODO
 
     def to_dict(self: Self) -> Dict[str, Any]:
         """

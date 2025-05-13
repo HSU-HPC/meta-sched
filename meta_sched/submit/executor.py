@@ -68,6 +68,8 @@ class Executor:
         """
         signal.signal(signal.SIGINT, self.__signal_handler)
         signal.signal(signal.SIGTERM, self.__signal_handler)
+        eprint(f"MS_JOB_ID={self.__job.array_id}.{self.__job.array_idx}")
+        eprint(f"MS_JOB_SPEC={self.__job.spec.name}")
         eprint("=== 1. Selecting suitable targets for job ===")
         suitable_targets: Dict[str, Target] = {}
         try:

@@ -18,7 +18,7 @@ from meta_sched.common import ssh
 from meta_sched.common.job import Spec, get_job_outputs, get_jobs_dir
 from meta_sched.common.scheduler_interface import SchedulerInterface as Scheduler
 from meta_sched.common.utils import eprint
-from meta_sched.submit import ipc
+from meta_sched.run_job import launch_job_array
 
 
 # TODO split into Client and CLI
@@ -27,18 +27,15 @@ class CLI:
     Command line application for creating job specifications, submitting, listing, and canceling jobs.
     """
 
-    def __init__(self: Self, submitd_socket_path: Path, scheduler: Scheduler) -> None:
+    def __init__(self: Self, scheduler: Scheduler) -> None:
         """
         Create a new instance of the CLI.
 
         Parameters
         ----------
-        submitd_socket_path : Path
-            Path to the socket file used to send submit requests to the daemon
         scheduler : Scheduler
             Interface to the scheduler policy
         """
-        self.__socket_path = submitd_socket_path
         self.__scheduler = scheduler
 
     def ssh_config(self: Self) -> int:
@@ -120,18 +117,23 @@ class CLI:
                 eprint("-", job_spec)
             return os.EX_NOINPUT
         try:
-            array_size = Spec.load(job_spec).array_size
+            # Validate job spec
+            Spec.load(job_spec)
         except ValueError as e:
             eprint("Could not load job spec:", job_spec)
             print(e)
             return os.EX_NOINPUT
         try:
-            with ipc.Client(self.__socket_path) as client:
-                response = client.request(f"SUBMIT {job_spec} {array_size}")
-                print("submitd:", response)
+            response = launch_job_array(job_spec)
+            print(response)
         except (ConnectionRefusedError, FileNotFoundError):
-            eprint("Could not connect to ms-submitd. (Is it running?)")
+            eprint("Could not connect to ms-service. (Is it running?)")
             return os.EX_UNAVAILABLE
+        except Exception as e:
+            if type(e).__name__ == "ConnectionError":
+                eprint("Could not connect to ms-service. (Is it running?)")
+            else:
+                raise e
         return os.EX_OK
 
     def status(
@@ -227,7 +229,7 @@ class CLI:
                 "Bad job pattern. (Supports only valid job_id characters and wildcard *.)"
             )
             return os.EX_USAGE
-        pattern.replace(".", "\\.")
+        pattern = pattern.replace(".", "\\.")
         pattern = pattern.replace("*", ".*")
         if "\\." not in pattern:
             pattern += "\\..*"  # Any array_idx (since not given)

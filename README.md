@@ -12,7 +12,6 @@ _TODO: Insert diagram_
 - [ ] Energy reporting (RAPL)
 - [ ] API authentication (optional if only using localhost)
 - [ ] User documentation
-- [ ] Refactoring: Daemon-less client using disowned process ignoring SIGHUP
 
 ## Requirements
 - [uv](https://docs.astral.sh/uv/) as project/package manager

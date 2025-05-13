@@ -14,8 +14,6 @@ dependencies = [
 
 [project.scripts]
 ms-cli     = "meta_sched:run_cli"
-ms-submitd = "meta_sched:run_submitd"
-ms-api     = "meta_sched:serve_api"
 ms-service = "meta_sched:run_service"
 
 [build-system]
