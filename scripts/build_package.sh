@@ -6,10 +6,10 @@ SCRIPT_PATH="$(readlink -f "$0")"
 cd "$(dirname "$(dirname "$SCRIPT_PATH")")"
 
 echo "=== Sync project ==="
-uv sync
-uv lock
+uv sync --upgrade
+uv lock --upgrade
 
 echo "=== Build package ==="
-uv build
+uv build --wheel
 
 echo "=== Done ==="

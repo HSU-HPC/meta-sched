@@ -126,12 +126,11 @@ class CLI:
         try:
             response = launch_job_array(job_spec)
             print(response)
-        except (ConnectionRefusedError, FileNotFoundError):
-            eprint("Could not connect to ms-service. (Is it running?)")
-            return os.EX_UNAVAILABLE
         except Exception as e:
+            # TODO Only while using HTTP API (Might change in the future)
             if type(e).__name__ == "ConnectionError":
-                eprint("Could not connect to ms-service. (Is it running?)")
+                eprint("Could not connect to msservice. (Is it running?)")
+                return os.EX_UNAVAILABLE
             else:
                 raise e
         return os.EX_OK

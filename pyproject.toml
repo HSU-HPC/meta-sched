@@ -12,9 +12,18 @@ dependencies = [
     "requests>=2.32.3",
 ]
 
+[dependency-groups]
+dev = [
+    "mypy>=1.15.0",
+    "pyright>=1.1.393",
+    # For static type checking
+    "types-paramiko>=3.5.0",
+    "types-requests>=2.32.0.20241016",
+]
+
 [project.scripts]
-ms-cli     = "meta_sched:run_cli"
-ms-service = "meta_sched:run_service"
+mscli     = "meta_sched:run_cli"
+msservice = "meta_sched:run_service"
 
 [build-system]
 requires      = ["poetry-core"]
@@ -22,13 +31,8 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.uv]
 package = true
-
-dev-dependencies = [
-    "mypy>=1.15.0",
-    "pyright>=1.1.393",
-    # For static type checking
-    "types-paramiko>=3.5.0",
-    "types-requests>=2.32.0.20241016",
+environments = [
+    "sys_platform == 'linux'",
 ]
 
 [tool.mypy]

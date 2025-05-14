@@ -11,8 +11,8 @@ echo "=== Remove python cache files ==="
 find $PACKAGE -type d -name '__pycache__' -exec rm -rf {} +
 
 echo "=== Update project ==="
-uv sync
-uv lock
+uv sync --upgrade
+uv lock --upgrade
 
 echo "=== Apply formatting ==="
 uvx isort .
