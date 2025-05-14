@@ -54,8 +54,8 @@ def __start_process(job_spec: str, array_id: str, array_idx: int) -> int:
     args = ["-s", job_spec, "-a", array_id, "-i", str(array_idx), "-r", "--nohup"]
     p = subprocess.Popen(
         [sys.executable, __file__] + args,
-        stdout=open("/dev/null", "w"),
-        stderr=open("/dev/null", "w"),
+        stdout=subprocess.DEVNULL,
+        stderr=subprocess.DEVNULL,
         preexec_fn=os.setpgrp,  # Do not receive signals from current process
     )
     return p.pid

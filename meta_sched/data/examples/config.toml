@@ -1,6 +1,7 @@
 scheduler_class="stateful.LeastUsed"
 counter_file="/var/lib/meta-sched/counter_file.json"
 
+
 [[targets]]
 # https://portal.hpc.hsu-hh.de/documentation/hsuper/partitions/
 id="ca0032c4-4573-4298-857e-6ba750883bb3"
@@ -27,6 +28,19 @@ max_time="7-00:00:00"
 source_scripts=["/etc/profile"]
 [targets.module_map]
 MPI = "mpi"
+
+
+[[targets]]
+id="526e24ab-38cd-42d3-8fb3-dac4323cc723"
+host="training.hlrs.de"
+batch_system="pbs"
+queue="windhpc"
+nodes="5"
+cores_per_node=48
+max_time="24:00:00"
+[targets.module_map]
+MPI = "mpi/openmpi"
+
 
 [[targets]]
 id="ed388155-bc45-4b59-95da-a2e9e578948d"

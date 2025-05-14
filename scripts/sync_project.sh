@@ -31,5 +31,9 @@ echo "=== Check docstring coverage ==="
 uvx docstr-coverage $PACKAGE \
     --skip-magic
 
+echo "=== WIP annotations ==="
+TC=$(grep -rni todo ./*  | wc -l)
+FC=$(grep -rni fixme ./*  | wc -l)
+echo Found $(($TC-2)) TODOs and "$(($FC-2))" FIXMEs in the project.
 echo "=== Done ==="
 

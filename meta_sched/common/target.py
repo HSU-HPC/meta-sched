@@ -619,6 +619,163 @@ class SlurmTarget(Target):
         expect_ok(exit_code)
 
 
+class PBSTarget(Target):
+    """
+    Class for target running the PBS batch system.
+    """
+
+    def __init__(self: Self, queue: str | None = None, **kwargs: Any) -> None:
+        """
+        Create a new instance of a target for executing jobs through PBS.
+
+        Parameters
+        ----------
+        queue : str | None
+            Optional name of the PBS queue to be used when executing jobs
+        **kwargs : Any
+            Parameters to be passed to the parent constructor of the target
+        """
+        self.queue = queue
+        super().__init__(**kwargs)
+
+    @staticmethod
+    def get_batch_system() -> str:
+        """
+        Get the batch system type of the target.
+
+        Returns
+        -------
+        str
+            "pbs"
+        """
+        return "pbs"
+
+    def _execute_batch_system(
+        self: Self,
+        connection: Connection,
+        job: Job,
+        env: Dict[str, Any] = {},
+    ) -> None:
+        """
+        Execute the job on the target using PBS.
+
+        Parameters
+        ----------
+        connection : Connection
+            The paramiko SSH connection object
+        job : Job
+            The job to be executed on the target
+        env : Dict[str, Any]
+            Optional environment variables to be injected on the target before executing the job
+        """
+        eprint("--- a. Creating and watching output/error files ---")
+        # TODO consider NOT streaming the output/error files
+        output_files = dict(output=sys.stdout, error=sys.stderr)
+        for k, v in output_files.items():
+            connection.run(
+                f"touch {k} && tail -f {k} &",
+                warn=True,
+                asynchronous=True,
+                out_stream=v,
+            )
+        eprint("--- b. Submitting job ---")
+        argv = ["qsub"]
+        if self.queue:
+            argv += ["-q", self.queue]
+        nodes = 1  # TODO use job spec
+        if job.spec.exclusive:
+            argv.append("-n")
+            argv += ["-l", f"select={nodes}:ncpus={self._cores_per_node}"]
+        argv += [f"-lwalltime={seconds_to_time(job.spec.seconds)}"]
+        argv += ["-o", "output"]
+        argv += ["-e", "error"]
+        argv += ["--", "$(which sh)", "-c", f"'{job.spec.cmd_main}'"]
+        argv += ["-N", job.spec.name]
+        argv += ["-V"]  # Export all environment variables
+        cmd = self._prefix_cmd(" ".join(argv), job.spec.required_modules)
+        result = connection.run(cmd, warn=True, env=env, out_stream=sys.stderr)
+        expect_ok(result.exited)
+        pbs_job_id = result.stdout.strip().split(".")[0]
+
+        backoff_count = 0
+        interrupted_error: InterruptedError | None = None
+
+        def sleep_or_cancel(seconds: float) -> None:
+            """
+            Sleep some time or, if receiving a SIGINT, cancel the PBS job.
+
+            Parameters
+            ----------
+            seconds : float
+                The time to sleep for in seconds
+            """
+            try:
+                time.sleep(seconds)
+            except InterruptedError as e:
+                nonlocal backoff_count, interrupted_error
+                if interrupted_error is not None:
+                    eprint("Job was already canceled. (Nothing to do.)")
+                    return
+                # Defer handling until PBS job has been canceled completely
+                eprint(f"Canceling PBS job {pbs_job_id}.")
+                expect_ok(connection.run(f"qdel {pbs_job_id}", warn=True).exited)
+                job.set_status(JobStatus.Canceled())
+                backoff_count = 0
+                interrupted_error = e
+
+        eprint("--- c. Awaiting job start ---")
+        while True:
+            result = connection.run(f"qstat -j {pbs_job_id}", warn=True, hide=True)
+            if (
+                len(result.stdout.strip()) == 0
+                or result.stdout.splitlines()[-1].strip().split()[-2] == "R"
+            ):
+                break  # Job no longer in queue or has started
+            sleep_or_cancel(exponential_backoff(backoff_count))
+            backoff_count += 1
+        eprint("--- d. Awaiting job completion ---")
+        if interrupted_error is None:
+            backoff_count = 0
+            job.set_status(JobStatus.Running(self.id))
+            # Do not wait requested time in case job completes earlier
+            # sleep_or_cancel(job.spec.seconds)
+        exit_code = 0
+        while True:
+            result = connection.run(f"qstat -j {pbs_job_id}", warn=True, hide=True)
+            if len(result.stdout.strip()) == 0:
+                break  # Job no longer in queue
+            sleep_or_cancel(exponential_backoff(backoff_count))
+            backoff_count += 1
+        eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
+        time.sleep(1)  # Wait a bit for the output/error to be received
+        exit_code = -1
+        result = connection.run(
+            f"qstat {pbs_job_id} -f -x",
+            warn=True,
+            hide=True,
+        )
+        try:
+            expect_ok(result.exited)
+            has_exit_code = False
+            for line in result.stdout.splitlines():
+                line = line.strip()
+                if line.startswith("exit_status ="):
+                    exit_code = int(line.split("=")[1].strip())
+                    has_exit_code = True
+                    break
+            assert has_exit_code
+        except Exception:
+            eprint("Job completed, but could not determine exit code:")
+        sys.stdout.flush()
+        sys.stderr.flush()
+        expect_ok(
+            connection.run(f"rm -f {' '.join(output_files.keys())}", warn=True).exited
+        )
+        if interrupted_error is not None:
+            raise interrupted_error
+        expect_ok(exit_code)
+
+
 class TargetFactory:
     """
     A class for creating instances of targets
@@ -642,7 +799,7 @@ class TargetFactory:
         Target
             The new target instance
         """
-        target_classes = [SlurmTarget, DirectTarget]
+        target_classes = [SlurmTarget, PBSTarget, DirectTarget]
         target_class: abc.ABCMeta = {
             cls.get_batch_system(): cls
             for cls in target_classes

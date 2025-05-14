@@ -17,9 +17,10 @@ Please refer to the [administrator](./docs/README.md#administrators) and [user](
 - [ ] **FIXME:** Call MPI applications directly with sbatch -n <ranks> (Also fix MPI example)
 - [ ] Job attributes (cores, time, MPI etc.)
 - [ ] Slurm support (partially done)
-- [ ] PBS support
+- [ ] PBS support (partially done, untested)
 - [ ] (Green) scheduling algorithms
 - [ ] Energy reporting (RAPL)
 - [ ] API authentication (optional if only using localhost)
 - [ ] Split package into separate client/service packages
 - [ ] [Documentation](./docs/README.md)
+- [ ] Refactor job execution in target classes (Single function with concrete implementation of sub-steps like "await_job_end(...)")
