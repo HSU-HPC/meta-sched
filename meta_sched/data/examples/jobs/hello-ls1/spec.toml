@@ -1,4 +1,4 @@
-cmd_setup = "$MS_INPUT/build_ls1.sh >&2"
+cmd_setup = "$MS_INPUT/build_ls1.sh --find >&2" # Build or locate existing binary
 cmd_main  = "$MS_INPUT/run_scenario.py --width $MS_ARRAY_IDX"
 array_size = 10
 # Only use OpenMP:

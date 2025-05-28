@@ -10,6 +10,7 @@ dependencies = [
     "flask>=3.1.0",
     "pandas>=2.2.3",
     "requests>=2.32.3",
+    "typeguard>=4.4.2",
 ]
 
 [dependency-groups]

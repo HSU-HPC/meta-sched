@@ -1,6 +1,7 @@
 """Module for managing and retrieving environment variables."""
 
 import os
+from typing import Any
 
 from meta_sched import defaults
 
@@ -25,7 +26,7 @@ def has(key: str) -> bool:
 
 def get(
     key: str,
-) -> str:
+) -> Any:
     """Get the value of an environment variable or its default.
 
     Parameters

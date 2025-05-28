@@ -35,7 +35,7 @@ id="526e24ab-38cd-42d3-8fb3-dac4323cc723"
 host="training.hlrs.de"
 batch_system="pbs"
 queue="windhpc"
-nodes="5"
+nodes=5
 cores_per_node=48
 max_time="24:00:00"
 [targets.module_map]

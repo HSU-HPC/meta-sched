@@ -186,7 +186,7 @@ class Config:
                 )
         require_config(config, ["targets", None, "host"], str)
         require_config(
-            config, ["targets", None, "batch_system"], str, ["slurm", "none"]
+            config, ["targets", None, "batch_system"], str, ["slurm", "pbs", "none"]
         )
         targets = [TargetFactory.create(**kwargs) for kwargs in config["targets"]]
 

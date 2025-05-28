@@ -19,6 +19,7 @@ from meta_sched.common.job import Status as JobStatus
 from meta_sched.common.serialization import Serializable
 from meta_sched.common.utils import (
     EX_BASH_COMMAND_NOT_FOUND,
+    enforce_type_annotations,
     eprint,
     expect_ok,
     exponential_backoff,
@@ -72,11 +73,12 @@ class Target(Serializable):
         **kwargs : Any
             Additional arguments which are not used
         """
+        enforce_type_annotations(Target)
         if self.__class__ == Target:
             raise NotImplementedError()
-        self.__dict = locals() | kwargs
-        del self.__dict["self"]
-        del self.__dict["kwargs"]
+        self._dict = locals() | kwargs
+        del self._dict["self"]
+        del self._dict["kwargs"]
         self.__id = id
         self.__host = host
         self.__port = port
@@ -98,7 +100,7 @@ class Target(Serializable):
         Dict[str, Any]
             The dictionary representing the target
         """
-        return self.__dict | {"batch_system": self.get_batch_system()}
+        return self._dict | {"batch_system": self.get_batch_system()}
 
     @property
     def id(self: Self) -> str:
@@ -482,10 +484,11 @@ class SlurmTarget(Target):
         partition : str | None
             Optional name of the Slurm partition to be used when executing jobs
         **kwargs : Any
-            Parameters to be passed to the parent constructor of the target
+            Additional parameters to be passed to the parent constructor of the target
         """
-        self.partition = partition
+        self.__partition = partition
         super().__init__(**kwargs)
+        self._dict |= {"partition": partition}
 
     @staticmethod
     def get_batch_system() -> str:
@@ -529,8 +532,8 @@ class SlurmTarget(Target):
             )
         eprint("--- b. Submitting job ---")
         argv = ["sbatch"]
-        if self.partition:
-            argv.append(f"--partition={self.partition}")
+        if self.__partition:
+            argv.append(f"--partition={self.__partition}")
         if job.spec.exclusive:
             argv.append("--exclusive")
             # FIXME: What about using multiple tasks for MPI?
@@ -635,8 +638,9 @@ class PBSTarget(Target):
         **kwargs : Any
             Parameters to be passed to the parent constructor of the target
         """
-        self.queue = queue
+        self.__queue = queue
         super().__init__(**kwargs)
+        self._dict |= {"queue": queue}
 
     @staticmethod
     def get_batch_system() -> str:
@@ -680,22 +684,36 @@ class PBSTarget(Target):
             )
         eprint("--- b. Submitting job ---")
         argv = ["qsub"]
-        if self.queue:
-            argv += ["-q", self.queue]
+        if self.__queue:
+            argv += ["-q", self.__queue]
         nodes = 1  # TODO use job spec
         if job.spec.exclusive:
-            argv.append("-n")
+            argv += ["-l", "place=excl"]
             argv += ["-l", f"select={nodes}:ncpus={self._cores_per_node}"]
-        argv += [f"-lwalltime={seconds_to_time(job.spec.seconds)}"]
+        else:
+            raise NotImplementedError(
+                "Non-exclusive jobs are not yet implemented"
+            )  # TODO
+        argv += ["-l", f"walltime={seconds_to_time(job.spec.seconds, False)}"]
         argv += ["-o", "output"]
         argv += ["-e", "error"]
-        argv += ["--", "$(which sh)", "-c", f"'{job.spec.cmd_main}'"]
+        argv += ["-koed"]  # Stream output files from execution host
         argv += ["-N", job.spec.name]
-        argv += ["-V"]  # Export all environment variables
+        # argv += ["-v", ",".join(f"{k}={v}" for k,v in env.items())]
+        argv += ["-V"]  # Just export all environment variables instead
+        # For non-script jobs, the directory is always $HOME
+        argv += [
+            "--",
+            "$(which sh)",
+            "-c",
+            f"'cd {job.remote_output} && {job.spec.cmd_main}'",
+        ]
         cmd = self._prefix_cmd(" ".join(argv), job.spec.required_modules)
         result = connection.run(cmd, warn=True, env=env, out_stream=sys.stderr)
         expect_ok(result.exited)
-        pbs_job_id = result.stdout.strip().split(".")[0]
+        pbs_job_id = (
+            result.stdout.strip()
+        )
 
         backoff_count = 0
         interrupted_error: InterruptedError | None = None
@@ -724,8 +742,9 @@ class PBSTarget(Target):
                 interrupted_error = e
 
         eprint("--- c. Awaiting job start ---")
+        time.sleep(1)
         while True:
-            result = connection.run(f"qstat -j {pbs_job_id}", warn=True, hide=True)
+            result = connection.run(f"qstat {pbs_job_id}", warn=True, hide=True)
             if (
                 len(result.stdout.strip()) == 0
                 or result.stdout.splitlines()[-1].strip().split()[-2] == "R"
@@ -741,7 +760,7 @@ class PBSTarget(Target):
             # sleep_or_cancel(job.spec.seconds)
         exit_code = 0
         while True:
-            result = connection.run(f"qstat -j {pbs_job_id}", warn=True, hide=True)
+            result = connection.run(f"qstat {pbs_job_id}", warn=True, hide=True)
             if len(result.stdout.strip()) == 0:
                 break  # Job no longer in queue
             sleep_or_cancel(exponential_backoff(backoff_count))

@@ -46,7 +46,7 @@ with open(config_path, "w") as file:
 print("UNIX_STARTED", int(datetime.now(tz=timezone.utc).timestamp()))
 print(f"Running exploding liquid simulation with film width of {args.width} nm:")
 sys.stdout.flush()
-if os.system("which mpiexec") == 0 or False:  # Never use MPI
+if os.system("which mpiexec &>/dev/null") == 0 and False:  # Never use MPI
     os.system(f"mpiexec ./MarDyn {config_path}")
 else:
     os.system(f"./MarDyn {config_path}")

@@ -28,8 +28,8 @@ def __get_scheduler() -> SchedulerInterface:
     Client
         The scheduler client
     """
-    host = env.get("MS_API_HOST")
-    port = int(env.get("MS_API_PORT"))
+    host = env.get("MS_SERVICE_HOST")
+    port = int(env.get("MS_SERVICE_PORT"))
     scheduler = Client(host, port)
     return scheduler
 
