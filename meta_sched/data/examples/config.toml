@@ -49,4 +49,5 @@ batch_system="slurm"
 nodes=5
 cores_per_node=48
 source_scripts=["/etc/profile"]
+[targets.module_map]
 MPI = "mpi/openmpi"

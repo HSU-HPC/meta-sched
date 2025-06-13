@@ -270,9 +270,14 @@ class Target(Serializable):
         with self._connect() as connection:
             expect_ok(connection.run(f"rm -rf {job.remote_output}", warn=True).exited)
 
-    def _connect(self: Self) -> Connection:
+    def _connect(self: Self, timeout: float = 5) -> Connection:
         """
         Connect to the target over SSH.
+
+        Parameters
+        ----------
+        timeout : float
+            The connection timeout in seconds
 
         Returns
         -------
@@ -303,7 +308,10 @@ class Target(Serializable):
             )
         config = Config(ssh_config=ssh_config)
         connection = Connection(
-            str(self.id), config=config, connect_kwargs=connect_kwargs
+            str(self.id),
+            config=config,
+            connect_kwargs=connect_kwargs,
+            connect_timeout=timeout,
         )
         return connection
 
@@ -601,8 +609,9 @@ class SlurmTarget(Target):
         eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
         time.sleep(1)  # Wait a bit for the output/error to be received
         exit_code = -1
+        sacct_cmd = f'sacct -j {slurm_job_id} --format "State,ExitCode" --noheader'
         result = connection.run(
-            f'sacct -j {slurm_job_id} --format "State,ExitCode" --noheader',
+            sacct_cmd,
             warn=True,
             hide=True,
         )
@@ -611,7 +620,9 @@ class SlurmTarget(Target):
             sacct_state, sacct_exit_code = result.stdout.splitlines()[0].split()
             exit_code = int(sacct_exit_code.split(":")[0])
         except Exception:
-            eprint("Job completed, but could not determine exit code:")
+            eprint(
+                f"Job completed, but could not determine exit code using {sacct_cmd}:"
+            )
         sys.stdout.flush()
         sys.stderr.flush()
         expect_ok(
@@ -687,9 +698,16 @@ class PBSTarget(Target):
         if self.__queue:
             argv += ["-q", self.__queue]
         nodes = 1  # TODO use job spec
+        if not job.spec.exclusive:
+            eprint("Treating non-exclusive job as exclusive")  # TODO
+            job.spec.exclusive = True
         if job.spec.exclusive:
+            tasks_per_node = self._cores_per_node  # TODO assumption
             argv += ["-l", "place=excl"]
-            argv += ["-l", f"select={nodes}:ncpus={self._cores_per_node}"]
+            argv += [
+                "-l",
+                f"select={nodes}:ncpus={self._cores_per_node}:mpiprocs={tasks_per_node}",
+            ]
         else:
             raise NotImplementedError(
                 "Non-exclusive jobs are not yet implemented"
@@ -711,9 +729,7 @@ class PBSTarget(Target):
         cmd = self._prefix_cmd(" ".join(argv), job.spec.required_modules)
         result = connection.run(cmd, warn=True, env=env, out_stream=sys.stderr)
         expect_ok(result.exited)
-        pbs_job_id = (
-            result.stdout.strip()
-        )
+        pbs_job_id = result.stdout.strip()
 
         backoff_count = 0
         interrupted_error: InterruptedError | None = None
@@ -768,15 +784,16 @@ class PBSTarget(Target):
         eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
         time.sleep(1)  # Wait a bit for the output/error to be received
         exit_code = -1
+        qstat_cmd = f"qstat {pbs_job_id} -f -x"
         result = connection.run(
-            f"qstat {pbs_job_id} -f -x",
+            qstat_cmd,
             warn=True,
             hide=True,
         )
         try:
             expect_ok(result.exited)
             has_exit_code = False
-            for line in result.stdout.splitlines():
+            for line in result.stdout.lower().splitlines():
                 line = line.strip()
                 if line.startswith("exit_status ="):
                     exit_code = int(line.split("=")[1].strip())
@@ -784,7 +801,9 @@ class PBSTarget(Target):
                     break
             assert has_exit_code
         except Exception:
-            eprint("Job completed, but could not determine exit code:")
+            eprint(
+                f"Job completed, but could not determine exit code using {qstat_cmd}:"
+            )
         sys.stdout.flush()
         sys.stderr.flush()
         expect_ok(
