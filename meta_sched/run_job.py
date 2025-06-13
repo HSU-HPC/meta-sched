@@ -44,7 +44,7 @@ def __start_process(job_spec: str, array_id: str, array_idx: int) -> int:
     array_id : str
         The global identifier of the job array
     array_idx : int
-        The job index in the array (starting at 1)
+        The job index in the array
 
     Returns
     -------
@@ -79,10 +79,10 @@ def launch_job_array(job_spec: str) -> str:
     spec = Spec.load(job_spec)
     scheduler = __get_scheduler()
     array_id = scheduler.create_array_id()
-    for array_idx in range(1, spec.array_size + 1):
+    for array_idx in range(0, spec.array_size):
         __start_process(job_spec, array_id, array_idx)
     # TODO consider returning raw array_id, array_idxs, and PIDs
-    return f"JOBS {job_spec} {array_id}.[1-{spec.array_size}]"
+    return f"JOBS {job_spec} {array_id}#[0-{spec.array_size-1}]"
 
 
 if __name__ == "__main__":

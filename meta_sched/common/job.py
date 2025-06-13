@@ -41,7 +41,7 @@ def _get_job_output(
     array_id : str
         The identifier of the job array
     array_idx : int
-        The index of the job withing the array starting at 1
+        The index of the job withing the array
     hidden : bool
         If true, the top-level directory is hidden (starts with ".")
 
@@ -50,7 +50,7 @@ def _get_job_output(
     Path
         The relative path to the directory containing the job output
     """
-    return get_jobs_dir(hidden=hidden) / f"{job_spec}/output/{array_id}/{array_idx}"
+    return get_jobs_dir(hidden=hidden) / f"{job_spec}/output/{array_id}_{array_idx}"
 
 
 def get_job_outputs() -> pd.DataFrame:
@@ -115,18 +115,15 @@ def get_job_outputs() -> pd.DataFrame:
             output_base_path = p_job / "output"
             if not output_base_path.is_dir():
                 continue
-            for p_array in output_base_path.iterdir():
-                if not p_array.is_dir():
+            for job_output_dir in output_base_path.iterdir():
+                if not job_output_dir.is_dir():
                     continue
-                array_id = p_array.name
-                for p_job in p_array.iterdir():
-                    if not p_job.is_dir():
-                        continue
-                    try:
-                        array_idx = int(p_job.name)
-                    except ValueError:
-                        continue
-                    df.loc[len(df)] = [job_spec, array_id, array_idx]
+                array_id = "_".join(job_output_dir.name.split("_")[:-1])
+                try:
+                    array_idx = int(job_output_dir.name.split("_")[-1])
+                except ValueError:
+                    continue
+                df.loc[len(df)] = [job_spec, array_id, array_idx]
     df["path"] = df.apply(lambda r: _get_job_output(*r), axis=1)
     df["pid"] = df["path"].apply(get_pid).astype(float)
     df["status"] = df["path"].apply(get_status).astype(str)
@@ -136,7 +133,7 @@ def get_job_outputs() -> pd.DataFrame:
     except Exception:
         eprint("Non integer array_id may result in incorrect sorting")
     df.set_index(["array_id", "array_idx"], inplace=True)
-    df.insert(0, "job_id", [f"{i[0]}.{i[1]}" for i in df.index.values])
+    df.insert(0, "job_id", [f"{i[0]}#{i[1]}" for i in df.index.values])
     df.sort_index(inplace=True)
     return df
 
