@@ -150,7 +150,7 @@ class Spec:
         cmd_setup: str | None = None,
         array_size: int = 1,
         nodes: int = 1,
-        ranks: int = 1,
+        ranks_per_node: int = 1,
         cores_per_rank: int = 1,
         required_modules: List[str] = [],
         exclusive: bool = False,
@@ -175,10 +175,10 @@ class Spec:
             The number of jobs in the array (defaults to 1)
         nodes : int
             The number of nodes required (defaults to 1)
-        ranks : int
-            The number of ranks required (defaults to 1)
+        ranks_per_node : int
+            The number of ranks required per node (defaults to 1)
         cores_per_rank : int
-            The number of cores required (defaults to 1)
+            The number of cores required per rank (defaults to 1)
         required_modules : List[str]
             The list of required abstract environment modules (e.g. "MPI" instead of "openmpi" or "mpi/openmpi")
         exclusive : bool
@@ -193,7 +193,7 @@ class Spec:
         self.cmd_main = cmd_main
         self.array_size = array_size
         self.nodes = nodes
-        self.ranks = ranks
+        self.ranks_per_node = ranks_per_node
         self.cores_per_rank = cores_per_rank
         self.required_modules = required_modules
         self.exclusive = exclusive

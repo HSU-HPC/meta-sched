@@ -1,0 +1,48 @@
+{
+  "language": "python",
+  "project": {
+    "include": [
+      "meta_sched/**/*.py"
+    ],
+    "exclude": [
+      "napi_out/**",
+      ".git/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/__pycache__/**",
+      "**/*.pyc",
+      "**/.pytest_cache/**",
+      "**/venv/**",
+      "**/.env/**",
+      "**/*.egg-info/**",
+      "**/.tox/**",
+      "**/.coverage",
+      "**/htmlcov/**",
+      "**/.mypy_cache/**"
+    ]
+  },
+  "outDir": "napi_out",
+  "metrics": {
+    "file": {
+      "maxCodeChar": 100000,
+      "maxChar": 100000,
+      "maxCodeLine": 1000,
+      "maxLine": 1000,
+      "maxDependency": 10,
+      "maxDependent": 10,
+      "maxCyclomaticComplexity": 100
+    },
+    "symbol": {
+      "maxCodeChar": 50000,
+      "maxChar": 50000,
+      "maxCodeLine": 500,
+      "maxLine": 500,
+      "maxDependency": 5,
+      "maxDependent": 5,
+      "maxCyclomaticComplexity": 50
+    }
+  },
+  "python": {
+    "version": "3.12"
+  }
+}

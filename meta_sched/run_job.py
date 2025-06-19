@@ -82,7 +82,7 @@ def launch_job_array(job_spec: str) -> str:
     for array_idx in range(0, spec.array_size):
         __start_process(job_spec, array_id, array_idx)
     # TODO consider returning raw array_id, array_idxs, and PIDs
-    return f"JOBS {job_spec} {array_id}#[0-{spec.array_size-1}]"
+    return f"JOBS {job_spec} {array_id}#[0-{spec.array_size - 1}]"
 
 
 if __name__ == "__main__":
@@ -93,7 +93,7 @@ if __name__ == "__main__":
     arg_parser.add_argument("-r", "--redirect-output", action="store_true")
     arg_parser.add_argument("--nohup", action="store_true")
     args = arg_parser.parse_args()
-    assert args.array_index > 0
+    assert args.array_index >= 0
 
     def ignore_signal(signalnum: int, frame: FrameType | None) -> None:
         """

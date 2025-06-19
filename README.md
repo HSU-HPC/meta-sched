@@ -13,11 +13,6 @@ Besides Linux and [Python 3.12](https://www.python.org/downloads/release/python-
 Please refer to the [administrator](./docs/README.md#administrators) and [user](./docs/README.md#users) documentation.
 
 ## To-Dos
-
-- [ ] **FIXME:** Call MPI applications directly with sbatch -n <ranks> (Also fix MPI example)
-- [ ] Job attributes (cores, time, MPI etc.)
-- [ ] Slurm support (partially done)
-- [ ] PBS support (partially done)
 - [ ] (Green) scheduling algorithms
 - [ ] Energy reporting (RAPL)
 - [ ] API authentication (optional if only using localhost)

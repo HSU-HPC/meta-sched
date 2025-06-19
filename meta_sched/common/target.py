@@ -189,8 +189,8 @@ class Target(Serializable):
         )
         if job_spec.nodes > max_nodes:
             return False, "Too many nodes required"
-        cores = job_spec.ranks * job_spec.cores_per_rank
-        if cores > self._cores_per_node:
+        cores_per_node = job_spec.ranks_per_node * job_spec.cores_per_rank
+        if cores_per_node > self._cores_per_node:
             return False, "Too many cores required"
         if any(m not in self.__module_map for m in job_spec.required_modules):
             return False, "Required module missing"
@@ -544,8 +544,9 @@ class SlurmTarget(Target):
             argv.append(f"--partition={self.__partition}")
         if job.spec.exclusive:
             argv.append("--exclusive")
-            # FIXME: What about using multiple tasks for MPI?
-            argv.append(f"--cpus-per-task={self._cores_per_node}")
+        argv.append(f"--nodes={job.spec.nodes}")
+        argv.append(f"--ntasks-per-node={job.spec.ranks_per_node}")
+        argv.append(f"--cpus-per-task={job.spec.cores_per_rank}")
         argv.append(f"--time={seconds_to_time(job.spec.seconds)}")
         argv.append("--output=output")
         argv.append("--error=error")
@@ -697,21 +698,13 @@ class PBSTarget(Target):
         argv = ["qsub"]
         if self.__queue:
             argv += ["-q", self.__queue]
-        nodes = 1  # TODO use job spec
-        if not job.spec.exclusive:
-            eprint("Treating non-exclusive job as exclusive")  # TODO
-            job.spec.exclusive = True
         if job.spec.exclusive:
-            tasks_per_node = self._cores_per_node  # TODO assumption
             argv += ["-l", "place=excl"]
-            argv += [
-                "-l",
-                f"select={nodes}:ncpus={self._cores_per_node}:mpiprocs={tasks_per_node}",
-            ]
-        else:
-            raise NotImplementedError(
-                "Non-exclusive jobs are not yet implemented"
-            )  # TODO
+        cores_per_node = job.spec.cores_per_rank * job.spec.ranks_per_node
+        argv += [
+            "-l",
+            f"select={job.spec.nodes}:ncpus={cores_per_node}:mpiprocs={job.spec.ranks_per_node}:ompthreads={job.spec.cores_per_rank}",
+        ]
         argv += ["-l", f"walltime={seconds_to_time(job.spec.seconds, False)}"]
         argv += ["-o", "output"]
         argv += ["-e", "error"]

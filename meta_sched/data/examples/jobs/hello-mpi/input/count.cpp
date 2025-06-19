@@ -7,10 +7,13 @@ int main(int argc, char **argv)
 {
     int counter = 0;
     int rank, size;
+    char cpu_name[MPI_MAX_PROCESSOR_NAME];
+    int cpu_name_len;
     const int max_count = 20;
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
+    MPI_Get_processor_name(cpu_name, &cpu_name_len);
     if (size < 2)
     {
         if (rank == 0)
@@ -48,7 +51,7 @@ int main(int argc, char **argv)
             break;
         }
     }
-    std::cout << "Rank #" << rank << " shutting down" << std::endl;
+    std::cout << "Rank #" << rank << " on " << cpu_name << " shutting down" << std::endl;
     MPI_Finalize();
     return 0;
 }
