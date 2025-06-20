@@ -7,14 +7,14 @@ import traceback
 from types import FrameType
 from typing import Dict, Self
 
-from common import job, scheduling_decision
-from common.job import Instance as Job
-from common.scheduler_interface import SchedulerInterface
-from common.target import Target
-from common.utils import StatusException, eprint
+from ms_common import job, scheduling_decision
+from ms_common.job import Instance as Job
+from ms_common.scheduler_interface import SchedulerInterface
+from ms_common.target import Target
+from ms_common.utils import StatusException, eprint
 
-from client.lock_file import LockFile
-from client.utils import RedirectOutputToFile
+from ms_client.lock_file import LockFile
+from ms_client.utils import RedirectOutputToFile
 
 
 class Executor:

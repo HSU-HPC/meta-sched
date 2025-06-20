@@ -4,7 +4,7 @@ import abc
 from dataclasses import dataclass
 from typing import Any, Dict, Self
 
-from common.serialization import Serializable
+from ms_common.serialization import Serializable
 
 
 @dataclass(frozen=True)

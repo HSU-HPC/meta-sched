@@ -4,11 +4,12 @@ Module containing stateful scheduling policies which update and use information 
 
 from typing import List, Self
 
-from common.job import Spec
-from common.scheduling_decision import Assigned, Impossible, SchedulingDecision
-from common.target import Target
+from ms_common.job import Spec
+from ms_common.scheduling_decision import (Assigned, Impossible,
+                                           SchedulingDecision)
+from ms_common.target import Target
 
-from server.scheduler import Scheduler
+from ms_server.scheduler import Scheduler
 
 
 class LeastUsed(Scheduler):

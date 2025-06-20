@@ -14,14 +14,14 @@ from pathlib import Path
 from typing import Any, Dict, Self
 
 import pandas as pd
-from common import env, ssh
-from common.job import Spec, get_job_outputs, get_jobs_dir
-from common.scheduler_interface import SchedulerInterface as Scheduler
-from common.utils import eprint
+from ms_common import env, ssh
+from ms_common.job import Spec, get_job_outputs, get_jobs_dir
+from ms_common.scheduler_interface import SchedulerInterface as Scheduler
+from ms_common.utils import eprint
 
-import client.data as data
-from client.client import Client
-from client.run_job import launch_job_array
+import ms_client.data as data
+from ms_client.client import Client
+from ms_client.run_job import launch_job_array
 
 
 # TODO split into Client and CLI

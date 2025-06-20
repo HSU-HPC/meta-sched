@@ -1,5 +1,5 @@
 [project]
-name = "metasched-client"
+name = "meta-sched-client"
 version = "0.1.0"
 description     = "Meta Scheduler Client"
 authors         = [{name="Ruben Horn"}]
@@ -22,7 +22,7 @@ dev = [
 ]
 
 [project.scripts]
-mscli = "client.cli:main"
+mscli = "ms_client.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "../../src"}
@@ -30,10 +30,10 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["../../src"]
-include = ["client", "client.data", "common"]
+include = ["ms_client", "ms_client.data", "ms_common"]
 
 [tool.setuptools.package-data]
-"client.data" = ["**/*"]
+"ms_client.data" = ["**/*"]
 
 [tool.uv]
 package = true

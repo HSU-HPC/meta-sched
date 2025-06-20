@@ -195,7 +195,7 @@ wheels = [
 ]
 
 [[package]]
-name = "metasched-client"
+name = "meta-sched-client"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

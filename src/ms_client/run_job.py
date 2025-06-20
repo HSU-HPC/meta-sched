@@ -10,13 +10,13 @@ import sys
 from pathlib import Path
 from types import FrameType
 
-from common import env
-from common.job import Instance as Job
-from common.job import Spec
-from common.scheduler_interface import SchedulerInterface
+from ms_common import env
+from ms_common.job import Instance as Job
+from ms_common.job import Spec
+from ms_common.scheduler_interface import SchedulerInterface
 
-from client.client import Client
-from client.executor import Executor
+from ms_client.client import Client
+from ms_client.executor import Executor
 
 
 def __get_scheduler() -> SchedulerInterface:

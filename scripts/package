@@ -2,19 +2,21 @@
 
 set -e
 
-PACKAGE=$1
+COMPONENT=$1
 
-if [[ "$PACKAGE" == "all" ]]; then
-    for PACKAGE in client server; do
-        echo "=== Building $PACKAGE package ==="
-        $0 $PACKAGE
+if [[ "$COMPONENT" == "all" ]]; then
+    for COMPONENT in client server; do
+        echo "=== Building ms_$COMPONENT package ==="
+        $0 $COMPONENT
     done
     echo "=== Done ==="
     exit 0
-elif [[ "$PACKAGE" != "client" && "$PACKAGE" != "server" ]]; then
+elif [[ "$COMPONENT" != "client" && "$COMPONENT" != "server" ]]; then
     echo "Usage: $0 <all|client|server>"
     exit 1
 fi
+
+PACKAGE="ms_$COMPONENT"
 
 SCRIPT_PATH="$(readlink -f "$0")"
 cd "$(dirname "$(dirname "$SCRIPT_PATH")")"
@@ -38,7 +40,7 @@ uv add mypy pyright --dev # Make sure type checkers are installed as development
 # shellcheck source=/dev/null
 source .venv/bin/activate
 cd "$BASE_DIR/src"
-echo -n "mypy " && python -m mypy --package $PACKAGE --package common \
+echo -n "mypy " && python -m mypy --package $PACKAGE --package ms_common \
     --strict \
     --follow-untyped-imports \
     --platform linux \
@@ -58,8 +60,8 @@ check-coverage-and-annotations() {
 echo "--- Analyze $PACKAGE package ---"
 cd "$BASE_DIR/src/$PACKAGE"
 check-coverage-and-annotations || :
-echo "--- Analyze common package ---"
-cd "$BASE_DIR/src/common"
+echo "--- Analyze ms_common package ---"
+cd "$BASE_DIR/src/ms_common"
 check-coverage-and-annotations || :
 echo "--- Done ---"
 

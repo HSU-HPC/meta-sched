@@ -9,15 +9,15 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, Self, Tuple
 
-from common import env
-from common.job import Spec
-from common.scheduler_interface import SchedulerInterface
-from common.utils import eprint, try_become_root
 from flask import Flask, Response, jsonify, request
+from ms_common import env
+from ms_common.job import Spec
+from ms_common.scheduler_interface import SchedulerInterface
+from ms_common.utils import eprint, try_become_root
 
-from server.config import Config
-from server.counter import PersistentCounter
-from server.scheduler import Scheduler
+from ms_server.config import Config
+from ms_server.counter import PersistentCounter
+from ms_server.scheduler import Scheduler
 
 
 class API:

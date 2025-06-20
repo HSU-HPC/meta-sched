@@ -6,7 +6,7 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, Dict, Self
 
-from common.utils import eprint
+from ms_common.utils import eprint
 
 
 class PersistentCounter:

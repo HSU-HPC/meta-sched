@@ -230,7 +230,7 @@ wheels = [
 ]
 
 [[package]]
-name = "metasched-server"
+name = "meta-sched-server"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

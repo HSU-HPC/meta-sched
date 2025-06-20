@@ -5,11 +5,11 @@ import http.client
 from typing import List, Self
 
 import requests
-from common.job import Spec
-from common.scheduler_interface import SchedulerInterface
-from common.scheduling_decision import (SchedulingDecision,
-                                        SchedulingDecisionFactory)
-from common.target import Target, TargetFactory
+from ms_common.job import Spec
+from ms_common.scheduler_interface import SchedulerInterface
+from ms_common.scheduling_decision import (SchedulingDecision,
+                                           SchedulingDecisionFactory)
+from ms_common.target import Target, TargetFactory
 
 
 class Client(SchedulerInterface):

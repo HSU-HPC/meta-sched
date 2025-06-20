@@ -1,18 +1,32 @@
-"""Module containing the interface for the scheduling policy."""
+"""Module containing the base class for implementing scheduling policies."""
 
-import abc
 from typing import List, Self
 
-from common.job import Spec
-from common.scheduling_decision import SchedulingDecision
-from common.target import Target
+from ms_common.job import Spec
+from ms_common.scheduler_interface import SchedulerInterface
+from ms_common.scheduling_decision import SchedulingDecision
+from ms_common.target import Target
 
 
-class SchedulerInterface(abc.ABC):
-    """Base class for scheduling policies."""
+class Scheduler(SchedulerInterface):
+    """
+    Base class for scheduling policies.
+    """
+
+    def __init__(self: Self, targets: List[Target]):
+        """
+        Create a new instance of the scheduling policy
+
+        Parameters
+        ----------
+        targets : List[Target]
+            The list of targets which jobs may be assigned to
+        """
+        if self.__class__ == Scheduler:
+            raise NotImplementedError()
+        self._targets = {t.id: t for t in targets}
 
     @property
-    @abc.abstractmethod
     def targets(self: Self) -> List[Target]:
         """
         Get all targets which jobs may be assigned to.
@@ -21,15 +35,9 @@ class SchedulerInterface(abc.ABC):
         -------
         List[Target]
             The list of all targets which jobs may be assigned to
-
-        Raises
-        ------
-        NotImplementedError
-            May be implemented in concrete scheduling policy"
         """
-        raise NotImplementedError()
+        return list(self._targets.values())
 
-    @abc.abstractmethod
     def create_array_id(self: Self) -> str:
         """
         Create a new unique identifier for a new job array.
@@ -42,11 +50,10 @@ class SchedulerInterface(abc.ABC):
         Raises
         ------
         NotImplementedError
-            May be implemented in concrete scheduling policy"
+            May be implemented in concrete scheduling policy
         """
         raise NotImplementedError()
 
-    @abc.abstractmethod
     def request_schedule(
         self: Self, job_spec: Spec, available_targets: List[str]
     ) -> SchedulingDecision:

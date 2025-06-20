@@ -1,5 +1,5 @@
 [project]
-name = "metasched-server"
+name = "meta-sched-server"
 version = "0.1.0"
 description     = "Meta Scheduler"
 authors         = [{name="Ruben Horn"}]
@@ -23,7 +23,7 @@ dev = [
 ]
 
 [project.scripts]
-msserver = "server:main"
+msserver = "ms_server:main"
 
 [tool.setuptools]
 package-dir = {"" = "../../src"}
@@ -31,7 +31,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["../../src"]
-include = ["server", "server.config", "server.scheduler", "common"]
+include = ["ms_server", "ms_server.config", "ms_server.scheduler", "ms_common"]
 
 [tool.setuptools.package-data]
 "server" = ["config/example.toml"]

@@ -8,9 +8,9 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, List, Self, Type
 
-from common.target import Target, TargetFactory
+from ms_common.target import Target, TargetFactory
 
-from server.scheduler import Scheduler
+from ms_server.scheduler import Scheduler
 
 
 class Config:

@@ -12,12 +12,12 @@ from typing import Any, Dict, List, Self, Tuple
 import invoke
 from fabric import Connection # type: ignore[attr-defined]
 from fabric.config import Config
-from common import ssh
-from common.job import Instance as Job
-from common.job import Spec
-from common.job import Status as JobStatus
-from common.serialization import Serializable
-from common.utils import (EX_BASH_COMMAND_NOT_FOUND,
+from ms_common import ssh
+from ms_common.job import Instance as Job
+from ms_common.job import Spec
+from ms_common.job import Status as JobStatus
+from ms_common.serialization import Serializable
+from ms_common.utils import (EX_BASH_COMMAND_NOT_FOUND,
                                      enforce_type_annotations, eprint,
                                      expect_ok, exponential_backoff,
                                      seconds_to_time, time_to_seconds)

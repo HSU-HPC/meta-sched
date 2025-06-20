@@ -6,7 +6,7 @@
         "**/__pycache__": true,
         "**/.venv": true,
         "**/*.egg-info": true,
-        "packages/client/build": true,
-        "packages/server/build": true,
+        "packages/ms_client/build": true,
+        "packages/ms_server/build": true,
     }
 }

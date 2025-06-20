@@ -7,15 +7,15 @@ if [[ "$SHELL" != */bash ]]; then
     exit 1
 fi
 
-PACKAGE=$1
+COMPONENT=$1
 
-if [[ "$PACKAGE" == "all" ]]; then
-    for PACKAGE in client server; do
-        $0 $PACKAGE
+if [[ "$COMPONENT" == "all" ]]; then
+    for COMPONENT in client server; do
+        $0 $COMPONENT
     done
     echo "=== Done ==="
     exit 0
-elif [[ "$PACKAGE" != "client" && "$PACKAGE" != "server" ]]; then
+elif [[ "$COMPONENT" != "client" && "$COMPONENT" != "server" ]]; then
     echo "Usage: $0 <all|client|server>"
     exit 1
 fi
@@ -59,22 +59,22 @@ else
     echo "--- Found pipx ---"
 fi
 
-echo "=== Install $PACKAGE package ==="
+echo "=== Install $COMPONENT package ==="
 
 SCRIPT_PATH="$(readlink -f "$0")"
 cd "$(dirname "$(dirname "$SCRIPT_PATH")")"
 
-WHEEL=$(find "packages/$PACKAGE/dist/" -type f -name "*.whl" 2>/dev/null || :)
+WHEEL=$(find "packages/ms_$COMPONENT/dist/" -type f -name "*.whl" 2>/dev/null || :)
 
 if [[ ! -f $WHEEL ]]; then
-    echo "Error: Please package $PACKAGE first!"
+    echo "Error: Please package $COMPONENT first!"
     exit 1
 fi
 
-echo "--- Uninstall old $PACKAGE package (if present) ---"
-pipx uninstall "metasched-$PACKAGE" || :
+echo "--- Uninstall old $COMPONENT package (if present) ---"
+pipx uninstall "meta-sched-$COMPONENT" || :
 
-echo "--- Install $PACKAGE package ---"
+echo "--- Install $COMPONENT package ---"
 pipx install $WHEEL --python "$PYTHON_BIN"
 
 echo "--- Done ---"

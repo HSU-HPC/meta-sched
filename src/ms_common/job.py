@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any, List, Self
 
 import pandas as pd
-from common.utils import eprint, time_to_seconds
+from ms_common.utils import eprint, time_to_seconds
 
 
 def get_jobs_dir(hidden: bool = False) -> Path:
