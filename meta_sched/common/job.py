@@ -133,7 +133,7 @@ def get_job_outputs() -> pd.DataFrame:
     except Exception:
         eprint("Non integer array_id may result in incorrect sorting")
     df.set_index(["array_id", "array_idx"], inplace=True)
-    df.insert(0, "job_id", [f"{i[0]}#{i[1]}" for i in df.index.values])
+    df.insert(0, "job_id", [f"{i[0]}_{i[1]}" for i in df.index.values])
     df.sort_index(inplace=True)
     return df
 

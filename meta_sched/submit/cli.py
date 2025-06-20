@@ -204,15 +204,14 @@ class CLI:
         print(df.to_string(index=False))
         return os.EX_OK
 
-    def cancel(self: Self, pattern: str, no_confirm: bool = False) -> int:
+    def cancel(self: Self, array_or_job: str, no_confirm: bool = False) -> int:
         """
         Cancel submitted jobs
 
         Parameters
         ----------
-        pattern : str
-            Pattern to match against all jobs to check if they should be canceled
-            (This is NOT RegEx, only * is supported as a wildcard)
+        array_or_job : str
+            Array or job full job id to match against when checking if a job should be canceled
         no_config : bool
             If true, the jobs will be canceled without prompting the user to confirm
 
@@ -223,18 +222,22 @@ class CLI:
         """
         os.chdir(Path.home())
         df: pd.DataFrame = get_job_outputs()
-        if any(not (c.isalnum() or c in "-_.*") for c in pattern):
+        if any(not (c.isalnum() or c in "_") for c in array_or_job):
             eprint(
                 "Bad job pattern. (Supports only valid job_id characters and wildcard *.)"
             )
             return os.EX_USAGE
-        pattern = pattern.replace(".", "\\.")
-        pattern = pattern.replace("*", ".*")
-        if "\\." not in pattern:
-            pattern += "\\..*"  # Any array_idx (since not given)
+        if "_" not in array_or_job:
+            array_or_job += "_.*"  # Any array_idx (since not given)
+        if array_or_job.endswith("_"):
+            array_or_job += ".*"  # Any array_idx (since not given)
         if len(df) > 0:
-            df = pd.DataFrame(df[df["job_id"].str.contains(f"^{pattern}$", regex=True)])
-            df = pd.DataFrame(df[~df["pid"].isna()])
+            df = pd.DataFrame(
+                df[~df["pid"].isna()]
+            )  # Only jobs that have not yet ended
+            df = pd.DataFrame(
+                df[df["job_id"].str.contains(f"^{array_or_job}$", regex=True)]
+            )
         if len(df) == 0:
             eprint("No jobs.")
             return os.EX_TEMPFAIL
