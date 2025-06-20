@@ -1,0 +1,69 @@
+#! /bin/bash
+
+set -e
+
+PACKAGE=$1
+
+if [[ "$PACKAGE" == "all" ]]; then
+    for PACKAGE in client server; do
+        echo "=== Building $PACKAGE package ==="
+        $0 $PACKAGE
+    done
+    echo "=== Done ==="
+    exit 0
+elif [[ "$PACKAGE" != "client" && "$PACKAGE" != "server" ]]; then
+    echo "Usage: $0 <all|client|server>"
+    exit 1
+fi
+
+SCRIPT_PATH="$(readlink -f "$0")"
+cd "$(dirname "$(dirname "$SCRIPT_PATH")")"
+BASE_DIR=$(pwd)
+
+cd "$BASE_DIR/packages/$PACKAGE"
+
+echo "--- Update project ---"
+uv sync --upgrade
+uv lock --upgrade
+
+cd "$BASE_DIR/src/$PACKAGE"
+echo "--- Apply formatting ---"
+uvx ruff check --fix
+uvx ruff format
+uvx isort .
+
+echo "--- Perform static type checking for modules ---"
+cd "$BASE_DIR/packages/$PACKAGE"
+uv add mypy pyright --dev # Make sure type checkers are installed as development dependencies
+# shellcheck source=/dev/null
+source .venv/bin/activate
+cd "$BASE_DIR/src"
+echo -n "mypy " && python -m mypy --package $PACKAGE --package common \
+    --strict \
+    --follow-untyped-imports \
+    --platform linux \
+    --python-version 3.12
+echo -n "pyright " && PYRIGHT_PYTHON_FORCE_VERSION=latest python -m pyright --project $PACKAGE
+
+check-coverage-and-annotations() {
+    echo "... Check docstring coverage ..."
+    uvx docstr-coverage . --skip-magic
+
+    echo "... Check WIP annotations ..."
+    TC=$(grep --binary-files=without-match -rni todo ./*  | wc -l)
+    FC=$(grep --binary-files=without-match -rni fixme ./*  | wc -l)
+    echo Found "$TC" TODOs and "$FC" FIXMEs in the project.
+}
+
+echo "--- Analyze $PACKAGE package ---"
+cd "$BASE_DIR/src/$PACKAGE"
+check-coverage-and-annotations || :
+echo "--- Analyze common package ---"
+cd "$BASE_DIR/src/common"
+check-coverage-and-annotations || :
+echo "--- Done ---"
+
+echo "--- Build distributable module ---"
+cd "$BASE_DIR/packages/$PACKAGE"
+uv build --wheel --quiet
+unzip -l "$BASE_DIR/packages/$PACKAGE/dist/*.whl"

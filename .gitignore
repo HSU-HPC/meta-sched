@@ -8,6 +8,3 @@ wheels/
 
 # Virtual environments
 .venv
-
-# Source code analysis
-napi_out/

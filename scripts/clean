@@ -1,0 +1,36 @@
+#!/bin/bash
+
+set -e
+
+SCRIPT_PATH="$(readlink -f "$0")"
+cd "$(dirname "$(dirname "$SCRIPT_PATH")")"
+
+DIR_PATTERNS=(
+  "__pycache__"
+  ".mypy_cache"
+  ".ruff_cache"
+  ".pytest_cache"
+  "build"
+  "dist"
+  "*.egg-info"
+)
+
+FILE_PATTERNS=(
+  "*.pyc"
+  "*.pyo"
+  "*.log"
+)
+
+echo "=== Remove generated folders ==="
+for PATTERN in "${DIR_PATTERNS[@]}"; do
+    echo "--- $PATTERN ---"
+    find . -type d -name "$PATTERN" -print -exec rm -rf {} +
+done
+
+echo "=== Remove python compilation files ==="
+for PATTERN in "${FILE_PATTERNS[@]}"; do
+    echo "--- $PATTERN ---"
+    find . -type f -name "$PATTERN" -print -delete
+done
+
+echo "=== Done ==="

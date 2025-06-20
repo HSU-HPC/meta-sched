@@ -1,0 +1,43 @@
+[project]
+name = "metasched-client"
+version = "0.1.0"
+description     = "Meta Scheduler Client"
+authors         = [{name="Ruben Horn"}]
+readme          = "README.md"
+requires-python = ">=3.12"
+
+dependencies = [
+    "fabric>=3.2.2",
+    "pandas>=2.2.3",
+    "requests>=2.32.3",
+    "typeguard>=4.4.2",
+]
+
+[dependency-groups]
+dev = [
+    "mypy>=1.15.0",
+    "pyright>=1.1.393",
+    # For static type checking
+    "types-paramiko>=3.5.0.20250516",
+    "types-requests>=2.32.0.20241016",
+]
+
+[project.scripts]
+mscli = "client.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "../../src"}
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["../../src"]
+include = ["client", "client.data", "common"]
+
+[tool.setuptools.package-data]
+"client.data" = ["**/*"]
+
+[tool.uv]
+package = true
+environments = [
+    "sys_platform == 'linux'",
+]

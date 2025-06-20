@@ -1,0 +1,41 @@
+#! /bin/bash
+
+set -e
+
+# TODO install python 3.12 and pipx
+if [[ -z "$(which pipx)" ]]; then
+    echo "Error: Please install pipx first!"
+    exit 1
+fi
+
+PACKAGE=$1
+
+if [[ "$PACKAGE" == "all" ]]; then
+    for PACKAGE in client server; do
+        echo "=== Installing $PACKAGE package ==="
+        $0 $PACKAGE
+    done
+    echo "=== Done ==="
+    exit 0
+elif [[ "$PACKAGE" != "client" && "$PACKAGE" != "server" ]]; then
+    echo "Usage: $0 <all|client|server>"
+    exit 1
+fi
+
+SCRIPT_PATH="$(readlink -f "$0")"
+cd "$(dirname "$(dirname "$SCRIPT_PATH")")"
+
+WHEEL=$(find "packages/$PACKAGE/dist/" -type f -name "*.whl" 2>/dev/null || :)
+
+if [[ ! -f $WHEEL ]]; then
+    echo "Error: Please package $PACKAGE first!"
+    exit 1
+fi
+
+echo "=== Uninstall old $PACKAGE package (if present) ==="
+pipx uninstall "metasched-$PACKAGE" || :
+
+echo "=== Install $PACKAGE package ==="
+pipx install $WHEEL --force
+
+echo "=== Done ==="

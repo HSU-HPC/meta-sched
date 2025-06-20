@@ -17,5 +17,7 @@ Please refer to the [administrator](./docs/README.md#administrators) and [user](
 - [ ] Energy reporting (RAPL)
 - [ ] API authentication (optional if only using localhost)
 - [ ] [Documentation](./docs/README.md)
+- [ ] Refactor class Target into two non-common classes
 - [ ] Refactor job execution in target classes (Single function with concrete implementation of sub-steps like "await_job_end(...)")
 - [ ] Add type checking where necessary
+- [ ] Add local task queue for direct targets?

@@ -1,0 +1,12 @@
+{
+    "files.exclude": {
+        "**/.git": true,
+        "**/.ruff_cache": true,
+        "**/.mypy_cache": true,
+        "**/__pycache__": true,
+        "**/.venv": true,
+        "**/*.egg-info": true,
+        "packages/client/build": true,
+        "packages/server/build": true,
+    }
+}

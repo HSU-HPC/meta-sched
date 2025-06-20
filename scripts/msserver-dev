@@ -1,0 +1,9 @@
+#! /bin/bash
+
+set -e
+
+SCRIPT_PATH="$(readlink -f "$0")"
+cd "$(dirname "$(dirname "$SCRIPT_PATH")")"
+
+cd packages/server
+uv run msserver --use-default-config --sudo
