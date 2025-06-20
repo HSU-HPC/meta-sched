@@ -3,7 +3,6 @@ name = "metasched-server"
 version = "0.1.0"
 description     = "Meta Scheduler"
 authors         = [{name="Ruben Horn"}]
-readme          = "README.md"
 requires-python = ">=3.12"
 
 dependencies = [

@@ -8,12 +8,10 @@
 
 ## Installation
 
-:exclamation: Users may skip this section if `which mscli` returns a path to the installed CLI.
-
 1. Use [direnv](https://direnv.net/) or `source .envrc` to set up the project environment and set up [uv](https://docs.astral.sh/uv/), if it isn't already installed.
 2. During development, use `mscli-dev` and `msserver-dev` to test the CLI and server respectively.
 3. Build the installable Python package under `./src/<component>/dist/` using `package <all|client|server>`
-4. Install the Python packages using `install <all|client|server>`. (Requires [pipx](https://pipx.pypa.io/stable/)!)
+4. Install the Python packages using `install <all|client|server>`. This also installs Python 3.12 (through [pyenv](https://github.com/pyenv/pyenv)) and [pipx](https://pipx.pypa.io/stable/).
 
 ## Administrators
 

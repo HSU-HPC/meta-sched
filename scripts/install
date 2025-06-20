@@ -2,9 +2,8 @@
 
 set -e
 
-# TODO install python 3.12 and pipx
-if [[ -z "$(which pipx)" ]]; then
-    echo "Error: Please install pipx first!"
+if [[ "$SHELL" != */bash ]]; then
+    echo "Error: Only bash shell is supported!"
     exit 1
 fi
 
@@ -12,7 +11,6 @@ PACKAGE=$1
 
 if [[ "$PACKAGE" == "all" ]]; then
     for PACKAGE in client server; do
-        echo "=== Installing $PACKAGE package ==="
         $0 $PACKAGE
     done
     echo "=== Done ==="
@@ -21,6 +19,47 @@ elif [[ "$PACKAGE" != "client" && "$PACKAGE" != "server" ]]; then
     echo "Usage: $0 <all|client|server>"
     exit 1
 fi
+
+PYTHON_VERSION=3.12.11 # Must be exact Python version (MAJOR.MINOR.PATCH)
+PROFILE="$HOME/.bashrc"
+
+echo "=== Set up environment ==="
+if [[ -z "$(which pyenv)" ]]; then
+    echo "--- Install pyenv ---"
+    wget -qO- https://pyenv.run | bash
+    {
+        echo -e '\n# pyenv configuration'
+        echo 'export PYENV_ROOT="$HOME/.pyenv"'
+        echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"'
+        echo 'eval "$(pyenv init - bash)"'
+    } >> "$PROFILE"
+    # shellcheck source=/dev/null
+    source "$PROFILE"
+else
+    echo "--- Found pyenv ---"
+fi
+
+if ! pyenv versions --bare | grep -q "^${PYTHON_VERSION//./\\.}$"; then
+    echo "--- Install Python $PYTHON_VERSION ---"
+    pyenv install "$PYTHON_VERSION"
+else
+    echo "--- Found Python $PYTHON_VERSION ---"
+fi
+
+PYTHON_BIN="${PYENV_ROOT}/versions/${PYTHON_VERSION}/bin/python3"
+
+if [[ -z "$(which pipx)" ]]; then
+    echo "--- Install pipx ---"
+    "$PYTHON_BIN" -m pip install --upgrade pip
+    "$PYTHON_BIN" -m pip install --user pipx
+    "$PYTHON_BIN" -m pipx ensurepath
+    # shellcheck source=/dev/null
+    source "$PROFILE"
+else
+    echo "--- Found pipx ---"
+fi
+
+echo "=== Install $PACKAGE package ==="
 
 SCRIPT_PATH="$(readlink -f "$0")"
 cd "$(dirname "$(dirname "$SCRIPT_PATH")")"
@@ -32,10 +71,10 @@ if [[ ! -f $WHEEL ]]; then
     exit 1
 fi
 
-echo "=== Uninstall old $PACKAGE package (if present) ==="
+echo "--- Uninstall old $PACKAGE package (if present) ---"
 pipx uninstall "metasched-$PACKAGE" || :
 
-echo "=== Install $PACKAGE package ==="
-pipx install $WHEEL --force
+echo "--- Install $PACKAGE package ---"
+pipx install $WHEEL --python "$PYTHON_BIN"
 
-echo "=== Done ==="
+echo "--- Done ---"
