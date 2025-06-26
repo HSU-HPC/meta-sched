@@ -22,7 +22,7 @@ from ms_common.utils import (EX_BASH_COMMAND_NOT_FOUND,
                                      expect_ok, exponential_backoff,
                                      seconds_to_time, time_to_seconds)
 
-
+# TODO base on pydantic's BaseModel instead (see job.Spec)
 class Target(Serializable):
     """
     Base class representing a target system for job execution.

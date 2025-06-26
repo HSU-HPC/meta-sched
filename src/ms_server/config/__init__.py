@@ -14,7 +14,7 @@ from ms_server.scheduler import Scheduler
 
 
 class Config:
-    """Class holding the configuration for the meta-scheduler."""
+    """Class holding the configuration for the meta scheduler."""
 
     def __init__(
         self: Self,
@@ -25,7 +25,7 @@ class Config:
         targets: List[Target],
     ) -> None:
         """
-        Create a new instance of the meta-scheduler configuration.
+        Create a new instance of the meta scheduler configuration.
 
         Parameters
         ----------

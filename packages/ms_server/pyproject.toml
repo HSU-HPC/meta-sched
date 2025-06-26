@@ -8,9 +8,11 @@ requires-python = ">=3.12"
 dependencies = [
     # TODO remove fabric/paramiko
     "fabric>=3.2.2",
-    "flask>=3.1.0",
+    "fastapi>=0.115.14",
     "pandas>=2.2.3",
+    "pydantic>=2.11.7",
     "typeguard>=4.4.2",
+    "uvicorn>=0.34.3",
 ]
 
 [dependency-groups]

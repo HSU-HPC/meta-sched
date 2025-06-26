@@ -8,5 +8,6 @@
         "**/*.egg-info": true,
         "packages/ms_client/build": true,
         "packages/ms_server/build": true,
-    }
+    },
+    "python.analysis.autoImportCompletions": true
 }
