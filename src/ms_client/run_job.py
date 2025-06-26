@@ -10,12 +10,13 @@ import sys
 from pathlib import Path
 from types import FrameType
 
-from ms_common import env
 from ms_common.job import Instance as Job
 from ms_common.job import Spec
 from ms_common.scheduler_interface import SchedulerInterface
+from ms_common.utils import eprint
 
 from ms_client.client import Client
+from ms_client.config import Config
 from ms_client.executor import Executor
 
 
@@ -29,9 +30,12 @@ def __get_scheduler() -> SchedulerInterface:
     Client
         The scheduler client
     """
-    host = env.get("MS_SERVER_HOST")
-    port = int(env.get("MS_SERVER_PORT"))
-    scheduler = Client(host, port)
+    try:
+        config = Config.load()
+    except Config.Error as e:
+        eprint(e)
+        sys.exit(os.EX_CONFIG)
+    scheduler = Client(config)
     return scheduler
 
 

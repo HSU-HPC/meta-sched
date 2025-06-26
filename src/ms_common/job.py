@@ -132,7 +132,7 @@ def get_job_outputs() -> pd.DataFrame:
     except Exception:
         eprint("Non integer array_id may result in incorrect sorting")
     df.set_index(["array_id", "array_idx"], inplace=True)
-    job_ids = pd.Series([f"{i[0]}_{i[1]}" for i in df.index.values])
+    job_ids = pd.Series([f"{i[0]}_{i[1]}" for i in df.index.values], index=df.index)
     df.insert(0, "job_id",job_ids)
     df.sort_index(inplace=True)
     return df
@@ -153,6 +153,7 @@ class Spec:
         ranks_per_node: int = 1,
         cores_per_rank: int = 1,
         required_modules: List[str] = [],
+        required_tags: List[str] = [],
         exclusive: bool = False,
         **kwargs: Any,
     ) -> None:
@@ -181,6 +182,8 @@ class Spec:
             The number of cores required per rank (defaults to 1)
         required_modules : List[str]
             The list of required abstract environment modules (e.g. "MPI" instead of "openmpi" or "mpi/openmpi")
+        required_tags : List[str]
+            The list of required tags (e.g. "x86", "gpu", "green")
         exclusive : bool
             If true, the allocated nodes should only be used by this job
         **kwargs : Any
@@ -196,6 +199,7 @@ class Spec:
         self.ranks_per_node = ranks_per_node
         self.cores_per_rank = cores_per_rank
         self.required_modules = required_modules
+        self.required_tags = required_tags
         self.exclusive = exclusive
         if array_size < 0:
             raise ValueError('"array_size" must be at least 1')

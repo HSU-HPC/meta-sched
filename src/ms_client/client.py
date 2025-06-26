@@ -11,23 +11,22 @@ from ms_common.scheduling_decision import (SchedulingDecision,
                                            SchedulingDecisionFactory)
 from ms_common.target import Target, TargetFactory
 
+from ms_client.config import Config
+
 
 class Client(SchedulerInterface):
     """Client for the meta-scheduler HTTP API."""
 
-    def __init__(self: Self, host: str, port: int):
+    def __init__(self: Self, config: Config):
         """
         Create a client for the HTTP server of the API.
 
         Parameters
         ----------
-        host : str
-            The hostname of the HTTP server
-        port : str
-            The port of the HTTP server
+        endpoint : str
+            The HTTP endpoint of the server
         """
-        self.__host = host
-        self.__port = port
+        self.__endpoint = config.endpoint
 
     @property
     def targets(self: Self) -> List[Target]:
@@ -39,7 +38,7 @@ class Client(SchedulerInterface):
         List[Target]
             The list of all targets which jobs may be assigned to
         """
-        response = requests.get(f"http://{self.__host}:{self.__port}/targets")
+        response = requests.get(f"{self.__endpoint}/targets")
         if http.HTTPStatus.OK != response.status_code:
             raise http.client.error()
         content = response.json()
@@ -56,7 +55,7 @@ class Client(SchedulerInterface):
         str
             A new unique identifier for a job array
         """
-        response = requests.post(f"http://{self.__host}:{self.__port}/jobs")
+        response = requests.post(f"{self.__endpoint}/jobs")
         if http.HTTPStatus.CREATED != response.status_code:
             raise http.client.error()
         content = response.json()
@@ -83,7 +82,7 @@ class Client(SchedulerInterface):
             The scheduling decision based on the policy
         """
         response = requests.put(
-            f"http://{self.__host}:{self.__port}/jobs",
+            f"{self.__endpoint}/jobs",
             json=dict(
                 job_spec=job_spec.__dict__,
                 available_targets=available_targets,

@@ -15,17 +15,9 @@
 
 ## Administrators
 
-After [installing the server package](#installation), execute it using:
-
-```bash
-MS_SERVER_HOST=localhost \
-MS_SERVER_PORT=8001 \
-MS_SCHED_CONFIG=config.toml \
-msserver
-```
-
-While all environment variables are optional, the flag `--use-default-config` must be added to use the [default configuration file](../src/server/server/config/default.toml).  
-If the application is running under a non-root user and requires `sudo`, add the flag `--sudo` to the command.
+After [installing the server package](#installation), execute it using `msserver`.  
+A [default configuration file](../src/server/server/config/default.toml) is displayed, if no configuration is found at `/etc/meta-sched.toml`.
+If the application is running under a non-root user and requires `sudo`, add the flag `--sudo`.
 
 To persistently execute the server in the background after the system has booted, create a new [systemd unit](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html) or use a terminal multiplexer like [tmux](https://github.com/tmux/tmux/wiki) to manually run it in the background.
 

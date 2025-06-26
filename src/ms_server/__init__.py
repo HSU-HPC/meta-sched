@@ -10,7 +10,6 @@ from pathlib import Path
 from typing import Any, Self, Tuple
 
 from flask import Flask, Response, jsonify, request
-from ms_common import env
 from ms_common.job import Spec
 from ms_common.scheduler_interface import SchedulerInterface
 from ms_common.utils import eprint, try_become_root
@@ -158,25 +157,22 @@ def main() -> int:
         The exit code (Always 0, but server runs forever and does not return)
     """
     try_become_root(False)
-    host = env.get("MS_SERVER_HOST")
-    port = int(env.get("MS_SERVER_PORT"))
-    key_env_conf = "MS_SCHED_CONFIG"
-    config_path = Path(env.get(key_env_conf, Config.get_default_config_path()))
-    if not (env.has(key_env_conf) or "--use-default-config" in sys.argv):
-        eprint(
-            f"No scheduler configuration was given in the environment variable {key_env_conf}."
-        )
-        eprint(
-            "Using the following default configuration, requires the flag --use-default-config:"
-        )
-        eprint()
-        config_str = config_path.read_text()
-        eprint(config_str)
-        return os.EX_NOINPUT
+    config_path = Config.get_config_path()
+    if not config_path.is_file():
+        if "--use-default-config" not in sys.argv:
+            eprint(f"No scheduler configuration was found at {config_path}.")
+            eprint(
+                "Using the following default configuration, requires the flag --use-default-config:"
+            )
+            eprint()
+            config_str = config_path.read_text()
+            eprint(config_str)
+            return os.EX_NOINPUT
+        config_path = Config.get_default_config_path()
     config = Config.load(config_path)
     scheduler: Scheduler = config.scheduler_class(config.targets)
     try:
-        api = API(host, port, config.counter_file, scheduler)
+        api = API(*config.endpoint, config.counter_file, scheduler)
         api.run()
     except PermissionError as e:
         eprint(e)

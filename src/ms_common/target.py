@@ -39,6 +39,7 @@ class Target(Serializable):
         max_nodes: int | None = None,
         source_scripts: List[str] = [],
         module_map: Dict[str, str] = {},
+        tags: List[str] = [],
         **kwargs: Any,
     ) -> None:
         """
@@ -65,6 +66,8 @@ class Target(Serializable):
         module_map : Dict[str, str]
             A mapping of abstract environment modules such as "MPI" to concrete ones such as "mpi/openmpi",
             which should be loaded after connecting to the target
+        tags : List[str]
+            A list of tags for the target such as "gpu", "x86", "green", etc.
         **kwargs : Any
             Additional arguments which are not used
         """
@@ -83,6 +86,7 @@ class Target(Serializable):
         self.__max_nodes = max_nodes
         self.__source_scripts = source_scripts
         self.__module_map = module_map
+        self.__tags = tags
         if len(kwargs) > 0:
             eprint(__file__, "Got unused kwargs", kwargs)  # TODO
 
@@ -96,6 +100,37 @@ class Target(Serializable):
             The dictionary representing the target
         """
         return self._dict | {"batch_system": self.get_batch_system()}
+
+    def _create_oe_files(self: Self, connection: Connection, stream_contents: bool) -> Tuple[str, str]:
+        """
+        Create job output and error files and optionally stream their contents as they are appended.
+
+        Parameters
+        ----------
+        connection : Connection
+            The connection over which to create the files
+        stream_contents : bool
+            If true, the contents of the files will be streamed to stdout/stderr as they are appended
+        """
+        # TODO use random filenames and return them for use in the job submission/cleanup
+        output_files = dict(output=sys.stdout, error=sys.stderr)
+        for k, v in output_files.items():
+            connection.run(
+                f"touch {k}",
+                warn=True,
+                asynchronous=True,
+                out_stream=v,
+            )
+            if stream_contents:
+                connection.run(
+                    f"tail -f {k} &",
+                    warn=True,
+                    asynchronous=True,
+                    out_stream=v,
+                )
+        oe = tuple(output_files.keys())
+        assert len(oe) == 2
+        return oe
 
     @property
     def id(self: Self) -> str:
@@ -187,8 +222,12 @@ class Target(Serializable):
         cores_per_node = job_spec.ranks_per_node * job_spec.cores_per_rank
         if cores_per_node > self._cores_per_node:
             return False, "Too many cores required"
-        if any(m not in self.__module_map for m in job_spec.required_modules):
-            return False, "Required module missing"
+        for t in job_spec.required_tags:
+            if t not in self.__tags:
+                return False, f'Required tag "{t}" missing'
+        for m in job_spec.required_modules:
+            if m not in self.__module_map:
+                return False, f'Required module "{m}" missing'
         return True, "OK"
 
     def transfer(
@@ -525,14 +564,7 @@ class SlurmTarget(Target):
         """
         eprint("--- a. Creating and watching output/error files ---")
         # TODO consider NOT streaming the output/error files
-        output_files = dict(output=sys.stdout, error=sys.stderr)
-        for k, v in output_files.items():
-            connection.run(
-                f"touch {k} && tail -f {k} &",
-                warn=True,
-                asynchronous=True,
-                out_stream=v,
-            )
+        output_files = self._create_oe_files(connection, True)
         eprint("--- b. Submitting job ---")
         argv = ["sbatch"]
         if self.__partition:
@@ -622,7 +654,7 @@ class SlurmTarget(Target):
         sys.stdout.flush()
         sys.stderr.flush()
         expect_ok(
-            connection.run(f"rm -f {' '.join(output_files.keys())}", warn=True).exited
+            connection.run(f"rm -f {' '.join(output_files)}", warn=True).exited
         )
         if interrupted_error is not None:
             raise interrupted_error
@@ -681,14 +713,7 @@ class PBSTarget(Target):
         """
         eprint("--- a. Creating and watching output/error files ---")
         # TODO consider NOT streaming the output/error files
-        output_files = dict(output=sys.stdout, error=sys.stderr)
-        for k, v in output_files.items():
-            connection.run(
-                f"touch {k} && tail -f {k} &",
-                warn=True,
-                asynchronous=True,
-                out_stream=v,
-            )
+        output_files = self._create_oe_files(connection, True)
         eprint("--- b. Submitting job ---")
         argv = ["qsub"]
         if self.__queue:
@@ -795,7 +820,7 @@ class PBSTarget(Target):
         sys.stdout.flush()
         sys.stderr.flush()
         expect_ok(
-            connection.run(f"rm -f {' '.join(output_files.keys())}", warn=True).exited
+            connection.run(f"rm -f {' '.join(output_files)}", warn=True).exited
         )
         if interrupted_error is not None:
             raise interrupted_error

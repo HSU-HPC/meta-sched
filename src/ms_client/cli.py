@@ -14,13 +14,14 @@ from pathlib import Path
 from typing import Any, Dict, Self
 
 import pandas as pd
-from ms_common import env, ssh
+from ms_common import ssh
 from ms_common.job import Spec, get_job_outputs, get_jobs_dir
 from ms_common.scheduler_interface import SchedulerInterface as Scheduler
 from ms_common.utils import eprint
 
 import ms_client.data as data
 from ms_client.client import Client
+from ms_client.config import Config
 from ms_client.run_job import launch_job_array
 
 
@@ -350,6 +351,9 @@ def main() -> int:
     int
         The exit code
     """
-    host = env.get("MS_SERVER_HOST")
-    port = int(env.get("MS_SERVER_PORT"))
-    return CLI(Client(host, port)).run()
+    try:
+        config = Config.load()
+    except Config.Error as e:
+        eprint(e)
+        return os.EX_CONFIG
+    return CLI(Client(config)).run()

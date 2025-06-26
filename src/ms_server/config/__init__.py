@@ -6,7 +6,7 @@ import tomllib
 import uuid
 from os import PathLike
 from pathlib import Path
-from typing import Any, List, Self, Type
+from typing import Any, List, Self, Tuple, Type
 
 from ms_common.target import Target, TargetFactory
 
@@ -18,6 +18,8 @@ class Config:
 
     def __init__(
         self: Self,
+        host: str,
+        port: int,
         scheduler_class: Type[Scheduler],
         counter_file: Path,
         targets: List[Target],
@@ -27,6 +29,8 @@ class Config:
 
         Parameters
         ----------
+        host : The host of the API
+        port : The port of the API
         scheduler_class : Type[Scheduler]
             The scheduling policy to be applied
         counter_file : Path
@@ -34,21 +38,47 @@ class Config:
         targets : List[Target]
             All targets available to execute jobs
         """
+        self.__host = host
+        self.__port = port
         self.__scheduler_class = scheduler_class
         self.__counter_file = counter_file
         self.__targets = targets
 
     @classmethod
-    def get_default_config_path(cls) -> str:
+    def get_config_path(cls) -> Path:
+        """
+        Get the path to the config file.
+
+        Returns
+        -------
+        Path
+            The absolute path to the config file
+        """
+        return Path("/") / "etc" / "meta-sched.toml"
+
+    @classmethod
+    def get_default_config_path(cls) -> Path:
         """
         Get the path to the default config file.
 
         Returns
         -------
-        str
+        Path
             The absolute path to the default config file
         """
-        return str((Path(__file__).parent / "example.toml").absolute())
+        return (Path(__file__).parent / "example.toml").absolute()
+
+    @property
+    def endpoint(self: Self) -> Tuple[str, int]:
+        """
+        Get the endpoint consisting of host and port for the API.
+
+        Returns
+        -------
+        Tuple[str, int]
+            The host and port for the API
+        """
+        return self.__host, self.__port
 
     @property
     def targets(self: Self) -> List[Target]:
@@ -173,6 +203,9 @@ class Config:
                         raise ValueError(f'Required config "{path_str}"')
                     require_config(value, path[1:], value_type, options, path_str)
 
+        require_config(config, ["host"], str)
+        require_config(config, ["port"], int)
+
         require_config(config, ["scheduler_class"], str)
         scheduler_class = Scheduler
 
@@ -217,4 +250,10 @@ class Config:
         )
         targets = [TargetFactory.create(**kwargs) for kwargs in config["targets"]]
 
-        return cls(scheduler_class, Path(config["counter_file"]), targets)
+        return cls(
+            config["host"],
+            config["port"],
+            scheduler_class,
+            Path(config["counter_file"]),
+            targets,
+        )
