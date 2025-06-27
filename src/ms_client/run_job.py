@@ -12,15 +12,15 @@ from types import FrameType
 
 from ms_common.job import Instance as Job
 from ms_common.job import Spec
-from ms_common.scheduler_interface import SchedulerInterface
 from ms_common.utils import eprint
 
 from ms_client.client import Client
 from ms_client.config import Config
 from ms_client.executor import Executor
+from ms_client.scheduler_interface import SchedulerClientInterface
 
 
-def __get_scheduler() -> SchedulerInterface:
+def __get_scheduler() -> SchedulerClientInterface:
     """
     Instantiates a client for access to the scheduler.
     (Uses parameters from the environment or default values.)
@@ -66,6 +66,24 @@ def __start_process(job_spec: str, array_id: str, array_idx: int) -> int:
     return p.pid
 
 
+class NoTargetsAvailableError(RuntimeError):
+    """
+    Exception raised when no targets are available to run a job.
+    """
+
+    def __init__(self, job_spec: str) -> None:
+        """
+        Initialize the exception with the job specification that has no targets available.
+
+        Parameters
+        ----------
+        job_spec : str
+            The name of the job spec (folder name)
+        """
+        super().__init__(f"No targets available to run '{job_spec}'.")
+        self.job_spec = job_spec
+
+
 def launch_job_array(job_spec: str) -> str:
     """
     Execute a job array by starting each job as a processes.
@@ -80,10 +98,18 @@ def launch_job_array(job_spec: str) -> str:
     str
         Information about the launched job spec and job identifiers
         # TODO consider returning python data structure instead
+
+    Raises
+    ------
+    NoTargetsAvailableError
+        If no targets are available to run the job spec
     """
     spec = Spec.load(job_spec)
     scheduler = __get_scheduler()
-    array_id = scheduler.create_array_id()
+    suitable_targets = Executor.filter_targets(spec, scheduler)
+    if len(suitable_targets) == 0:
+        raise NoTargetsAvailableError(job_spec)
+    array_id = scheduler.submit(spec, suitable_targets)
     for array_idx in range(0, spec.array_size):
         __start_process(job_spec, array_id, array_idx)
     # TODO consider returning raw array_id, array_idxs, and PIDs

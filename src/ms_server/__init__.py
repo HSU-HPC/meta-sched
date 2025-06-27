@@ -4,10 +4,11 @@ import os
 import sys
 
 from ms_common.utils import eprint, try_become_root
+from pydantic import ValidationError
 
 from ms_server.api import API
 from ms_server.config import Config
-from ms_server.scheduler import Scheduler
+from ms_server.scheduling import Policy
 
 
 def main() -> int:
@@ -32,10 +33,14 @@ def main() -> int:
             eprint(config_str)
             return os.EX_NOINPUT
         config_path = Config.get_default_config_path()
-    config = Config.load(config_path)
-    scheduler: Scheduler = config.scheduler_class(config.targets)
     try:
-        api = API(config.counter_file, scheduler)
+        config = Config.load(config_path)
+    except ValidationError as e:
+        eprint(e.json(indent=3))
+        sys.exit(os.EX_CONFIG)
+    scheduler: Policy = config.scheduler_class(config.targets)
+    try:
+        api = API(scheduler)
         api.run(*config.endpoint)
     except PermissionError as e:
         eprint(e)

@@ -2,7 +2,6 @@ host = "localhost"
 port = 8001
 
 scheduler_class="stateful.py:LeastUsed"
-counter_file="/var/lib/meta-sched/counter_file.json"
 
 
 [[targets]]
@@ -10,8 +9,7 @@ counter_file="/var/lib/meta-sched/counter_file.json"
 id="ca0032c4-4573-4298-857e-6ba750883bb3"
 host="hsuper-login01.hsu-hh.de"
 batch_system="slurm"
-partition="small"
-# TODO make sure types are actually ints
+queue="small"
 nodes=571
 cores_per_node=72
 max_time="72:00:00"
@@ -25,7 +23,7 @@ MPI = "intel-oneapi-mpi"
 id="256b4c0e-c6b7-41da-a35d-03382428528a"
 host="windhpc00.hsu-hh.de"
 batch_system="slurm"
-partition="long"
+queue="long"
 nodes=3
 cores_per_node=48
 max_time="7-00:00:00"

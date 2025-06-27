@@ -12,94 +12,85 @@ from typing import Any, Dict, List, Self, Tuple
 import invoke
 from fabric import Connection # type: ignore[attr-defined]
 from fabric.config import Config
+from pydantic import BaseModel, model_validator
 from ms_common import ssh
 from ms_common.job import Instance as Job
 from ms_common.job import Spec
 from ms_common.job import Status as JobStatus
-from ms_common.serialization import Serializable
 from ms_common.utils import (EX_BASH_COMMAND_NOT_FOUND,
                                      enforce_type_annotations, eprint,
                                      expect_ok, exponential_backoff,
                                      seconds_to_time, time_to_seconds)
 
 # TODO base on pydantic's BaseModel instead (see job.Spec)
-class Target(Serializable):
+class Target(BaseModel):
     """
     Base class representing a target system for job execution.
+
+    Attributes
+    ----------
+    id : str
+        The unique identifier of the target also used as its SSH alias
+    batch_system : str
+        The batch system used by the target, e.g. "slurm", "pbs", "none" (default, direct execution)
+    queue : str | None
+        The name of the queue/partition used by the target (if applicable, e.g. for Slurm or PBS)
+    host : str
+        The hostname used to connect to the target
+    nodes : int
+        The number of compute nodes associated with this target
+    cores_per_node : int
+        The number of CPU cores per compute node for this target
+    port : int
+        The port used to connect to the target (defaults to default SSH port)
+    max_time : str
+        The maximum time for which a job may run on this target formatted as "d-hh:MM:ss"
+    max_nodes : int
+        The maximum number of compute nodes which may be allocated to a job
+    source_scripts : List[str]
+        A list of files which should be sourced after connecting to the target before running any commands
+    module_map : Dict[str, str]
+        A mapping of abstract environment modules such as "MPI" to concrete ones such as "mpi/openmpi",
+        which should be loaded after connecting to the target
+    tags : List[str]
+        A list of tags for the target such as "gpu", "x86", "green", etc.
     """
+    id: str
+    batch_system: str = "none"
+    queue: str | None = None
+    host: str
+    nodes: int
+    cores_per_node: int
+    port: int = ssh.DEFAULT_PORT
+    max_time: str | None = None
+    max_nodes: int | None = None
+    source_scripts: List[str] = []
+    module_map: Dict[str, str] = {}
+    tags: List[str] = []
 
-    def __init__(
-        self: Self,
-        id: str,
-        host: str,
-        nodes: int,
-        cores_per_node: int,
-        port: int = ssh.DEFAULT_PORT,
-        max_time: str | int | None = None,
-        max_nodes: int | None = None,
-        source_scripts: List[str] = [],
-        module_map: Dict[str, str] = {},
-        tags: List[str] = [],
-        **kwargs: Any,
-    ) -> None:
+    @model_validator(mode="after")
+    def validate_attributes(cls, target: Any) -> Any:
         """
-        Create a new instance representing a target system.
-
-        Parameters
-        ----------
-        id : str
-            The unique identifier of the target also used as its SSH alias
-        host : str
-            The hostname used to connect to the target
-        nodes : int
-            The number of compute nodes associated with this target
-        cores_per_node : int
-            The number of CPU cores per compute node for this target
-        port : int
-            The port used to connect to the target (defaults to default SSH port)
-        max_time : str
-            The maximum time for which a job may run on this target formatted as "d-hh:MM:ss"
-        max_nodes : int
-            The maximum number of compute nodes which may be allocated to a job
-        source_scripts : List[str]
-            A list of files which should be sourced after connecting to the target before running any commands
-        module_map : Dict[str, str]
-            A mapping of abstract environment modules such as "MPI" to concrete ones such as "mpi/openmpi",
-            which should be loaded after connecting to the target
-        tags : List[str]
-            A list of tags for the target such as "gpu", "x86", "green", etc.
-        **kwargs : Any
-            Additional arguments which are not used
+        Validates an adjusts (!) target attributes. (Is idempotent.)
         """
-        enforce_type_annotations(Target)
-        if self.__class__ == Target:
-            raise NotImplementedError()
-        self._dict = locals() | kwargs
-        del self._dict["self"]
-        del self._dict["kwargs"]
-        self.__id = id
-        self.__host = host
-        self.__port = port
-        self._nodes = nodes
-        self._cores_per_node = cores_per_node
-        self.__max_time = None if max_time is None else time_to_seconds(max_time)
-        self.__max_nodes = max_nodes
-        self.__source_scripts = source_scripts
-        self.__module_map = module_map
-        self.__tags = tags
-        if len(kwargs) > 0:
-            eprint(__file__, "Got unused kwargs", kwargs)  # TODO
-
-    def to_dict(self: Self) -> Dict[str, Any]:
-        """
-        Create a dictionary representation of the target.
-
-        Returns
-        -------
-        Dict[str, Any]
-            The dictionary representing the target
-        """
-        return self._dict | {"batch_system": self.get_batch_system()}
+        if target.batch_system not in ["none", "slurm", "pbs"]:
+            raise ValueError(
+                f"Invalid batch system {target.batch_system} for target {target.id}"
+            )
+        if target.batch_system == "none":
+            if target.nodes != 1 or target.max_nodes is not None:
+                raise ValueError(
+                    f"Target {target.id} of type {target.__class__.__name__} does not support multiple nodes"
+                )
+            if target.queue is not None:
+                eprint(
+                    f"Warning: Target {target.id} of type {target.__class__.__name__} does not support queues. (Ignoring.)"
+                )
+            if target.max_time is not None:
+                eprint(
+                    f"Warning: Target {target.id} of type {target.__class__.__name__} does not support maximum job time. (Ignoring.)"
+                )
+        return target
 
     def _create_oe_files(self: Self, connection: Connection, stream_contents: bool) -> Tuple[str, str]:
         """
@@ -131,47 +122,6 @@ class Target(Serializable):
         oe = tuple(output_files.keys())
         assert len(oe) == 2
         return oe
-
-    @property
-    def id(self: Self) -> str:
-        """
-        Get the identifier of the target which is also used as its SSH alias.
-
-        Returns
-        -------
-        str
-            The identifier of the target
-        """
-        return self.__id
-
-    @property
-    def host(self: Self) -> str:
-        """
-        Get the hostname of the target.
-
-        Returns
-        -------
-        str
-            The hostname of the target
-        """
-        return self.__host
-
-    @staticmethod
-    def get_batch_system() -> str:
-        """
-        Get the batch system type of the target.
-
-        Returns
-        -------
-        str
-            The batch system type of the target
-
-        Raises
-        ------
-        NotImplementedError
-            Must be implemented by the concrete target class
-        """
-        raise NotImplementedError()
 
     @property
     def has_user(self: Self) -> bool:
@@ -212,21 +162,21 @@ class Target(Serializable):
         """
         if not self.has_user:
             return False, "Credentials missing"
-        if self.__max_time is not None and job_spec.seconds > self.__max_time:
+        if self.max_time is not None and job_spec.seconds > time_to_seconds(self.max_time):
             return False, "Too much time required"
         max_nodes = (
-            min(self._nodes, self.__max_nodes) if self.__max_nodes else self._nodes
+            min(self.nodes, self.max_nodes) if self.max_nodes else self.nodes
         )
         if job_spec.nodes > max_nodes:
             return False, "Too many nodes required"
         cores_per_node = job_spec.ranks_per_node * job_spec.cores_per_rank
-        if cores_per_node > self._cores_per_node:
+        if cores_per_node > self.cores_per_node:
             return False, "Too many cores required"
         for t in job_spec.required_tags:
-            if t not in self.__tags:
+            if t not in self.tags:
                 return False, f'Required tag "{t}" missing'
         for m in job_spec.required_modules:
-            if m not in self.__module_map:
+            if m not in self.module_map:
                 return False, f'Required module "{m}" missing'
         return True, "OK"
 
@@ -264,7 +214,7 @@ class Target(Serializable):
             "--archive",
             "--progress",
             "--verbose",
-            f'-e "ssh -p {self.__port} {ssh_options_str}"',
+            f'-e "ssh -p {self.port} {ssh_options_str}"',
         ]
         cmd = f"rsync {' '.join(rsync_flags)} {src} {dst} 1>&2"
         result = invoke.run(cmd, warn=True)
@@ -276,7 +226,7 @@ class Target(Serializable):
             )
             scp_flags = [
                 "-P",
-                str(self.__port),
+                str(self.port),
                 "-p",
                 "-r",
                 "-O",
@@ -329,13 +279,13 @@ class Target(Serializable):
         host = (
             target_ssh_config["hostname"] if "hostname" in target_ssh_config else None
         )
-        if host != self.__host:
+        if host != self.host:
             eprint(
-                f"Warning: HostName mismatch for {self.id}:", host, "!=", self.__host
+                f"Warning: HostName mismatch for {self.id}:", host, "!=", self.host
             )
-        if self.__port != ssh.DEFAULT_PORT and (
+        if self.port != ssh.DEFAULT_PORT and (
             "port" not in target_ssh_config
-            or int(target_ssh_config["port"]) != self.__port
+            or int(target_ssh_config["port"]) != self.port
         ):
             raise RuntimeError(
                 f"Cannot connect to target {self.id} (Non-default Port missing in SSH config)"
@@ -366,13 +316,18 @@ class Target(Serializable):
             The job to be executed on the target
         env : Dict[str, Any]
             Optional environment variables to be injected on the target before executing the job
-
-        Raises
-        ------
-        NotImplementedError
-            The execution of the job must be implemented by the concrete target class
         """
-        raise NotImplementedError()
+        match self.batch_system:
+            case "none":
+                self._execute_batch_system_none(connection, job, env)
+            case "slurm":
+                self._execute_batch_system_slurm(connection, job, env)
+            case "pbs":
+                self._execute_batch_system_pbs(connection, job, env)
+            case _:
+                raise ValueError(
+                    f"Unsupported batch system {self.batch_system} for target {self.id}"
+                )
 
     def _prefix_cmd(self: Self, cmd: str, modules: List[str] = []) -> str:
         """
@@ -390,9 +345,9 @@ class Target(Serializable):
         str
             The prefixed command
         """
-        specific_modules = [self.__module_map[m] for m in modules]
+        specific_modules = [self.module_map[m] for m in modules]
         cmd = " && ".join(
-            [f"source {script}" for script in self.__source_scripts]
+            [f"source {script}" for script in self.source_scripts]
             + [f"module load {module}" for module in specific_modules]
             + [cmd]
         )
@@ -456,40 +411,7 @@ class Target(Serializable):
                 self._execute_batch_system(connection, job, Target.__get_env(job))
 
 
-class DirectTarget(Target):
-    """
-    Class for target without a batch system.
-    (Jobs are executed directly on the remote shell.)
-    """
-
-    def __init__(self: Self, **kwargs: Any) -> None:
-        """
-        Create a new instance of a target for direct command execution.
-
-        Parameters
-        ----------
-        **kwargs : Any
-            Parameters to be passed to the parent constructor of the target
-        """
-        if "nodes" in kwargs and kwargs["nodes"] != 1:
-            eprint(
-                f"Target {self.id} of type {self.__class__.__name__} does not support multiple nodes"
-            )
-        super().__init__(**kwargs | {"nodes": 1})
-
-    @staticmethod
-    def get_batch_system() -> str:
-        """
-        Get the batch system type of the target.
-
-        Returns
-        -------
-        str
-            "none"
-        """
-        return "none"
-
-    def _execute_batch_system(
+    def _execute_batch_system_none(
         self: Self,
         connection: Connection,
         job: Job,
@@ -512,39 +434,7 @@ class DirectTarget(Target):
         expect_ok(connection.run(cmd, warn=True, env=env).exited)
 
 
-class SlurmTarget(Target):
-    """
-    Class for target running the Slurm batch system.
-    """
-
-    def __init__(self: Self, partition: str | None = None, **kwargs: Any) -> None:
-        """
-        Create a new instance of a target for executing jobs through Slurm.
-
-        Parameters
-        ----------
-        partition : str | None
-            Optional name of the Slurm partition to be used when executing jobs
-        **kwargs : Any
-            Additional parameters to be passed to the parent constructor of the target
-        """
-        self.__partition = partition
-        super().__init__(**kwargs)
-        self._dict |= {"partition": partition}
-
-    @staticmethod
-    def get_batch_system() -> str:
-        """
-        Get the batch system type of the target.
-
-        Returns
-        -------
-        str
-            "slurm"
-        """
-        return "slurm"
-
-    def _execute_batch_system(
+    def _execute_batch_system_slurm(
         self: Self,
         connection: Connection,
         job: Job,
@@ -567,8 +457,8 @@ class SlurmTarget(Target):
         output_files = self._create_oe_files(connection, True)
         eprint("--- b. Submitting job ---")
         argv = ["sbatch"]
-        if self.__partition:
-            argv.append(f"--partition={self.__partition}")
+        if self.queue:
+            argv.append(f"--partition={self.queue}")
         if job.spec.exclusive:
             argv.append("--exclusive")
         argv.append(f"--nodes={job.spec.nodes}")
@@ -660,40 +550,7 @@ class SlurmTarget(Target):
             raise interrupted_error
         expect_ok(exit_code)
 
-
-class PBSTarget(Target):
-    """
-    Class for target running the PBS batch system.
-    """
-
-    def __init__(self: Self, queue: str | None = None, **kwargs: Any) -> None:
-        """
-        Create a new instance of a target for executing jobs through PBS.
-
-        Parameters
-        ----------
-        queue : str | None
-            Optional name of the PBS queue to be used when executing jobs
-        **kwargs : Any
-            Parameters to be passed to the parent constructor of the target
-        """
-        self.__queue = queue
-        super().__init__(**kwargs)
-        self._dict |= {"queue": queue}
-
-    @staticmethod
-    def get_batch_system() -> str:
-        """
-        Get the batch system type of the target.
-
-        Returns
-        -------
-        str
-            "pbs"
-        """
-        return "pbs"
-
-    def _execute_batch_system(
+    def _execute_batch_system_pbs(
         self: Self,
         connection: Connection,
         job: Job,
@@ -716,8 +573,8 @@ class PBSTarget(Target):
         output_files = self._create_oe_files(connection, True)
         eprint("--- b. Submitting job ---")
         argv = ["qsub"]
-        if self.__queue:
-            argv += ["-q", self.__queue]
+        if self.queue:
+            argv += ["-q", self.queue]
         if job.spec.exclusive:
             argv += ["-l", "place=excl"]
         cores_per_node = job.spec.cores_per_rank * job.spec.ranks_per_node
@@ -825,36 +682,3 @@ class PBSTarget(Target):
         if interrupted_error is not None:
             raise interrupted_error
         expect_ok(exit_code)
-
-
-class TargetFactory:
-    """
-    A class for creating instances of targets
-    """
-
-    @staticmethod
-    def create(batch_system: str, **kwargs: Any) -> Target:
-        """
-        Create a new target instance
-
-        Parameters
-        ----------
-        batch_system : str
-            The type of target which should be created
-
-        **kwargs : Any
-            The parameters which should be passed to the constructor of the specific target
-
-        Returns
-        -------
-        Target
-            The new target instance
-        """
-        target_classes = [SlurmTarget, PBSTarget, DirectTarget]
-        target_class: abc.ABCMeta = {
-            cls.get_batch_system(): cls
-            for cls in target_classes
-            if issubclass(cls, Target)
-        }[batch_system]
-        assert issubclass(target_class, Target)
-        return target_class(**kwargs)

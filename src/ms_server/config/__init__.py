@@ -8,11 +8,12 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, List, Self, Tuple, Type
 
-from ms_common.target import Target, TargetFactory
+from ms_common.target import Target
 
-from ms_server.scheduler import Scheduler
+from ms_server.scheduling import Policy
 
 
+# TODO refactor to use pydantic BaseModel for parsing and validation
 class Config:
     """Class holding the configuration for the meta scheduler."""
 
@@ -20,8 +21,7 @@ class Config:
         self: Self,
         host: str,
         port: int,
-        scheduler_class: Type[Scheduler],
-        counter_file: Path,
+        scheduler_class: Type[Policy],
         targets: List[Target],
     ) -> None:
         """
@@ -33,15 +33,12 @@ class Config:
         port : The port of the API
         scheduler_class : Type[Scheduler]
             The scheduling policy to be applied
-        counter_file : Path
-            The path used for persistent, sequential identifiers
         targets : List[Target]
             All targets available to execute jobs
         """
         self.__host = host
         self.__port = port
         self.__scheduler_class = scheduler_class
-        self.__counter_file = counter_file
         self.__targets = targets
 
     @classmethod
@@ -93,7 +90,7 @@ class Config:
         return self.__targets
 
     @property
-    def scheduler_class(self: Self) -> Type[Scheduler]:
+    def scheduler_class(self: Self) -> Type[Policy]:
         """
         Get the scheduling policy to be applied.
 
@@ -103,18 +100,6 @@ class Config:
             The type of scheduling policy to be applied
         """
         return self.__scheduler_class
-
-    @property
-    def counter_file(self: Self) -> Path:
-        """
-        Get the path used for persistent, sequential identifiers.
-
-        Returns
-        -------
-        Path
-            The path used for persistent, sequential identifiers
-        """
-        return self.__counter_file
 
     @classmethod
     def load(cls, path: str | PathLike[Any]) -> Self:
@@ -207,18 +192,18 @@ class Config:
         require_config(config, ["port"], int)
 
         require_config(config, ["scheduler_class"], str)
-        scheduler_class = Scheduler
+        scheduler_class = Policy
 
         module_filename, class_name = config["scheduler_class"].split(":")
         try:
-            base_path = Path(__file__).parent.parent / "scheduler"
+            base_path = Path(__file__).parent.parent / "scheduling"
             module_path = (
                 Path(module_filename)
                 if module_filename.startswith("/")
                 else base_path / module_filename
             )
             spec = importlib.util.spec_from_file_location(
-                "__scheduler." + module_path.stem, module_path
+                "__scheduling." + module_path.stem, module_path
             )
             assert spec is not None
             module = importlib.util.module_from_spec(spec)
@@ -227,12 +212,11 @@ class Config:
             scheduler_class = getattr(module, class_name)
         except (ModuleNotFoundError, AttributeError, AssertionError):
             raise ValueError(f'Could not load scheduler "{config["scheduler_class"]}"')
-        if not issubclass(scheduler_class, Scheduler):
+        if not issubclass(scheduler_class, Policy):
             raise ValueError(
-                f'"{config["scheduler_class"]}" is not a subclass of "{Scheduler.__class__.__qualname__}"'
+                f'"{config["scheduler_class"]}" is not a subclass of "{Policy.__class__.__qualname__}"'
             )
 
-        require_config(config, ["counter_file"], str)
         require_config(config, ["targets", None, "id"], str)
         for i in range(len(config["targets"])):
             id = config["targets"][i]["id"]
@@ -248,12 +232,11 @@ class Config:
         require_config(
             config, ["targets", None, "batch_system"], str, ["slurm", "pbs", "none"]
         )
-        targets = [TargetFactory.create(**kwargs) for kwargs in config["targets"]]
+        targets = [Target.model_validate(o) for o in config["targets"]]
 
         return cls(
             config["host"],
             config["port"],
             scheduler_class,
-            Path(config["counter_file"]),
             targets,
         )

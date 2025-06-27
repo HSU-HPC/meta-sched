@@ -1,14 +1,14 @@
 """Module containing the interface for the scheduling policy."""
 
 import abc
-from typing import List, Self
+from typing import List, Self, Set
 
 from ms_common.job import Spec
-from ms_common.scheduling_decision import SchedulingDecision
+from ms_common.scheduling_decision import SchedulingDecisionType
 from ms_common.target import Target
 
 
-class SchedulerInterface(abc.ABC):
+class SchedulerClientInterface(abc.ABC):
     """Base class for scheduling policies."""
 
     @property
@@ -25,33 +25,14 @@ class SchedulerInterface(abc.ABC):
         Raises
         ------
         NotImplementedError
-            May be implemented in concrete scheduling policy"
+            Must be implemented in concrete scheduling policy"
         """
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def create_array_id(self: Self) -> str:
+    def submit(self: Self, job_spec: Spec, available_targets: Set[str]) -> str:
         """
-        Create a new unique identifier for a new job array.
-
-        Returns
-        -------
-        str
-            A new unique identifier for a job array
-
-        Raises
-        ------
-        NotImplementedError
-            May be implemented in concrete scheduling policy"
-        """
-        raise NotImplementedError()
-
-    @abc.abstractmethod
-    def request_schedule(
-        self: Self, job_spec: Spec, available_targets: List[str]
-    ) -> SchedulingDecision:
-        """
-        Apply scheduling policy.
+        Create a new unique identifier for a new job array and schedule the corresponding jobs.
 
         Parameters
         ----------
@@ -59,6 +40,32 @@ class SchedulerInterface(abc.ABC):
             The job specification
         available_targets : List[str]
             List of identifiers of targets available to the client for job submission
+
+        Returns
+        -------
+        str
+            The array ID of the new job array
+
+        Raises
+        ------
+        NotImplementedError
+            Must be implemented in concrete scheduling policy"
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def poll_scheduling_decision(
+        self: Self, array_id: str, array_idx: int
+    ) -> SchedulingDecisionType:
+        """
+        Await the final decision of the scheduler (may block for very long.)
+
+        Parameters
+        ----------
+        array_id : str
+            The unique identifier of the job array
+        array_idx : int
+            The index of the job in the job array
 
         Returns
         -------

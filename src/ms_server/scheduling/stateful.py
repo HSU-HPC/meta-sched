@@ -4,15 +4,14 @@ Module containing stateful scheduling policies which update and use information 
 
 from typing import List, Self
 
-from ms_common.job import Spec
-from ms_common.scheduling_decision import (Assigned, Impossible,
-                                           SchedulingDecision)
+from ms_common.scheduling_decision import Assigned, Impossible
 from ms_common.target import Target
 
-from ms_server.scheduler import Scheduler
+from ms_server.job import Job
+from ms_server.scheduling import GreedyPolicy
 
 
-class LeastUsed(Scheduler):
+class LeastUsed(GreedyPolicy):
     """
     This scheduling policy assigns jobs uniformly by assigning the least used target next.
     (Note that this may result in a non-uniform distribution across all targets depending on the available ones.)
@@ -30,31 +29,25 @@ class LeastUsed(Scheduler):
         super().__init__(targets)
         self.__job_count = {t.id: 0 for t in targets}
 
-    def request_schedule(
-        self: Self, job_spec: Spec, available_targets: List[str]
-    ) -> SchedulingDecision:
+    async def schedule_job(self: Self, job: Job) -> None:
         """
-        Apply scheduling policy, assigning the job to the least used available target.
+        Schedule a job by assigning it to the least used target.
 
         Parameters
         ----------
-        job_spec : Spec
-            The job specification (Unused)
-        available_targets : List[str]
-            List of identifiers of targets available to the client for job submission
-
-        Returns
-        -------
-        SchedulingDecision
-            The scheduling decision based on the policy (assigned to least used target or impossible)
+        job : Job
+            The job to be scheduled
         """
-        available_targets.sort()
+        available_targets = sorted(list(job.available_targets))
         target_ids = [t for t in available_targets if t in self.__job_count]
         if len(target_ids) == 0:
-            return Impossible()
+            await job.make_scheduling_decision(Impossible())
+            return
         selected = 0
         for i in range(len(target_ids)):
             if self.__job_count[target_ids[selected]] > self.__job_count[target_ids[i]]:
                 selected = i
         self.__job_count[target_ids[selected]] += 1
-        return Assigned(wait_seconds=0, target_id=target_ids[selected])
+        target = self._targets[target_ids[selected]]
+        decision = Assigned(wait_seconds=0, target=target)
+        await job.make_scheduling_decision(decision)

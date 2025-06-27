@@ -16,13 +16,13 @@ from typing import Any, Dict, Self
 import pandas as pd
 from ms_common import ssh
 from ms_common.job import Spec, get_job_outputs, get_jobs_dir
-from ms_common.scheduler_interface import SchedulerInterface as Scheduler
 from ms_common.utils import eprint
 
 import ms_client.data as data
 from ms_client.client import Client
 from ms_client.config import Config
-from ms_client.run_job import launch_job_array
+from ms_client.run_job import NoTargetsAvailableError, launch_job_array
+from ms_client.scheduler_interface import SchedulerClientInterface as Scheduler
 
 
 # TODO split into Client and CLI
@@ -130,6 +130,9 @@ class CLI:
         try:
             response = launch_job_array(job_spec)
             print(response)
+        except NoTargetsAvailableError as e:
+            eprint("No targets available to run job spec:", e.job_spec)
+            sys.exit(os.EX_UNAVAILABLE)
         except Exception as e:
             # TODO Only while using HTTP API (Might change in the future)
             if type(e).__name__ == "ConnectionError":

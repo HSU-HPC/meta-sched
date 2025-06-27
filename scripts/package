@@ -52,8 +52,8 @@ check-coverage-and-annotations() {
     uvx docstr-coverage . --skip-magic
 
     echo "... Check WIP annotations ..."
-    TC=$(grep --binary-files=without-match -rni todo ./*  | wc -l)
-    FC=$(grep --binary-files=without-match -rni fixme ./*  | wc -l)
+    TC=$(grep --binary-files=without-match --exclude="*.pyc" -rni todo ./*  | wc -l)
+    FC=$(grep --binary-files=without-match --exclude="*.pyc" -rni fixme ./*  | wc -l)
     echo Found "$TC" TODOs and "$FC" FIXMEs in the project.
 }
 

@@ -1,3 +1,5 @@
+"""Module containing the configuration for the meta scheduler client."""
+
 import tomllib
 from pathlib import Path
 from typing import Self
