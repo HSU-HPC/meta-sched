@@ -1,6 +1,7 @@
 """Module containing the HTTP API (FastAPI) for the meta scheduler server component."""
 
 import asyncio
+import signal
 from typing import Any, List, Self, Set
 
 import uvicorn
@@ -159,14 +160,17 @@ class API(FastAPI):
         Run the scheduling loop (non-blocking).
         """
         loop_interval = 10  # seconds # TODO make configurable
-        while True:
-            loop_start = asyncio.get_event_loop().time()
-            pending_jobs = self.__state.pending_jobs
-            await self.__scheduler.update(pending_jobs)
-            sleep_time = max(
-                0, loop_interval - (asyncio.get_event_loop().time() - loop_start)
-            )
-            await asyncio.sleep(sleep_time)
+        try:
+            while True:
+                loop_start = asyncio.get_event_loop().time()
+                pending_jobs = self.__state.pending_jobs
+                await self.__scheduler.update(pending_jobs)
+                sleep_time = max(
+                    0, loop_interval - (asyncio.get_event_loop().time() - loop_start)
+                )
+                await asyncio.sleep(sleep_time)
+        except asyncio.CancelledError:
+            pass
 
     async def serve(self: Self, host: str, port: int) -> None:
         """Run the HTTP API  (non-blocking).
@@ -183,8 +187,15 @@ class API(FastAPI):
         Process
             The process executing the API
         """
+        loop = asyncio.get_running_loop()
+        stop_event = asyncio.Event()
+        scheduler_task = asyncio.create_task(self.scheduling_loop())
 
-        asyncio.create_task(self.scheduling_loop())
+        def shutdown() -> None:
+            stop_event.set()
+
+        loop.add_signal_handler(signal.SIGINT, shutdown)
+        loop.add_signal_handler(signal.SIGTERM, shutdown)
         config = uvicorn.Config(
             self,
             host=host,
@@ -192,7 +203,15 @@ class API(FastAPI):
             workers=1,  # NOTE: Shared memory only works with a single process
         )
         server = uvicorn.Server(config)
-        await server.serve()
+        server_task = asyncio.create_task(server.serve())
+        await stop_event.wait()
+        scheduler_task.cancel()
+        try:
+            await scheduler_task
+        except asyncio.CancelledError:
+            pass
+        server.should_exit = True
+        await server_task
 
     def run(self: Self, host: str, port: int) -> None:
         """Run the HTTP API  (blocking).
