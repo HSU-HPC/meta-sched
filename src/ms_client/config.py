@@ -1,4 +1,4 @@
-"""Module containing the configuration for the meta scheduler client."""
+"""Module containing the configuration for the Meta Scheduler client."""
 
 import tomllib
 from pathlib import Path
@@ -18,7 +18,7 @@ class Config(BaseModel):
     protocol : str
         The protocol ("http" or "https") to use for the connection (default: "http")
     host : str
-        The host of the meta scheduler server
+        The host of the Meta Scheduler server
     port : int
     """
 
@@ -37,7 +37,7 @@ class Config(BaseModel):
     @property
     def endpoint(self: Self) -> str:
         """
-        Get the full endpoint URL of the meta scheduler server.
+        Get the full endpoint URL of the Meta Scheduler server.
 
         Returns
         -------

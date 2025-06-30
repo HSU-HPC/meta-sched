@@ -15,7 +15,7 @@ from ms_server.scheduling import Policy
 
 # TODO refactor to use pydantic BaseModel for parsing and validation
 class Config:
-    """Class holding the configuration for the meta scheduler."""
+    """Class holding the configuration for the Meta Scheduler."""
 
     def __init__(
         self: Self,
@@ -25,7 +25,7 @@ class Config:
         targets: List[Target],
     ) -> None:
         """
-        Create a new instance of the meta scheduler configuration.
+        Create a new instance of the Meta Scheduler configuration.
 
         Parameters
         ----------

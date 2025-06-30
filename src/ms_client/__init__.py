@@ -1,1 +1,1 @@
-"""Module containing the meta scheduler client code."""
+"""Module containing the Meta Scheduler client code."""

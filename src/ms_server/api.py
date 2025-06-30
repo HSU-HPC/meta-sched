@@ -1,4 +1,4 @@
-"""Module containing the HTTP API (FastAPI) for the meta scheduler server component."""
+"""Module containing the HTTP API (FastAPI) for the Meta Scheduler server component."""
 
 import asyncio
 import signal
@@ -18,7 +18,7 @@ from ms_server.scheduling import Policy
 
 class API(FastAPI):
     """
-    Flask-based HTTP API for the meta scheduler.
+    Flask-based HTTP API for the Meta Scheduler.
     """
 
     def __init__(

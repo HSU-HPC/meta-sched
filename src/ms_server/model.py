@@ -1,4 +1,4 @@
-"""Module containing the model for the meta scheduler server component."""
+"""Module containing the model for the Meta Scheduler server component."""
 
 from typing import Self, Set, Tuple
 
@@ -9,7 +9,7 @@ from ms_server.job import Job
 
 class Model:
     """
-    Class representing the model for the meta scheduler server component.
+    Class representing the model for the Meta Scheduler server component.
     This class is responsible for storing the state (jobs, queues, etc.) used by the policy.
     """
 

@@ -1,4 +1,4 @@
-"""Module containing the meta scheduler HTTP API client."""
+"""Module containing the Meta Scheduler HTTP API client."""
 
 import http
 import http.client

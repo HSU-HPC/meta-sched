@@ -1,4 +1,4 @@
-"""Module containing the meta scheduler HTTP API."""
+"""Module containing the Meta Scheduler HTTP API."""
 
 import os
 import sys

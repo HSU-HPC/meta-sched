@@ -13,6 +13,7 @@ from types import FrameType
 from ms_common.job import Instance as Job
 from ms_common.job import Spec
 from ms_common.utils import eprint
+from pydantic import ValidationError
 
 from ms_client.client import Client
 from ms_client.config import Config
@@ -32,7 +33,7 @@ def __get_scheduler() -> SchedulerClientInterface:
     """
     try:
         config = Config.load()
-    except ValueError as e:
+    except ValidationError as e:
         eprint(e.json(indent=3))
         sys.exit(os.EX_CONFIG)
     scheduler = Client(config)

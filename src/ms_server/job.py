@@ -1,4 +1,4 @@
-"""Module containing the Job class for the meta scheduler server component."""
+"""Module containing the Job class for the Meta Scheduler server component."""
 
 import asyncio
 from typing import Self, Set

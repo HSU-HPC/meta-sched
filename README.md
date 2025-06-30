@@ -15,7 +15,7 @@ Please refer to the [administrator](./docs/README.md#administrators) and [user](
 ## To-Dos
 - [ ] (Green) scheduling algorithms
 - [ ] Energy reporting (RAPL)
-- [ ] API authentication (optional if only using localhost)
+- [ ] API authentication
 - [ ] [Documentation](./docs/README.md)
 - [ ] Refactor class Target into two non-common classes
 - [ ] Refactor job execution in target classes (Single function with concrete implementation of sub-steps like "await_job_end(...)")

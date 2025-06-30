@@ -17,6 +17,7 @@ import pandas as pd
 from ms_common import ssh
 from ms_common.job import Spec, get_job_outputs, get_jobs_dir
 from ms_common.utils import eprint
+from pydantic import ValidationError
 
 import ms_client.data as data
 from ms_client.client import Client
@@ -356,7 +357,7 @@ def main() -> int:
     """
     try:
         config = Config.load()
-    except ValueError as e:
+    except ValidationError as e:
         eprint(e.json(indent=3))
         return os.EX_CONFIG
     return CLI(Client(config)).run()
