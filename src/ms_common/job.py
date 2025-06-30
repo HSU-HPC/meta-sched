@@ -188,6 +188,16 @@ class Spec(BaseModel):
     def validate_attributes(cls, spec: Any) -> Any:
         """
         Validates an adjusts (!) job attributes. (Is idempotent.)
+
+        Parameters
+        ----------
+        spec : Any
+            The job spec to validate and update
+
+        Returns
+        -------
+        Any
+            The validated and updated job spec
         """
         if any(not (c.isalnum() or c in "-_") for c in spec.name):
             raise ValueError("Job spec name contains illegal characters")

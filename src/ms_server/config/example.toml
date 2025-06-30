@@ -1,7 +1,7 @@
 host = "localhost"
 port = 8001
 
-scheduler_class="stateful.py:LeastUsed"
+scheduler_class_name="stateful.py:LeastUsed"
 
 
 [[targets]]

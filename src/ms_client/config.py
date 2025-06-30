@@ -28,6 +28,19 @@ class Config(BaseModel):
 
     @model_validator(mode="after")
     def validate_attributes(cls, config: Any) -> Any:
+        """
+        Validates an adjusts (!) client config attributes. (Is idempotent.)
+
+        Parameters
+        ----------
+        config : Any
+            The client config to validate and update
+
+        Returns
+        -------
+        Any
+            The validated and updated client config
+        """
         if config.protocol not in ["http", "https"]:
             raise ValueError(
                 f'Invalid protocol "{config.protocol}". Must be "http" or "https".'

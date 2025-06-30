@@ -1,48 +1,9 @@
 """Module containing general purpose utility functions and classes."""
 
-import inspect
 import os
 import shlex
 import sys
-from pathlib import Path
-from typing import Any, Self
-
-from typeguard import check_type
-
-
-def enforce_type_annotations(clazz: Any | None = None) -> None:
-    """
-    Perform runtime type checking inside of a function call.
-    (This function must be the first line in the function to check.)
-
-    Parameters
-    ----------
-    clazz : Any | None
-        The class of the object when type checking a method or None for a global function
-    """
-    frame2 = None
-    frame = inspect.currentframe()
-    if frame:
-        frame2 = frame.f_back
-    del frame
-    try:
-        if frame2 is None:
-            return
-        func_name = frame2.f_code.co_name
-        locals = frame2.f_locals
-        func = None
-        if clazz:
-            func = getattr(clazz, func_name)
-        else:
-            func = frame2.f_globals[func_name]
-        for k, v in inspect.signature(func).parameters.items():
-            annotation = v.annotation
-            if annotation == Self:
-                annotation = clazz  # Cannot check against Self here
-            check_type(locals[k], annotation)
-    finally:
-        del frame2  # Avoid memory leak due to cyclic reference
-
+from typing import Any
 
 def eprint(*args: Any, **kwargs: Any) -> None:
     """
@@ -58,7 +19,7 @@ def eprint(*args: Any, **kwargs: Any) -> None:
     print(*args, **kwargs, file=sys.stderr, flush=True)
 
 
-# https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html
+# See https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html
 EX_BASH_COMMAND_NOT_FOUND = 127
 
 

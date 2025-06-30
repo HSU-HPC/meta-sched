@@ -1,17 +1,16 @@
 [project]
 name = "meta-sched-server"
 version = "0.1.0"
-description     = "Meta Scheduler"
+description     = "Meta Scheduler Server"
 authors         = [{name="Ruben Horn"}]
 requires-python = ">=3.12"
 
 dependencies = [
-    # TODO remove fabric/paramiko
+    # TODO remove fabric/paramiko dependency
     "fabric>=3.2.2",
     "fastapi>=0.115.14",
     "pandas>=2.2.3",
     "pydantic>=2.11.7",
-    "typeguard>=4.4.2",
     "uvicorn>=0.34.3",
 ]
 
@@ -19,8 +18,8 @@ dependencies = [
 dev = [
     "mypy>=1.15.0",
     "pyright>=1.1.393",
+    # TODO remove fabric/paramiko dependency
     # For static type checking
-    # TODO remove fabric/paramiko
     "types-paramiko>=3.5.0",
 ]
 

@@ -212,7 +212,6 @@ dependencies = [
     { name = "pandas", marker = "sys_platform == 'linux'" },
     { name = "pydantic", marker = "sys_platform == 'linux'" },
     { name = "requests", marker = "sys_platform == 'linux'" },
-    { name = "typeguard", marker = "sys_platform == 'linux'" },
 ]
 
 [package.dev-dependencies]
@@ -229,7 +228,6 @@ requires-dist = [
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "pydantic", specifier = ">=2.11.7" },
     { name = "requests", specifier = ">=2.32.3" },
-    { name = "typeguard", specifier = ">=4.4.2" },
 ]
 
 [package.metadata.requires-dev]
@@ -474,18 +472,6 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz", hash = "sha256:ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81", size = 34031 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/b7/ce/149a00dd41f10bc29e5921b496af8b574d8413afcd5e30dfa0ed46c2cc5e/six-1.17.0-py2.py3-none-any.whl", hash = "sha256:4721f391ed90541fddacab5acf947aa0d3dc7d27b2e1e8eda2be8970586c3274", size = 11050 },
-]
-
-[[package]]
-name = "typeguard"
-version = "4.4.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions", marker = "sys_platform == 'linux'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c7/68/71c1a15b5f65f40e91b65da23b8224dad41349894535a97f63a52e462196/typeguard-4.4.4.tar.gz", hash = "sha256:3a7fd2dffb705d4d0efaed4306a704c89b9dee850b688f060a8b1615a79e5f74", size = 75203 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1b/a9/e3aee762739c1d7528da1c3e06d518503f8b6c439c35549b53735ba52ead/typeguard-4.4.4-py3-none-any.whl", hash = "sha256:b5f562281b6bfa1f5492470464730ef001646128b180769880468bd84b68b09e", size = 34874 },
 ]
 
 [[package]]

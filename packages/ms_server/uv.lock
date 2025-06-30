@@ -220,7 +220,6 @@ dependencies = [
     { name = "fastapi", marker = "sys_platform == 'linux'" },
     { name = "pandas", marker = "sys_platform == 'linux'" },
     { name = "pydantic", marker = "sys_platform == 'linux'" },
-    { name = "typeguard", marker = "sys_platform == 'linux'" },
     { name = "uvicorn", marker = "sys_platform == 'linux'" },
 ]
 
@@ -237,7 +236,6 @@ requires-dist = [
     { name = "fastapi", specifier = ">=0.115.14" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "pydantic", specifier = ">=2.11.7" },
-    { name = "typeguard", specifier = ">=4.4.2" },
     { name = "uvicorn", specifier = ">=0.34.3" },
 ]
 
@@ -488,18 +486,6 @@ dependencies = [
 sdist = { url = "https://files.pythonhosted.org/packages/ce/20/08dfcd9c983f6a6f4a1000d934b9e6d626cff8d2eeb77a89a68eef20a2b7/starlette-0.46.2.tar.gz", hash = "sha256:7f7361f34eed179294600af672f565727419830b54b7b084efe44bb82d2fccd5", size = 2580846 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/8b/0c/9d30a4ebeb6db2b25a841afbb80f6ef9a854fc3b41be131d249a977b4959/starlette-0.46.2-py3-none-any.whl", hash = "sha256:595633ce89f8ffa71a015caed34a5b2dc1c0cdb3f0f1fbd1e69339cf2abeec35", size = 72037 },
-]
-
-[[package]]
-name = "typeguard"
-version = "4.4.4"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "typing-extensions", marker = "sys_platform == 'linux'" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/c7/68/71c1a15b5f65f40e91b65da23b8224dad41349894535a97f63a52e462196/typeguard-4.4.4.tar.gz", hash = "sha256:3a7fd2dffb705d4d0efaed4306a704c89b9dee850b688f060a8b1615a79e5f74", size = 75203 }
-wheels = [
-    { url = "https://files.pythonhosted.org/packages/1b/a9/e3aee762739c1d7528da1c3e06d518503f8b6c439c35549b53735ba52ead/typeguard-4.4.4-py3-none-any.whl", hash = "sha256:b5f562281b6bfa1f5492470464730ef001646128b180769880468bd84b68b09e", size = 34874 },
 ]
 
 [[package]]

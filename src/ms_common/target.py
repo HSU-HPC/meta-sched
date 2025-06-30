@@ -17,10 +17,7 @@ from ms_common import ssh
 from ms_common.job import Instance as Job
 from ms_common.job import Spec
 from ms_common.job import Status as JobStatus
-from ms_common.utils import (EX_BASH_COMMAND_NOT_FOUND,
-                                     enforce_type_annotations, eprint,
-                                     expect_ok, exponential_backoff,
-                                     seconds_to_time, time_to_seconds)
+from ms_common.utils import EX_BASH_COMMAND_NOT_FOUND, eprint,expect_ok, exponential_backoff, seconds_to_time, time_to_seconds
 
 # TODO base on pydantic's BaseModel instead (see job.Spec)
 class Target(BaseModel):
@@ -72,6 +69,16 @@ class Target(BaseModel):
     def validate_attributes(cls, target: Any) -> Any:
         """
         Validates an adjusts (!) target attributes. (Is idempotent.)
+
+        Parameters
+        ----------
+        target : Any
+            The target to validate and update
+
+        Returns
+        -------
+        Any
+            The validated and updated target
         """
         if target.batch_system not in ["none", "slurm", "pbs"]:
             raise ValueError(

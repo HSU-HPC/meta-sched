@@ -10,7 +10,6 @@ dependencies = [
     "pandas>=2.2.3",
     "pydantic>=2.11.7",
     "requests>=2.32.3",
-    "typeguard>=4.4.2",
 ]
 
 [dependency-groups]
