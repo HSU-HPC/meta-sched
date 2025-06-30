@@ -2,11 +2,12 @@
 
 import http
 import http.client
+import time
 from typing import List, Self, Set
 
 import requests
 from ms_common.job import Spec
-from ms_common.scheduling_decision import (SchedulingDecision,
+from ms_common.scheduling_decision import (Deferred, SchedulingDecision,
                                            SchedulingDecisionType)
 from ms_common.target import Target
 
@@ -92,13 +93,21 @@ class Client(SchedulerClientInterface):
         SchedulingDecision
             The scheduling decision based on the policy
         """
-        timeout = 30  # seconds
+        timeout = 60  # seconds
         while True:
-            response = requests.get(
-                f"{self.__endpoint}/jobs/{array_id}/{array_idx}/scheduling_decision",
-                timeout=timeout,
-            )
+            try:
+                response = requests.get(
+                    f"{self.__endpoint}/jobs/{array_id}/{array_idx}/scheduling_decision",
+                    timeout=timeout,
+                )
+            except requests.Timeout:
+                # If the request times out, just retry
+                continue
             if http.HTTPStatus.OK != response.status_code:
                 raise http.client.error(response)
             content = response.json()
-            return SchedulingDecision.parse(content)
+            decision = SchedulingDecision.parse(content)
+            if isinstance(decision, Deferred):
+                time.sleep(decision.wait_seconds)
+            else:
+                return decision

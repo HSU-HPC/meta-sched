@@ -32,8 +32,8 @@ def __get_scheduler() -> SchedulerClientInterface:
     """
     try:
         config = Config.load()
-    except Config.Error as e:
-        eprint(e)
+    except ValueError as e:
+        eprint(e.json(indent=3))
         sys.exit(os.EX_CONFIG)
     scheduler = Client(config)
     return scheduler

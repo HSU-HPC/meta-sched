@@ -356,7 +356,7 @@ def main() -> int:
     """
     try:
         config = Config.load()
-    except Config.Error as e:
-        eprint(e)
+    except ValueError as e:
+        eprint(e.json(indent=3))
         return os.EX_CONFIG
     return CLI(Client(config)).run()

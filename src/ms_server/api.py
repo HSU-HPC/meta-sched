@@ -121,7 +121,7 @@ class API(FastAPI):
             decision: SchedulingDecisionType = Deferred(
                 wait_seconds=0  # May retry immediately
             )
-            timeout = 10  # seconds
+            timeout = 30  # seconds
             try:
                 decision = await asyncio.wait_for(
                     job.get_scheduling_decision(), timeout

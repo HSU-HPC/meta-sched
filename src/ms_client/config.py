@@ -2,31 +2,49 @@
 
 import tomllib
 from pathlib import Path
-from typing import Self
+from typing import Any, Self
+
+from pydantic import BaseModel, model_validator
 
 import ms_client.data as data
 
 
-class Config:
+class Config(BaseModel):
     """
     Class containing the client configuration
+
+    Attributes
+    ----------
+    protocol : str
+        The protocol ("http" or "https") to use for the connection (default: "http")
+    host : str
+        The host of the meta scheduler server
+    port : int
     """
 
-    def __init__(self: Self) -> None:
-        """
-        Config objects can NOT be created using the constructor.
-        (Use Config.load() instead to load the default/current user config!)
-        """
-        # "Declare" properties of the class
-        self.endpoint = ""
-        raise RuntimeError(f"Cannot instantiate {self.__class__.__name__} directly.")
+    protocol: str = "http"
+    host: str
+    port: int
 
-    class Error(RuntimeError):
-        """
-        Class for representing errors during parsing of the configuration.
-        """
+    @model_validator(mode="after")
+    def validate_attributes(cls, config: Any) -> Any:
+        if config.protocol not in ["http", "https"]:
+            raise ValueError(
+                f'Invalid protocol "{config.protocol}". Must be "http" or "https".'
+            )
+        return config
 
-        pass
+    @property
+    def endpoint(self: Self) -> str:
+        """
+        Get the full endpoint URL of the meta scheduler server.
+
+        Returns
+        -------
+        str
+            The full endpoint URL
+        """
+        return f"{self.protocol}://{self.host}:{self.port}"
 
     @classmethod
     def load(cls) -> Self:
@@ -43,18 +61,5 @@ class Config:
             # Write default config to path
             config_path.write_text(data.get_default_config_path().read_text())
         values = tomllib.loads(config_path.read_text())
-
-        config = super().__new__(cls)
-        if "host" not in values or not isinstance(values["host"], str):
-            raise Config.Error('Config file must contain key "host" (string)')
-        if "port" in values and not isinstance(values["port"], int):
-            raise Config.Error('Config file key "port" must be an integer')
-        protocols = ["http", "https"]
-        if values.get("protocol", protocols[0]) not in protocols:
-            protocols_fmtd = " or ".join([f'"{s}"' for s in protocols])
-            raise Config.Error(
-                f'Value of config file key "protocol" must be {protocols_fmtd}'
-            )
-        config.endpoint = f"{values.get('protocol', 'http')}://{values['host']}:{values.get('port', 80)}"
-
+        config = cls.model_validate(values)
         return config
