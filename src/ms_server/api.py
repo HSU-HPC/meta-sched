@@ -1,16 +1,15 @@
 """Module containing the HTTP API (FastAPI) for the Meta Scheduler server component."""
 
 import asyncio
+import secrets
 from typing import Any, List, Self, Set, Tuple
 
 import ms_common
 import uvicorn
-from fastapi import FastAPI, HTTPException, Query, status
-from fastapi.responses import JSONResponse
-from ms_common.job import Spec as JobSpec
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
+from ms_common.job import ScheduleRequest, ScheduleResponse
 from ms_common.scheduling_decision import Deferred, SchedulingDecisionType
 from ms_common.target import Target
-from pydantic import BaseModel
 
 from ms_server.job import Job
 from ms_server.model import Model
@@ -54,12 +53,14 @@ class API(FastAPI):
         super().__init__(**kwargs)
         self.set_up_endpoints()
 
-    async def get_job(self: Self, array_id: str, array_idx: int) -> Job:
+    async def get_job(self: Self, token: str, array_id: str, array_idx: int) -> Job:
         """
         Get a job by its array ID and index.
 
         Parameters
         ----------
+        token : str
+            The random string required to look up the job
         array_id : str
             The ID of the job array
         array_idx : int
@@ -75,13 +76,13 @@ class API(FastAPI):
         HTTPException
             If the job with the specified array ID and index does not exist
         """
-        job_id = (array_id, array_idx)
+        job_id = (token, array_id, array_idx)
         try:
             return await self.__model.get_job(job_id)
         except KeyError:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail=f"Job with array ID {array_id} and index {array_idx} not found.",
+                detail=f"Job with array ID {array_id} and index {array_idx} not found or token was invalid.",
             )
 
     def set_up_endpoints(self: Self) -> None:
@@ -111,14 +112,35 @@ class API(FastAPI):
             """
             return self.__targets
 
-        class ScheduleRequest(BaseModel):
-            available_targets: Set[str]
-            job_spec: JobSpec
+        def get_job_token(x_job_token: str | None = Header(None)) -> str:
+            """
+            Extract the job token from the current request headers.
+
+            Parameters
+            ----------
+            x_job_token : str
+                The job token passed using the X-Job-Token header
+
+            Returns
+            -------
+            str
+                The job token
+            """
+            if not x_job_token:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail='Required header "X-Job-Token" missing.',
+                )
+            return x_job_token
 
         # region job control
         # CREATE
-        @self.post("/jobs")
-        async def submit_job_array(request: ScheduleRequest) -> JSONResponse:
+        @self.post(
+            "/jobs",
+            response_model=ScheduleResponse,
+            status_code=status.HTTP_201_CREATED,
+        )
+        async def submit_job_array(request: ScheduleRequest) -> ScheduleResponse:
             # TODO update doc string
             """
             Create a new unique identifier for a new job array. (API endpoint)
@@ -135,21 +157,20 @@ class API(FastAPI):
             """
             target_ids = set([t.id for t in self.__targets])
             if any([t not in target_ids for t in request.available_targets]):
-                return JSONResponse(
+                raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    content=dict(
-                        status="fail",
-                        data=dict(prefix="Unknown target(s)"),
-                    ),
+                    detail="Unknown target(s)",
                 )
+            token = secrets.token_urlsafe(32)
             array_id = await self.__model.create_job_array(
-                request.job_spec, available_targets=request.available_targets
+                request.job_spec,
+                available_targets=set(request.available_targets),
+                token=token,
             )
-            # TODO return list of job IDs instead of array ID?
-            data = dict(array_id=array_id)
-            return JSONResponse(
-                status_code=status.HTTP_201_CREATED,
-                content=dict(status="success", data=data),
+            return ScheduleResponse(
+                array_id=array_id,
+                array_size=request.job_spec.array_size,
+                token=token,
             )
 
         # READ
@@ -158,17 +179,26 @@ class API(FastAPI):
             response_model=SchedulingDecisionType,
         )
         async def get_scheduling_decision(
-            array_id: str, array_idx: int
+            array_id: str,
+            array_idx: int,
+            token: str = Depends(get_job_token),
         ) -> SchedulingDecisionType:
             """
             Poll the final decision of the scheduler or time out if it is not yet available. (API endpoint)
+
+            array_id : str
+                The ID of the job array
+            array_idx : int
+                The index of the job within the array
+            token : str
+                The random string required to look up the job
 
             Returns
             -------
             SchedulingDecisionType
                 The scheduling decision for the job with the specified array ID and index
             """
-            job = await self.get_job(array_id, array_idx)
+            job = await self.get_job(token, array_id, array_idx)
             decision: SchedulingDecisionType = Deferred(
                 wait_seconds=0  # May retry immediately
             )
@@ -182,14 +212,15 @@ class API(FastAPI):
             return decision
 
         # UPDATE
-
-        # TODO this endpoint should be protected by authentication
-        @self.put("/jobs/{array_id}/{array_idx}", status_code=204)
+        @self.put(
+            "/jobs/{array_id}/{array_idx}", status_code=status.HTTP_204_NO_CONTENT
+        )
         async def update_job_time(
             array_id: str,
             array_idx: int,
             timestamp_start: int | None = Query(None),
             timestamp_end: int | None = Query(None),
+            token: str = Depends(get_job_token),
         ) -> None:
             """
             Notify the API about a change to the jobs state. (API endpoint)
@@ -204,6 +235,8 @@ class API(FastAPI):
                 The start time of the job as a unix timestamp (seconds since epoch), or None if the job has not started yet
             timestamp_end : int | None
                 The end time of the job as a unix timestamp (seconds since epoch), or None if the job has not ended yet
+            token : str
+                The random string required to look up the job
             """
             if (timestamp_start is None and timestamp_end is None) or (
                 timestamp_start is not None and timestamp_end is not None
@@ -212,7 +245,7 @@ class API(FastAPI):
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail='Either "timestamp_start" or "timestamp_end" must be provided, but not both.',
                 )
-            job = await self.get_job(array_id, array_idx)
+            job = await self.get_job(token, array_id, array_idx)
             try:
                 if timestamp_start is not None:
                     await job.set_timestamp_start(timestamp_start)
@@ -223,10 +256,15 @@ class API(FastAPI):
                     status_code=status.HTTP_400_BAD_REQUEST, detail=str(e)
                 )
 
-        # TODO this endpoint should be protected by authentication
-        @self.post("/jobs/{array_id}/{array_idx}/reschedule", status_code=204)
+        @self.post(
+            "/jobs/{array_id}/{array_idx}/reschedule",
+            status_code=status.HTTP_204_NO_CONTENT,
+        )
         async def reschedule_job(
-            array_id: str, array_idx: int, available_targets: Set[str]
+            array_id: str,
+            array_idx: int,
+            available_targets: Set[str],
+            token: str = Depends(get_job_token),
         ) -> None:
             """
             Reschedule a job by its array ID and index. (API endpoint)
@@ -239,14 +277,17 @@ class API(FastAPI):
                 The index of the job within the array
             available_targets : Set[str]
                 The new set of target IDs which this job may be assigned to
+            token : str
+                The random string required to look up the job
             """
-            job = await self.get_job(array_id, array_idx)
+            job = await self.get_job(token, array_id, array_idx)
             await job.reschedule(available_targets)
 
         # DELETE
-        # TODO this endpoint should be protected by authentication
         @self.delete("/jobs/{array_id}/{array_idx}")
-        async def cancel_job(array_id: str, array_idx: int) -> None:
+        async def cancel_job(
+            array_id: str, array_idx: int, token: str = Depends(get_job_token)
+        ) -> None:
             """
             Cancel a job by its array ID and index. (API endpoint)
 
@@ -256,14 +297,16 @@ class API(FastAPI):
                 The ID of the job array
             array_idx : int
                 The index of the job within the array
+            token : str
+                The random string required to look up the job
             """
-            job_id = (array_id, array_idx)
+            job_id = (token, array_id, array_idx)
             try:
                 await self.__model.remove_job(job_id)
             except KeyError:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
-                    detail=f"Job with array ID {array_id} and index {array_idx} not found.",
+                    detail=f"Job with array ID {array_id} and index {array_idx} not found or token was invalid.",
                 )
 
         # endregion job control

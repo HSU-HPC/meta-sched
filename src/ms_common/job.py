@@ -1,6 +1,6 @@
 """Module containing functions and classes related to the jobs executed by the Meta Scheduler."""
 
-from typing import Any, List
+from typing import Any, List, Set, Tuple
 
 from pydantic import BaseModel, model_validator
 from ms_common.utils import time_to_seconds
@@ -79,3 +79,37 @@ class Spec(BaseModel):
         if spec.seconds <= 0:
             raise ValueError('Duration ("time" or "seconds") must be a positive value')
         return spec
+
+class ScheduleRequest(BaseModel):
+    """
+    Class representing the request to schedule a new job array.
+
+    Attributes
+    ----------
+    available_targets : List[str]
+        The target identifiers of all targets which the jobs may be scheduled on
+    job_spec : JobSpec
+        The specification of the job array
+    """
+
+    available_targets: List[str]
+    job_spec: Spec
+
+class ScheduleResponse(BaseModel):
+    """
+    Class representing the response to schedule a job array scheduling request.
+
+    Attributes
+    ----------
+    array_id : str
+        The ID of the job array
+    array_size : int
+        The number of jobs in the array (Matches request)
+    token : str
+        The random string required to look up the jobs in the array
+    """
+    array_id: str
+    array_size: int
+    token: str
+
+JobKey = Tuple[str, str, int] # (token, array_id, array_idx)

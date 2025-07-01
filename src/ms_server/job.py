@@ -1,13 +1,10 @@
 """Module containing the Job class for the Meta Scheduler server component."""
 
 import asyncio
-from typing import Self, Set, Tuple
+from typing import Self, Set
 
 from ms_common.job import Spec as JobSpec
 from ms_common.scheduling_decision import SchedulingDecisionType
-
-# TODO move to ms_common.job and use liberally
-JobId = Tuple[str, int]  # (array_id, array_idx)
 
 
 class Job:

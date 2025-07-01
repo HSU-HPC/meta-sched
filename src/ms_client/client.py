@@ -3,11 +3,11 @@
 import http
 import http.client
 import time
-from typing import List, Self, Set
+from typing import Dict, List, Self, Set
 
 import ms_common
 import requests
-from ms_common.job import Spec
+from ms_common.job import JobKey, ScheduleRequest, ScheduleResponse, Spec
 from ms_common.scheduling_decision import (Deferred, SchedulingDecision,
                                            SchedulingDecisionType)
 from ms_common.target import Target
@@ -74,7 +74,7 @@ class Client(SchedulerClientInterface):
 
     def submit_job_array(
         self: Self, job_spec: Spec, available_targets: Set[str]
-    ) -> str:
+    ) -> ScheduleResponse:
         """
         Create a new unique identifier for a new job array and schedule the corresponding jobs.
 
@@ -87,35 +87,47 @@ class Client(SchedulerClientInterface):
 
         Returns
         -------
-        str
-            A new unique identifier for a job array
+        ScheduleResponse
+            The response from the scheduler containing information to look up the jobs that were created
         """
         response = requests.post(
             f"{self.__endpoint}/jobs",
-            json={
-                "job_spec": job_spec.model_dump(),
-                "available_targets": list(available_targets),
-            },
+            json=ScheduleRequest(
+                available_targets=list(available_targets), job_spec=job_spec
+            ).model_dump(),
         )
         if http.HTTPStatus.CREATED != response.status_code:
             raise http.client.error()
         content = response.json()
-        if content["status"] != "success":
-            raise RuntimeError(content)
-        return str(content["data"]["array_id"])
+        return ScheduleResponse.model_validate(content)
+
+    def __get_job_request_headers(self: Self, job_token: str) -> Dict[str, str]:
+        """
+        Create the HTTP headers for requests pertaining to a single job.
+
+        Parameters
+        ----------
+        job_token : str
+            The random string required to modify the job at the server
+
+        Returns
+        -------
+        Dict[str, str]
+            The HTTP headers for the request
+        """
+        return {"X-Job-Token": job_token}
 
     def poll_scheduling_decision(
-        self: Self, array_id: str, array_idx: int
+        self: Self,
+        job_key: JobKey,
     ) -> SchedulingDecisionType:
         """
         Apply scheduling policy.
 
         Parameters
         ----------
-        array_id : str
-            The unique identifier of the job array
-        array_idx : int
-            The index of the job in the job array
+        job_key : JobKey
+            The token, array id, and array index required to look up the job
 
         Returns
         -------
@@ -123,11 +135,13 @@ class Client(SchedulerClientInterface):
             The scheduling decision based on the policy
         """
         timeout = 60  # seconds
+        token, array_id, array_idx = job_key
         while True:
             try:
                 response = requests.get(
                     f"{self.__endpoint}/jobs/{array_id}/{array_idx}/scheduling_decision",
                     timeout=timeout,
+                    headers=self.__get_job_request_headers(token),
                 )
             except requests.Timeout:
                 # If the request times out, just retry
@@ -141,83 +155,81 @@ class Client(SchedulerClientInterface):
             else:
                 return decision
 
-    def cancel_job(self: Self, array_id: str, array_idx: int) -> None:
+    def cancel_job(self: Self, job_key: JobKey) -> None:
         """
         Cancel a job.
 
         Parameters
         ----------
-        array_id : str
-            The unique identifier of the job array
-        array_idx : int
-            The index of the job in the job array
+        job_key : JobKey
+            The token, array id, and array index required to look up the job
         """
+        token, array_id, array_idx = job_key
         response = requests.delete(
             f"{self.__endpoint}/jobs/{array_id}/{array_idx}",
+            headers=self.__get_job_request_headers(token),
         )
         if http.HTTPStatus.NO_CONTENT != response.status_code:
             raise http.client.error(response)
 
-    def update_job_started(
-        self: Self, array_id: str, array_idx: int, timestamp: int
-    ) -> None:
+    def update_job_started(self: Self, job_key: JobKey, timestamp: int) -> None:
         """
         Set the timestamp when a job was started.
 
         Parameters
         ----------
-        array_id : str
-            The unique identifier of the job array
-        array_idx : int
-            The index of the job in the job array
+        job_key : JobKey
+            The token, array id, and array index required to look up the job
         timestamp : int
             The start time of the job as a unix timestamp (seconds since epoch)
         """
+        token, array_id, array_idx = job_key
         response = requests.put(
-            f"{self.__endpoint}/jobs/{array_id}/{array_idx}?timestamp_start={timestamp}"
+            f"{self.__endpoint}/jobs/{array_id}/{array_idx}?timestamp_start={timestamp}",
+            headers=self.__get_job_request_headers(token),
         )
         if http.HTTPStatus.NO_CONTENT != response.status_code:
             raise http.client.error(response)
 
-    def update_job_ended(
-        self: Self, array_id: str, array_idx: int, timestamp: int
-    ) -> None:
+    def update_job_ended(self: Self, job_key: JobKey, timestamp: int) -> None:
         """
         Set the timestamp when a job was ended.
 
         Parameters
         ----------
-        array_id : str
-            The unique identifier of the job array
-        array_idx : int
-            The index of the job in the job array
+        job_key : JobKey
+            The token, array id, and array index required to look up the job
         timestamp : int
             The end time of the job as a unix timestamp (seconds since epoch)
         """
+        token, array_id, array_idx = job_key
         response = requests.put(
-            f"{self.__endpoint}/jobs/{array_id}/{array_idx}?timestamp_end={timestamp}"
+            f"{self.__endpoint}/jobs/{array_id}/{array_idx}?timestamp_end={timestamp}",
+            headers=self.__get_job_request_headers(token),
         )
         if http.HTTPStatus.NO_CONTENT != response.status_code:
             raise http.client.error(response)
 
     def reschedule_job(
-        self: Self, array_id: str, array_idx: int, available_targets: Set[str]
+        self: Self,
+        job_key: JobKey,
+        available_targets: Set[str],
     ) -> None:
         """
         Reschedule a job with the given array ID and index.
 
         Parameters
         ----------
-        array_id : str
-            The unique identifier of the job array
-        array_idx : int
-            The index of the job in the job array
+        job_key : JobKey
+            The token, array id, and array index required to look up the job
         available_targets : Set[str]
             The set of target IDs which this job may be assigned to
         """
+        token, array_id, array_idx = job_key
         response = requests.put(
             f"{self.__endpoint}/jobs/{array_id}/{array_idx}/reschedule",
             json={"available_targets": list(available_targets)},
+            headers=self.__get_job_request_headers(token),
         )
         if http.HTTPStatus.NO_CONTENT != response.status_code:
             raise http.client.error(response)

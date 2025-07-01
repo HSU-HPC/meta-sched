@@ -3,7 +3,7 @@
 import abc
 from typing import List, Self, Set
 
-from ms_common.job import Spec
+from ms_common.job import JobKey, ScheduleResponse, Spec
 from ms_common.scheduling_decision import SchedulingDecisionType
 from ms_common.target import Target
 
@@ -32,7 +32,7 @@ class SchedulerClientInterface(abc.ABC):
     @abc.abstractmethod
     def submit_job_array(
         self: Self, job_spec: Spec, available_targets: Set[str]
-    ) -> str:
+    ) -> ScheduleResponse:
         """
         Create a new unique identifier for a new job array and schedule the corresponding jobs.
 
@@ -45,8 +45,8 @@ class SchedulerClientInterface(abc.ABC):
 
         Returns
         -------
-        str
-            The array ID of the new job array
+        ScheduleResponse
+            The response from the scheduler containing information to look up the jobs that were created
 
         Raises
         ------
@@ -57,17 +57,16 @@ class SchedulerClientInterface(abc.ABC):
 
     @abc.abstractmethod
     def poll_scheduling_decision(
-        self: Self, array_id: str, array_idx: int
+        self: Self,
+        job_key: JobKey,
     ) -> SchedulingDecisionType:
         """
         Await the final decision of the scheduler (may block for very long.)
 
         Parameters
         ----------
-        array_id : str
-            The unique identifier of the job array
-        array_idx : int
-            The index of the job in the job array
+        job_key : JobKey
+            The token, array id, and array index required to look up the job
 
         Returns
         -------
@@ -82,16 +81,14 @@ class SchedulerClientInterface(abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def cancel_job(self: Self, array_id: str, array_idx: int) -> None:
+    def cancel_job(self: Self, job_key: JobKey) -> None:
         """
         Cancel a job.
 
         Parameters
         ----------
-        array_id : str
-            The unique identifier of the job array
-        array_idx : int
-            The index of the job in the job array
+        job_key : JobKey
+            The token, array id, and array index required to look up the job
 
         Raises
         ------
@@ -101,18 +98,14 @@ class SchedulerClientInterface(abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def update_job_started(
-        self: Self, array_id: str, array_idx: int, timestamp: int
-    ) -> None:
+    def update_job_started(self: Self, job_key: JobKey, timestamp: int) -> None:
         """
         Set the timestamp when a job was started.
 
         Parameters
         ----------
-        array_id : str
-            The unique identifier of the job array
-        array_idx : int
-            The index of the job in the job array
+        job_key : JobKey
+            The token, array id, and array index required to look up the job
         timestamp : int
             The start time of the job as a unix timestamp (seconds since epoch)
 
@@ -124,18 +117,14 @@ class SchedulerClientInterface(abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def update_job_ended(
-        self: Self, array_id: str, array_idx: int, timestamp: int
-    ) -> None:
+    def update_job_ended(self: Self, job_key: JobKey, timestamp: int) -> None:
         """
         Set the timestamp when a job was ended.
 
         Parameters
         ----------
-        array_id : str
-            The unique identifier of the job array
-        array_idx : int
-            The index of the job in the job array
+        job_key : JobKey
+            The token, array id, and array index required to look up the job
         timestamp : int
             The end time of the job as a unix timestamp (seconds since epoch)
 

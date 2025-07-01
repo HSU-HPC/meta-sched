@@ -39,13 +39,15 @@ def __get_scheduler() -> SchedulerClientInterface:
     return scheduler
 
 
-def __start_process(job_spec: str, array_id: str, array_idx: int) -> int:
+def __start_process(job_spec: str, token: str, array_id: str, array_idx: int) -> int:
     """
     Execute a job as a new process running the module containing this function as a script.
 
     Parameters:
     job_spec : str
         The name of the job spec (folder name) to use
+    token : str
+        The random string required to modify the job at the server
     array_id : str
         The global identifier of the job array
     array_idx : int
@@ -56,7 +58,18 @@ def __start_process(job_spec: str, array_id: str, array_idx: int) -> int:
     str
         The PID of the process that was started
     """
-    args = ["-s", job_spec, "-a", array_id, "-i", str(array_idx), "-r", "--nohup"]
+    args = [
+        "-s",
+        job_spec,
+        "-t",
+        token,
+        "-a",
+        array_id,
+        "-i",
+        str(array_idx),
+        "-r",
+        "--nohup",
+    ]
     p = subprocess.Popen(
         [sys.executable, __file__] + args,
         stdout=subprocess.DEVNULL,
@@ -109,16 +122,17 @@ def launch_job_array(job_spec: str) -> str:
     suitable_targets = Executor.filter_targets(spec, scheduler)
     if len(suitable_targets) == 0:
         raise NoTargetsAvailableError(job_spec)
-    array_id = scheduler.submit_job_array(spec, suitable_targets)
-    for array_idx in range(0, spec.array_size):
-        __start_process(job_spec, array_id, array_idx)
+    response = scheduler.submit_job_array(spec, suitable_targets)
+    for array_idx in range(0, response.array_size):
+        __start_process(job_spec, response.token, response.array_id, array_idx)
     # TODO consider returning raw array_id, array_idxs, and PIDs
-    return f"JOBS {job_spec} {array_id}_[0-{spec.array_size - 1}]"
+    return f"JOBS {job_spec} {response.array_id}_[0-{response.array_size - 1}]"
 
 
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("-s", "--job-spec", type=str, required=True)
+    arg_parser.add_argument("-t", "--token", type=str, required=True)
     arg_parser.add_argument("-a", "--array-id", type=str, required=True)
     arg_parser.add_argument("-i", "--array-index", type=int, default=1)
     arg_parser.add_argument("-r", "--redirect-output", action="store_true")
@@ -148,6 +162,7 @@ if __name__ == "__main__":
     scheduler = __get_scheduler()
     Executor(
         job,
+        args.token,
         scheduler,
         redirect_output=args.redirect_output,
     ).run()

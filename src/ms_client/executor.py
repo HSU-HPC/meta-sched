@@ -28,6 +28,7 @@ class Executor:
     def __init__(
         self: Self,
         job: Job,
+        job_token: str,
         scheduler: SchedulerClientInterface,
         redirect_output: bool = False,
     ) -> None:
@@ -38,12 +39,16 @@ class Executor:
         ----------
         job : Job
             The job to be executed
+        job_token : str
+            The random string required to modify the job at the server
         scheduler : SchedulerInterface
             Interface to the component determining execution time and target
         redirect_output : bool
             If true (default), all output to sys.stdout/sys.stderr will be redirected to a corresponding file in the job output folder (disable for debugging)
         """
         self.__job = job
+        # Used to look up job at client
+        self.__job_key = (job_token, job.array_id, job.array_idx)
         self.__scheduler = scheduler
         self.__redirect_output = redirect_output
 
@@ -167,9 +172,7 @@ class Executor:
         eprint("=== 1. Awaiting scheduling of job ===")
         target: Target
         try:
-            decision = self.__scheduler.poll_scheduling_decision(
-                self.__job.array_id, self.__job.array_idx
-            )
+            decision = self.__scheduler.poll_scheduling_decision(self.__job_key)
         except Exception:
             raise StatusException(os.EX_UNAVAILABLE)
         match decision:
@@ -199,7 +202,6 @@ class Executor:
             remote_target.transfer(src, dst, RemoteTarget.TransferMode.UPLOAD)
             remote_target.setup(self.__job)
         eprint(f"=== 3. Executing job on target {target.id} ===")
-        job_id = self.__job.array_id, self.__job.array_idx
 
         def callback_job_started() -> None:
             """
@@ -207,7 +209,7 @@ class Executor:
             """
             self.__job.set_status(job.Status.Running(target.id))
             try:
-                self.__scheduler.update_job_started(*job_id, int(time.time()))
+                self.__scheduler.update_job_started(self.__job_key, int(time.time()))
             except Exception as e:
                 eprint("Error updating job state:", e)
 
@@ -217,7 +219,7 @@ class Executor:
             """
             self.__job.set_status(job.Status.Completed())
             try:
-                self.__scheduler.update_job_ended(*job_id, int(time.time()))
+                self.__scheduler.update_job_ended(self.__job_key, int(time.time()))
             except Exception as e:
                 eprint("Error updating job state:", e)
 
@@ -255,7 +257,7 @@ class Executor:
             try:
                 self.__run()
             except InterruptedError:
-                self.__scheduler.cancel_job(self.__job.array_id, self.__job.array_idx)
+                self.__scheduler.cancel_job(self.__job_key)
                 final_job_status = job.Status.Canceled()
             except Exception as e:
                 status = -1

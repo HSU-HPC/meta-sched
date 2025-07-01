@@ -15,6 +15,5 @@ Please refer to the [administrator](./docs/README.md#administrators) and [user](
 ## To-Dos
 - [ ] (Green) scheduling algorithms
 - [ ] Energy reporting (RAPL)
-- [ ] API authentication
 - [ ] [Documentation](./docs/README.md)
 - [ ] Client side re-scheduling
