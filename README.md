@@ -17,5 +17,4 @@ Please refer to the [administrator](./docs/README.md#administrators) and [user](
 - [ ] Energy reporting (RAPL)
 - [ ] API authentication
 - [ ] [Documentation](./docs/README.md)
-- [ ] Minimize shared code
 - [ ] Client side re-scheduling

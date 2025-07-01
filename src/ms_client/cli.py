@@ -14,14 +14,15 @@ from pathlib import Path
 from typing import Any, Dict, Self
 
 import pandas as pd
-from ms_common import ssh
-from ms_common.job import Spec, get_job_outputs, get_jobs_dir
 from ms_common.utils import eprint
 from pydantic import ValidationError
 
 import ms_client.data as data
+from ms_client import ssh
 from ms_client.client import Client
 from ms_client.config import Config
+from ms_client.job import (get_job_outputs, get_jobs_dir, list_job_spec_names,
+                           load_job_spec)
 from ms_client.run_job import NoTargetsAvailableError, launch_job_array
 from ms_client.scheduler_interface import SchedulerClientInterface as Scheduler
 
@@ -115,15 +116,16 @@ class CLI:
             The exit status of the operation
         """
         os.chdir(Path.home())
-        if job_spec not in Spec.list():
+        job_specs = list_job_spec_names()
+        if job_spec not in job_specs:
             eprint("No such job spec:", job_spec)
             eprint(f"\nAvailable under {get_jobs_dir().absolute()}:")
-            for job_spec in Spec.list():
+            for job_spec in job_specs:
                 eprint("-", job_spec)
             return os.EX_NOINPUT
         try:
             # Validate job spec
-            Spec.load(job_spec)
+            load_job_spec(job_spec)
         except ValueError as e:
             eprint("Could not load job spec:", job_spec)
             print(e)

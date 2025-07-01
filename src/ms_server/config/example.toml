@@ -1,58 +1,59 @@
 host = "localhost"
 port = 8001
 
-scheduler_class_name="stateful.py:LeastUsed"
+scheduler_class_name = "stateful.py:LeastUsed"
+scheduling_loop_interval = 10
 
 
 [[targets]]
 # https://portal.hpc.hsu-hh.de/documentation/hsuper/partitions/
-id="ca0032c4-4573-4298-857e-6ba750883bb3"
-host="hsuper-login01.hsu-hh.de"
-batch_system="slurm"
-queue="small"
-nodes=571
-cores_per_node=72
-max_time="72:00:00"
-max_nodes=5
+id = "ca0032c4-4573-4298-857e-6ba750883bb3"
+host = "hsuper-login01.hsu-hh.de"
+batch_system = "slurm"
+queue = "small"
+nodes = 571
+cores_per_node = 72
+max_time = "72:00:00"
+max_nodes = 5
 tags = ["x86"]
 [targets.module_map]
 MPI = "intel-oneapi-mpi"
 
 
 [[targets]]
-id="256b4c0e-c6b7-41da-a35d-03382428528a"
-host="windhpc00.hsu-hh.de"
-batch_system="slurm"
-queue="long"
-nodes=3
-cores_per_node=48
-max_time="7-00:00:00"
-source_scripts=["/etc/profile"]
+id = "256b4c0e-c6b7-41da-a35d-03382428528a"
+host = "windhpc00.hsu-hh.de"
+batch_system = "slurm"
+queue = "long"
+nodes = 3
+cores_per_node = 48
+max_time = "7-00:00:00"
+source_scripts = ["/etc/profile"]
 tags = ["x86", "test"]
 [targets.module_map]
 MPI = "mpi"
 
 
 [[targets]]
-id="526e24ab-38cd-42d3-8fb3-dac4323cc723"
-host="training.hlrs.de"
-batch_system="pbs"
-queue="windhpc"
-nodes=5
-cores_per_node=48
-max_time="24:00:00"
+id = "526e24ab-38cd-42d3-8fb3-dac4323cc723"
+host = "training.hlrs.de"
+batch_system = "pbs"
+queue = "windhpc"
+nodes = 5
+cores_per_node = 48
+max_time = "24:00:00"
 tags = ["x86"]
 [targets.module_map]
 MPI = "mpi/openmpi"
 
 
 [[targets]]
-id="ed388155-bc45-4b59-95da-a2e9e578948d"
-host="windpark.windhpc.de"
-batch_system="slurm"
-nodes=5
-cores_per_node=48
-source_scripts=["/etc/profile"]
+id = "ed388155-bc45-4b59-95da-a2e9e578948d"
+host = "windpark.windhpc.de"
+batch_system = "slurm"
+nodes = 5
+cores_per_node = 48
+source_scripts = ["/etc/profile"]
 tags = ["x86", "green"]
 [targets.module_map]
 MPI = "mpi/openmpi"

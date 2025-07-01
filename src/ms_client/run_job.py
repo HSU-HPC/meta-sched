@@ -10,14 +10,14 @@ import sys
 from pathlib import Path
 from types import FrameType
 
-from ms_common.job import Instance as Job
-from ms_common.job import Spec
 from ms_common.utils import eprint
 from pydantic import ValidationError
 
 from ms_client.client import Client
 from ms_client.config import Config
 from ms_client.executor import Executor
+from ms_client.job import Instance as Job
+from ms_client.job import load_job_spec
 from ms_client.scheduler_interface import SchedulerClientInterface
 
 
@@ -105,7 +105,7 @@ def launch_job_array(job_spec: str) -> str:
     NoTargetsAvailableError
         If no targets are available to run the job spec
     """
-    spec = Spec.load(job_spec)
+    spec = load_job_spec(job_spec)
     scheduler = __get_scheduler()
     suitable_targets = Executor.filter_targets(spec, scheduler)
     if len(suitable_targets) == 0:
@@ -145,7 +145,7 @@ if __name__ == "__main__":
         signal.signal(signal.SIGHUP, ignore_signal)
 
     os.chdir(Path.home())
-    job = Job(Spec.load(args.job_spec), args.array_id, args.array_index)
+    job = Job(load_job_spec(args.job_spec), args.array_id, args.array_index)
     scheduler = __get_scheduler()
     Executor(
         job,

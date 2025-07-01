@@ -147,7 +147,7 @@ class Client(SchedulerClientInterface):
             The start time of the job as a unix timestamp (seconds since epoch)
         """
         response = requests.put(
-            f"{self.__endpoint}/jobs/{array_id}/{array_idx}?timestamp_started={timestamp}"
+            f"{self.__endpoint}/jobs/{array_id}/{array_idx}?timestamp_start={timestamp}"
         )
         if http.HTTPStatus.NO_CONTENT != response.status_code:
             raise http.client.error(response)
@@ -168,7 +168,7 @@ class Client(SchedulerClientInterface):
             The end time of the job as a unix timestamp (seconds since epoch)
         """
         response = requests.put(
-            f"{self.__endpoint}/jobs/{array_id}/{array_idx}?timestamp_ended={timestamp}"
+            f"{self.__endpoint}/jobs/{array_id}/{array_idx}?timestamp_end={timestamp}"
         )
         if http.HTTPStatus.NO_CONTENT != response.status_code:
             raise http.client.error(response)

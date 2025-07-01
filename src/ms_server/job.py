@@ -3,9 +3,10 @@
 import asyncio
 from typing import Self, Set, Tuple
 
-from ms_common import job
+from ms_common.job import Spec as JobSpec
 from ms_common.scheduling_decision import SchedulingDecisionType
 
+# TODO move to ms_common.job and use liberally
 JobId = Tuple[str, int]  # (array_id, array_idx)
 
 
@@ -16,13 +17,13 @@ class Job:
 
     # TODO make this an abstract base class and move it into model.py (notification may alternatively be done via pub/sub instead of condition variable)
 
-    def __init__(self: Self, spec: job.Spec, available_targets: Set[str]) -> None:
+    def __init__(self: Self, spec: JobSpec, available_targets: Set[str]) -> None:
         """
         Create a new job instance.
 
         Parameters
         ----------
-        spec : job.Spec
+        spec : JobSpec
             The specification of the job to be scheduled
         available_targets : Set[str]
             The set of target IDs which this job may be assigned to
@@ -31,11 +32,11 @@ class Job:
         self.spec = spec
         self.available_targets = available_targets
         self.__scheduling_decision: SchedulingDecisionType | None = None
-        self.__timestamp_started: int | None = None
-        self.__timestamp_ended: int | None = None
+        self.__timestamp_start: int | None = None
+        self.__timestamp_end: int | None = None
 
     @property
-    def timestamp_started(self: Self) -> int | None:
+    def timestamp_start(self: Self) -> int | None:
         """
         Get the timestamp when this job was started.
 
@@ -44,9 +45,9 @@ class Job:
         int | None
             The start time of the job as a unix timestamp (seconds since epoch), or None if not started yet
         """
-        return self.__timestamp_started
+        return self.__timestamp_start
 
-    async def set_timestamp_started(self: Self, timestamp: int) -> None:
+    async def set_timestamp_start(self: Self, timestamp: int) -> None:
         """
         Set the timestamp when this job was started.
 
@@ -55,15 +56,15 @@ class Job:
         timestamp : int
             The start time of the job as a unix timestamp (seconds since epoch)
         """
-        assert self.__timestamp_started is None, (
-            "Cannot set timestamp_started again, it is already set."
+        assert self.__timestamp_start is None, (
+            "Cannot set timestamp_start again, it is already set."
         )
         async with self.__condition:
-            self.__timestamp_started = timestamp
+            self.__timestamp_start = timestamp
             self.__condition.notify_all()
 
     @property
-    def timestamp_ended(self: Self) -> int | None:
+    def timestamp_end(self: Self) -> int | None:
         """
         Get the timestamp when this job was ended.
 
@@ -72,9 +73,9 @@ class Job:
         int | None
             The end time of the job as a unix timestamp (seconds since epoch), or None if not ended yet
         """
-        return self.__timestamp_ended
+        return self.__timestamp_end
 
-    async def set_timestamp_ended(self: Self, timestamp: int) -> None:
+    async def set_timestamp_end(self: Self, timestamp: int) -> None:
         """
         Set the timestamp when this job was ended.
 
@@ -83,17 +84,17 @@ class Job:
         timestamp : int
             The end time of the job as a unix timestamp (seconds since epoch)
         """
-        assert self.__timestamp_ended is None, (
-            "Cannot set timestamp_ended again, it is already set."
+        assert self.__timestamp_end is None, (
+            "Cannot set timestamp_end again, it is already set."
         )
-        assert self.timestamp_started is not None, (
+        assert self.timestamp_start is not None, (
             "Job must be started before it can be ended."
         )
-        assert self.timestamp_started <= timestamp, (
+        assert self.timestamp_start <= timestamp, (
             "Job end time must be after start time."
         )
         async with self.__condition:
-            self.__timestamp_ended = timestamp
+            self.__timestamp_end = timestamp
             self.__condition.notify_all()
 
     async def reschedule(self: Self, available_targets: Set[str]) -> None:
@@ -108,8 +109,8 @@ class Job:
         async with self.__condition:
             self.available_targets = available_targets
             self.__scheduling_decision = None
-            self.__timestamp_started = None
-            self.__timestamp_ended = None
+            self.__timestamp_start = None
+            self.__timestamp_end = None
             self.__condition.notify_all()
 
     async def is_pending(self: Self) -> bool:

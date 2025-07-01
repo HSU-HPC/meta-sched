@@ -5,14 +5,17 @@ import signal
 import time
 import traceback
 from types import FrameType
-from typing import Self, Set
+from typing import Self, Set, Tuple
 
-from ms_common import job, scheduling_decision
-from ms_common.job import Instance as Job
+from ms_common import scheduling_decision
+from ms_common.job import Spec as JobSpec
 from ms_common.target import Target
-from ms_common.utils import StatusException, eprint
+from ms_common.utils import StatusException, eprint, time_to_seconds
 
+from ms_client import job, ssh
+from ms_client.job import Instance as Job
 from ms_client.lock_file import LockFile
+from ms_client.remote_target import RemoteTarget
 from ms_client.scheduler_interface import SchedulerClientInterface
 from ms_client.utils import RedirectOutputToFile
 
@@ -64,15 +67,72 @@ class Executor:
         raise InterruptedError(signalnum)
 
     @staticmethod
+    def is_target_suitable(target: Target, job_spec: JobSpec) -> Tuple[bool, str]:
+        """
+        Check if the target is suitable for executing a specific job.
+
+        Parameters
+        ----------
+        job_spec : Spec
+            The specification of the job considered for execution on the target
+
+        Returns
+        -------
+        Tuple[bool, str]
+            Suitability of the target for executing the job and reason
+        """
+
+        def has_ssh_config_entry(target: Target) -> bool:
+            """
+            Check if the current user can use a target system.
+
+            Parameters
+            ----------
+            target : Target
+                The target system
+
+            Returns
+            -------
+            bool
+                True, if the the current user has SSH credentials for this target
+            """
+            config = ssh.get_config()
+            return str(target.id) in config.get_hostnames() and "user" in config.lookup(
+                str(target.id)
+            )
+
+        if not has_ssh_config_entry(target):
+            return False, "Credentials missing"
+        if target.max_time is not None and job_spec.seconds > time_to_seconds(
+            target.max_time
+        ):
+            return False, "Too much time required"
+        max_nodes = (
+            min(target.nodes, target.max_nodes) if target.max_nodes else target.nodes
+        )
+        if job_spec.nodes > max_nodes:
+            return False, "Too many nodes required"
+        cores_per_node = job_spec.ranks_per_node * job_spec.cores_per_rank
+        if cores_per_node > target.cores_per_node:
+            return False, "Too many cores required"
+        for t in job_spec.required_tags:
+            if t not in target.tags:
+                return False, f'Required tag "{t}" missing'
+        for m in job_spec.required_modules:
+            if m not in target.module_map:
+                return False, f'Required module "{m}" missing'
+        return True, "OK"
+
+    @staticmethod
     def filter_targets(
-        job_spec: job.Spec, scheduler: SchedulerClientInterface
+        job_spec: JobSpec, scheduler: SchedulerClientInterface
     ) -> Set[str]:
         """
         Obtain the set of available targets of the scheduler for a given job specification.
 
         Parameters
         ----------
-        job_spec : job.Spec
+        job_spec : JobSpec
             The job specification on which to filter the targets
         scheduler : SchedulerInterface
             The scheduler from which to obtain the targets to be filtered
@@ -88,7 +148,7 @@ class Executor:
         except Exception:
             raise StatusException(os.EX_UNAVAILABLE)
         for t in targets:
-            is_suitable, reason = t.is_suitable(job_spec)
+            is_suitable, reason = Executor.is_target_suitable(t, job_spec)
             # Uncomment for debugging:
             # eprint(f'Job may run on {t.id}: {"Yes" if is_suitable else "No"} ({reason})')
             if is_suitable:
@@ -105,7 +165,7 @@ class Executor:
         eprint(f"MS_ARRAY_IDX={self.__job.array_idx}")
         eprint(f"MS_JOB_SPEC={self.__job.spec.name}")
         eprint("=== 1. Awaiting scheduling of job ===")
-        target: Target | None = None
+        target: Target
         try:
             decision = self.__scheduler.poll_scheduling_decision(
                 self.__job.array_id, self.__job.array_idx
@@ -127,6 +187,7 @@ class Executor:
                 time.sleep(decision.wait_seconds)
             case _:
                 raise NotImplementedError()
+        remote_target = RemoteTarget.from_target(target)
         eprint(
             f"=== 2. Copying input files to target {target.id} and run optional setup step ==="
         )
@@ -135,8 +196,8 @@ class Executor:
         ):
             src = self.__job.local_input
             dst = self.__job.remote_input.parent
-            target.transfer(src, dst, Target.TransferMode.UPLOAD)
-            target.setup(self.__job)
+            remote_target.transfer(src, dst, RemoteTarget.TransferMode.UPLOAD)
+            remote_target.setup(self.__job)
         eprint(f"=== 3. Executing job on target {target.id} ===")
         job_id = self.__job.array_id, self.__job.array_idx
 
@@ -144,6 +205,7 @@ class Executor:
             """
             Callback to update the Meta Scheduler server that the job has started executing on the target.
             """
+            self.__job.set_status(job.Status.Running(target.id))
             try:
                 self.__scheduler.update_job_started(*job_id, int(time.time()))
             except Exception as e:
@@ -153,23 +215,24 @@ class Executor:
             """
             Callback to update the Meta Scheduler server that the job has finished executing on the target.
             """
+            self.__job.set_status(job.Status.Completed())
             try:
                 self.__scheduler.update_job_ended(*job_id, int(time.time()))
             except Exception as e:
                 eprint("Error updating job state:", e)
 
-        callbacks = Target.JobExecutionCallbacks(
+        callbacks = RemoteTarget.JobExecutionCallbacks(
             on_start=callback_job_started,
             on_end=callback_job_ended,
         )
-        target.execute(self.__job, callbacks)
+        remote_target.execute(self.__job, callbacks)
         eprint(f"=== 4. Fetching results from target {target.id} ===")
         src = self.__job.remote_output
         dst = self.__job.local_output.parent
-        target.transfer(src, dst, Target.TransferMode.DOWNLOAD)
+        remote_target.transfer(src, dst, RemoteTarget.TransferMode.DOWNLOAD)
         eprint(f"=== 5. Cleaning up files on target {target.id} ===")
         # TODO: Consider always cleaning up (even if job failed/was canceled)
-        target.clean_up(self.__job)
+        remote_target.clean_up(self.__job)
 
     def run(self: Self) -> None:
         """

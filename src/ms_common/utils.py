@@ -7,6 +7,8 @@ from typing import Any
 
 from deprecated import deprecated # type: ignore[attr-defined]
 
+DEFAULT_SSH_PORT = 22
+
 def eprint(*args: Any, **kwargs: Any) -> None:
     """
     Print function for stderr.
@@ -18,7 +20,8 @@ def eprint(*args: Any, **kwargs: Any) -> None:
     **kwargs : Any
         Named arguments forwarded to built-in print function
     """
-    print(*args, **kwargs, file=sys.stderr, flush=True)
+    kwargs["flush"] = True
+    print(*args, **kwargs, file=sys.stderr)
 
 
 # See https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html

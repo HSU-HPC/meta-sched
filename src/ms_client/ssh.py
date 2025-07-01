@@ -6,8 +6,6 @@ from typing import Dict, Tuple
 
 from paramiko import SSHConfig
 
-DEFAULT_PORT = 22
-
 
 def get_config_paths() -> Tuple[Path, Path]:
     """

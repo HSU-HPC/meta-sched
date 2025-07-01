@@ -5,7 +5,7 @@ import importlib.util
 import tomllib
 from os import PathLike
 from pathlib import Path
-from typing import Any, List, Self, Tuple, Type
+from typing import Any, List, Self, Type
 
 from ms_common.target import Target
 from pydantic import BaseModel, model_validator
@@ -25,6 +25,8 @@ class Config(BaseModel):
         The port of the API
     scheduler_class : Type[Policy]
         The scheduling policy to be applied
+    scheduling_loop_interval : float
+        The interval period between applying the scheduling policy in seconds
     targets : List[Target]
         All targets available to execute jobs
     """
@@ -33,6 +35,7 @@ class Config(BaseModel):
     port: int
     scheduler_class_name: str
     _scheduler_class: Type[Policy] | None = None
+    scheduling_loop_interval: float
     targets: List[Target]
 
     @classmethod
@@ -58,18 +61,6 @@ class Config(BaseModel):
             The absolute path to the default config file
         """
         return (Path(__file__).parent / "example.toml").absolute()
-
-    @property
-    def endpoint(self: Self) -> Tuple[str, int]:
-        """
-        Get the endpoint consisting of host and port for the API.
-
-        Returns
-        -------
-        Tuple[str, int]
-            The host and port for the API
-        """
-        return self.host, self.port
 
     @property
     def scheduler_class(self: Self) -> Type[Policy]:

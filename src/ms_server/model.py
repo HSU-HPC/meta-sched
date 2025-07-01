@@ -3,7 +3,7 @@
 import asyncio
 from typing import Self, Set
 
-from ms_common import job
+from ms_common.job import Spec as JobSpec
 
 from ms_server.job import Job, JobId
 
@@ -25,14 +25,14 @@ class Model:
         self.__next_array_id: int = 1
 
     async def create_job_array(
-        self: Self, spec: job.Spec, available_targets: Set[str]
+        self: Self, spec: JobSpec, available_targets: Set[str]
     ) -> str:
         """
         Create a new job array with the given specification and available targets for scheduling.
 
         Parameters
         ----------
-        spec : job.Spec
+        spec : JobSpec
             The specification of the job array to be created
         available_targets : Set[str]
             The set of target IDs which this job array may be assigned to

@@ -1,6 +1,8 @@
 """Module containing the Meta Scheduler HTTP API."""
 
+import asyncio
 import os
+import signal
 import sys
 
 from ms_common.utils import eprint, try_become_root
@@ -8,7 +10,79 @@ from pydantic import ValidationError
 
 from ms_server.api import API
 from ms_server.config import Config
+from ms_server.model import Model
 from ms_server.scheduling import Policy
+
+
+async def scheduling_loop(
+    scheduler: Policy, scheduling_loop_interval: float, model: Model
+) -> None:
+    """
+    Run the scheduling loop (non-blocking).
+
+    Parameters
+    ----------
+    scheduler : Policy
+        The scheduling policy to be applied
+    scheduling_loop_interval : float
+        The number of seconds between consecutive applications of the scheduling policy
+    model : Model
+        The state of the Meta Scheduler
+    """
+    try:
+        while True:
+            # TODO update jobs which have started and who must have finished, but have not been updated accordingly
+            loop_start = asyncio.get_event_loop().time()
+            pending_jobs = await model.get_pending_jobs()
+            await scheduler.update(pending_jobs)
+            sleep_time = max(
+                0,
+                scheduling_loop_interval
+                - (asyncio.get_event_loop().time() - loop_start),
+            )
+            await asyncio.sleep(sleep_time)
+    except asyncio.CancelledError:
+        pass
+
+
+async def __run_server(
+    api: API, scheduler: Policy, model: Model, config: Config
+) -> None:
+    """
+    Run the Meta Scheduler server asynchronously.
+
+    Parameters
+    ----------
+    api : API
+        The HTTP API of the Meta Scheduler server
+    scheduler : Policy
+        The scheduling policy to be applied by the Meta Scheduler
+    model : Model
+        The state of the Meta Scheduler
+    config : Config
+        The configuration for the Meta Scheduler Server
+    """
+    loop = asyncio.get_running_loop()
+    stop_event = asyncio.Event()
+    scheduler_task = asyncio.create_task(
+        scheduling_loop(scheduler, config.scheduling_loop_interval, model)
+    )
+
+    def shutdown() -> None:
+        """Signal handler to shut down the scheduling loop."""
+        stop_event.set()
+
+    loop.add_signal_handler(signal.SIGINT, shutdown)
+    loop.add_signal_handler(signal.SIGTERM, shutdown)
+    server, server_task = api.serve()
+    await stop_event.wait()
+    scheduler_task.cancel()
+    try:
+        await scheduler_task
+    except asyncio.CancelledError:
+        pass
+    server.should_exit = True
+    await server_task
 
 
 def main() -> int:
@@ -40,8 +114,9 @@ def main() -> int:
         sys.exit(os.EX_CONFIG)
     scheduler: Policy = config.scheduler_class(config.targets)
     try:
-        api = API(scheduler)
-        api.run(*config.endpoint)
+        model = Model()
+        api = API(config.host, config.port, config.targets, model)
+        asyncio.run(__run_server(api, scheduler, model, config))
     except PermissionError as e:
         eprint(e)
         eprint()
