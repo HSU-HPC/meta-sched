@@ -24,7 +24,6 @@ from ms_client.config import Config
 from ms_client.job import (get_job_outputs, get_jobs_dir, list_job_spec_names,
                            load_job_spec)
 from ms_client.run_job import NoTargetsAvailableError, launch_job_array
-from ms_client.scheduler_interface import SchedulerClientInterface as Scheduler
 
 
 # TODO split into Client and CLI
@@ -33,16 +32,27 @@ class CLI:
     Command line application for creating job specifications, submitting, listing, and canceling jobs.
     """
 
-    def __init__(self: Self, scheduler: Scheduler) -> None:
+    def __init__(self: Self, client: Client) -> None:
         """
         Create a new instance of the CLI.
 
         Parameters
         ----------
-        scheduler : Scheduler
-            Interface to the scheduler policy
+        client : Client
+            Interface to the HTTP API
         """
-        self.__scheduler = scheduler
+        self.__client = client
+
+    def require_can_use_client(self: Self) -> None:
+        """Check if the client has the correct version or exit the process with the corresponding error."""
+        try:
+            self.__client.check_version_ok()
+        except ValueError as e:
+            eprint(e)
+            sys.exit(os.EX_PROTOCOL)
+        except RuntimeError as e:
+            eprint(e)
+            sys.exit(os.EX_UNAVAILABLE)
 
     def ssh_config(self: Self) -> int:
         """
@@ -54,8 +64,9 @@ class CLI:
         int
             The exit status of the operation
         """
+        self.require_can_use_client()
         try:
-            targets = self.__scheduler.targets
+            targets = self.__client.targets
         except Exception:
             eprint("Could not connect to scheduler")
             return os.EX_UNAVAILABLE
@@ -130,19 +141,13 @@ class CLI:
             eprint("Could not load job spec:", job_spec)
             print(e)
             return os.EX_NOINPUT
+        self.require_can_use_client()
         try:
             response = launch_job_array(job_spec)
             print(response)
         except NoTargetsAvailableError as e:
             eprint("No targets available to run job spec:", e.job_spec)
             sys.exit(os.EX_UNAVAILABLE)
-        except Exception as e:
-            # TODO Only while using HTTP API (Might change in the future)
-            if type(e).__name__ == "ConnectionError":
-                eprint("Could not connect to msserver. (Is it running?)")
-                return os.EX_UNAVAILABLE
-            else:
-                raise e
         return os.EX_OK
 
     def status(
@@ -358,8 +363,12 @@ def main() -> int:
         The exit code
     """
     try:
-        config = Config.load()
+        config = Config.load(raise_on_missing=True)
+    except FileNotFoundError as e:
+        eprint(e)
+        return os.EX_CONFIG
     except ValidationError as e:
         eprint(e.json(indent=3))
         return os.EX_CONFIG
-    return CLI(Client(config)).run()
+    client = Client(config)
+    return CLI(client).run()

@@ -60,9 +60,14 @@ class Config(BaseModel):
         return f"{self.protocol}://{self.host}:{self.port}"
 
     @classmethod
-    def load(cls) -> Self:
+    def load(cls, raise_on_missing: bool = False) -> Self:
         """
         Load and validate the client configuration.
+
+        Parameter
+        ---------
+        raise_on_missing : bool
+            If true, an error will be raised if the file had to be created.
 
         Returns
         -------
@@ -73,6 +78,10 @@ class Config(BaseModel):
         if not config_path.is_file():
             # Write default config to path
             config_path.write_text(data.get_default_config_path().read_text())
+            if raise_on_missing:
+                raise FileNotFoundError(
+                    f'No config file found. (Default was created at "{config_path}", please repeat!)'
+                )
         values = tomllib.loads(config_path.read_text())
         config = cls.model_validate(values)
         return config

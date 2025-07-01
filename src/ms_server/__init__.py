@@ -87,7 +87,7 @@ async def __run_server(
 
 def main() -> int:
     """
-    Execute HTTP API as root with parameters from the environment or default values.
+    Execute Server (HTTP API and scheduling loop).
 
     Returns
     -------

@@ -24,7 +24,6 @@ from ms_client.scheduler_interface import SchedulerClientInterface
 def __get_scheduler() -> SchedulerClientInterface:
     """
     Instantiates a client for access to the scheduler.
-    (Uses parameters from the environment or default values.)
 
     Returns
     -------

@@ -3,6 +3,7 @@
 import asyncio
 from typing import Any, List, Self, Set, Tuple
 
+import ms_common
 import uvicorn
 from fastapi import FastAPI, HTTPException, Query, status
 from fastapi.responses import JSONResponse
@@ -86,6 +87,18 @@ class API(FastAPI):
     def set_up_endpoints(self: Self) -> None:
         """Set up the HTTP API endpoints."""
 
+        @self.get("/version", response_model=str)
+        def get_version() -> str:
+            """
+            Get the Meta Scheduler version name.
+
+            Returns
+            -------
+            str
+                The version name of the Meta Scheduler
+            """
+            return ms_common.__version__
+
         @self.get("/targets", response_model=List[Target])
         def get_targets() -> List[Target]:
             """
@@ -102,6 +115,7 @@ class API(FastAPI):
             available_targets: Set[str]
             job_spec: JobSpec
 
+        # region job control
         # CREATE
         @self.post("/jobs")
         async def submit_job_array(request: ScheduleRequest) -> JSONResponse:
@@ -251,6 +265,8 @@ class API(FastAPI):
                     status_code=status.HTTP_404_NOT_FOUND,
                     detail=f"Job with array ID {array_id} and index {array_idx} not found.",
                 )
+
+        # endregion job control
 
     def serve(self: Self) -> Tuple[uvicorn.Server, asyncio.Task[Any]]:
         """Start the HTTP API  (non-blocking).

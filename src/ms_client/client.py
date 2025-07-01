@@ -5,6 +5,7 @@ import http.client
 import time
 from typing import List, Self, Set
 
+import ms_common
 import requests
 from ms_common.job import Spec
 from ms_common.scheduling_decision import (Deferred, SchedulingDecision,
@@ -28,6 +29,32 @@ class Client(SchedulerClientInterface):
             The HTTP endpoint of the server
         """
         self.__endpoint = config.endpoint
+
+    def check_version_ok(self: Self) -> None:
+        """
+        Check if the server is running and if its version matches that of the client.
+
+        Raises
+        ------
+        RuntimeError
+            Error raised if a connection to/response from the server could not be obtained
+        ValueError
+            Error raised if the version of the server does not match the version of the client
+        """
+        response: requests.Response
+        try:
+            response = requests.get(f"{self.__endpoint}/version")
+        except Exception:
+            raise RuntimeError(
+                f"Could check server version at {self.__endpoint}. (Is it running?)"
+            )
+        if http.HTTPStatus.OK != response.status_code:
+            raise http.client.error()
+        server_version = response.json()
+        if ms_common.__version__ != server_version:
+            raise ValueError(
+                f"Version mismatch. (Using server version {server_version} with client version {ms_common.__version__}.)"
+            )
 
     @property
     def targets(self: Self) -> List[Target]:
