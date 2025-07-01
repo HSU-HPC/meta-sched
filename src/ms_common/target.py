@@ -1,6 +1,6 @@
 """Module containing classes for managing data transfer and command execution for target systems."""
 
-import abc
+from dataclasses import dataclass
 import enum
 import sys
 import time
@@ -305,11 +305,26 @@ class Target(BaseModel):
             connect_timeout=timeout,
         )
         return connection
+    
+    @dataclass
+    class JobExecutionCallbacks:
+        """
+        Callbacks for job execution on the target.
+        Attributes
+        ----------
+        on_start : callable | None
+            Callback to be called when the job starts executing on the target
+        on_end : callable | None
+            Callback to be called when the job ends executing on the target
+        """
+        on_start: Any = lambda: None
+        on_end: Any = lambda: None
 
     def _execute_batch_system(
         self: Self,
         connection: Connection,
         job: Job,
+        callbacks: JobExecutionCallbacks = JobExecutionCallbacks(),
         env: Dict[str, Any] = {},
     ) -> None:
         """
@@ -326,11 +341,11 @@ class Target(BaseModel):
         """
         match self.batch_system:
             case "none":
-                self._execute_batch_system_none(connection, job, env)
+                self._execute_batch_system_none(connection, job, callbacks, env)
             case "slurm":
-                self._execute_batch_system_slurm(connection, job, env)
+                self._execute_batch_system_slurm(connection, job, callbacks, env)
             case "pbs":
-                self._execute_batch_system_pbs(connection, job, env)
+                self._execute_batch_system_pbs(connection, job, callbacks, env)
             case _:
                 raise ValueError(
                     f"Unsupported batch system {self.batch_system} for target {self.id}"
@@ -403,7 +418,7 @@ class Target(BaseModel):
                     result = connection.run(cmd, warn=True, env=Target.__get_env(job))
                     expect_ok(result.exited)
 
-    def execute(self: Self, job: Job) -> None:
+    def execute(self: Self, job: Job, callbacks: JobExecutionCallbacks) -> None:
         """
         Execute the job on the target.
 
@@ -415,13 +430,14 @@ class Target(BaseModel):
         with self._connect() as connection:
             expect_ok(connection.run(f"mkdir -p {job.remote_output}", warn=True).exited)
             with connection.cd(job.remote_output):
-                self._execute_batch_system(connection, job, Target.__get_env(job))
+                self._execute_batch_system(connection, job, callbacks, Target.__get_env(job))
 
 
     def _execute_batch_system_none(
         self: Self,
         connection: Connection,
         job: Job,
+        callbacks: JobExecutionCallbacks = JobExecutionCallbacks(),
         env: Dict[str, Any] = {},
     ) -> None:
         """
@@ -438,13 +454,17 @@ class Target(BaseModel):
         """
         job.set_status(JobStatus.Running(self.id))
         cmd = self._prefix_cmd(job.spec.cmd_main, job.spec.required_modules)
-        expect_ok(connection.run(cmd, warn=True, env=env).exited)
+        callbacks.on_start()
+        exit_code = connection.run(cmd, warn=True, env=env).exited
+        callbacks.on_end()
+        expect_ok(exit_code)
 
 
     def _execute_batch_system_slurm(
         self: Self,
         connection: Connection,
         job: Job,
+        callbacks: JobExecutionCallbacks = JobExecutionCallbacks(),
         env: Dict[str, Any] = {},
     ) -> None:
         """
@@ -516,6 +536,7 @@ class Target(BaseModel):
                 break  # Job no longer in queue or has started
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
+        callbacks.on_start()
         eprint("--- d. Awaiting job completion ---")
         if interrupted_error is None:
             backoff_count = 0
@@ -531,6 +552,7 @@ class Target(BaseModel):
                 break  # Job no longer in queue
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
+        callbacks.on_end()
         eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
         time.sleep(1)  # Wait a bit for the output/error to be received
         exit_code = -1
@@ -561,6 +583,7 @@ class Target(BaseModel):
         self: Self,
         connection: Connection,
         job: Job,
+        callbacks: JobExecutionCallbacks = JobExecutionCallbacks(),
         env: Dict[str, Any] = {},
     ) -> None:
         """
@@ -627,7 +650,6 @@ class Target(BaseModel):
                 if interrupted_error is not None:
                     eprint("Job was already canceled. (Nothing to do.)")
                     return
-                # Defer handling until PBS job has been canceled completely
                 eprint(f"Canceling PBS job {pbs_job_id}.")
                 expect_ok(connection.run(f"qdel {pbs_job_id}", warn=True).exited)
                 job.set_status(JobStatus.Canceled())
@@ -645,6 +667,7 @@ class Target(BaseModel):
                 break  # Job no longer in queue or has started
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
+        callbacks.on_start()
         eprint("--- d. Awaiting job completion ---")
         if interrupted_error is None:
             backoff_count = 0
@@ -658,6 +681,7 @@ class Target(BaseModel):
                 break  # Job no longer in queue
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
+        callbacks.on_end()
         eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
         time.sleep(1)  # Wait a bit for the output/error to be received
         exit_code = -1

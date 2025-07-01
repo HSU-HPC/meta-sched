@@ -25,12 +25,14 @@ class SchedulerClientInterface(abc.ABC):
         Raises
         ------
         NotImplementedError
-            Must be implemented in concrete scheduling policy"
+            Must be implemented in concrete client"
         """
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def submit(self: Self, job_spec: Spec, available_targets: Set[str]) -> str:
+    def submit_job_array(
+        self: Self, job_spec: Spec, available_targets: Set[str]
+    ) -> str:
         """
         Create a new unique identifier for a new job array and schedule the corresponding jobs.
 
@@ -49,7 +51,7 @@ class SchedulerClientInterface(abc.ABC):
         Raises
         ------
         NotImplementedError
-            Must be implemented in concrete scheduling policy"
+            Must be implemented in concrete client"
         """
         raise NotImplementedError()
 
@@ -75,6 +77,71 @@ class SchedulerClientInterface(abc.ABC):
         Raises
         ------
         NotImplementedError
-            Must be implemented in concrete scheduling policy
+            Must be implemented in concrete client
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def cancel_job(self: Self, array_id: str, array_idx: int) -> None:
+        """
+        Cancel a job.
+
+        Parameters
+        ----------
+        array_id : str
+            The unique identifier of the job array
+        array_idx : int
+            The index of the job in the job array
+
+        Raises
+        ------
+        NotImplementedError
+            Must be implemented in concrete client
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def update_job_started(
+        self: Self, array_id: str, array_idx: int, timestamp: int
+    ) -> None:
+        """
+        Set the timestamp when a job was started.
+
+        Parameters
+        ----------
+        array_id : str
+            The unique identifier of the job array
+        array_idx : int
+            The index of the job in the job array
+        timestamp : int
+            The start time of the job as a unix timestamp (seconds since epoch)
+
+        Raises
+        ------
+        NotImplementedError
+            Must be implemented in concrete client
+        """
+        raise NotImplementedError()
+
+    @abc.abstractmethod
+    def update_job_ended(
+        self: Self, array_id: str, array_idx: int, timestamp: int
+    ) -> None:
+        """
+        Set the timestamp when a job was ended.
+
+        Parameters
+        ----------
+        array_id : str
+            The unique identifier of the job array
+        array_idx : int
+            The index of the job in the job array
+        timestamp : int
+            The end time of the job as a unix timestamp (seconds since epoch)
+
+        Raises
+        ------
+        NotImplementedError
+            Must be implemented in concrete client
         """
         raise NotImplementedError()

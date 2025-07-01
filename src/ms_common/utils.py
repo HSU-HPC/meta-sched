@@ -5,6 +5,8 @@ import shlex
 import sys
 from typing import Any
 
+from deprecated import deprecated # type: ignore[attr-defined]
+
 def eprint(*args: Any, **kwargs: Any) -> None:
     """
     Print function for stderr.
@@ -87,7 +89,7 @@ def expect_ok(status: int) -> None:
     if status != os.EX_OK:
         raise StatusException(status)
 
-
+@deprecated(reason="Maybe not needed anymore") # type: ignore[no-untyped-call,misc]
 def try_become_root(required: bool = False) -> None:
     """
     Try to restart the current application as the root user if not already and "--sudo" was given as a command line parameter.

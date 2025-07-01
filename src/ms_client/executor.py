@@ -138,7 +138,31 @@ class Executor:
             target.transfer(src, dst, Target.TransferMode.UPLOAD)
             target.setup(self.__job)
         eprint(f"=== 3. Executing job on target {target.id} ===")
-        target.execute(self.__job)
+        job_id = self.__job.array_id, self.__job.array_idx
+
+        def callback_job_started() -> None:
+            """
+            Callback to update the Meta Scheduler server that the job has started executing on the target.
+            """
+            try:
+                self.__scheduler.update_job_started(*job_id, int(time.time()))
+            except Exception as e:
+                eprint("Error updating job state:", e)
+
+        def callback_job_ended() -> None:
+            """
+            Callback to update the Meta Scheduler server that the job has finished executing on the target.
+            """
+            try:
+                self.__scheduler.update_job_ended(*job_id, int(time.time()))
+            except Exception as e:
+                eprint("Error updating job state:", e)
+
+        callbacks = Target.JobExecutionCallbacks(
+            on_start=callback_job_started,
+            on_end=callback_job_ended,
+        )
+        target.execute(self.__job, callbacks)
         eprint(f"=== 4. Fetching results from target {target.id} ===")
         src = self.__job.remote_output
         dst = self.__job.local_output.parent
@@ -168,6 +192,7 @@ class Executor:
             try:
                 self.__run()
             except InterruptedError:
+                self.__scheduler.cancel_job(self.__job.array_id, self.__job.array_idx)
                 final_job_status = job.Status.Canceled()
             except Exception as e:
                 status = -1

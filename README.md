@@ -18,3 +18,4 @@ Please refer to the [administrator](./docs/README.md#administrators) and [user](
 - [ ] API authentication
 - [ ] [Documentation](./docs/README.md)
 - [ ] Minimize shared code
+- [ ] Client side re-scheduling

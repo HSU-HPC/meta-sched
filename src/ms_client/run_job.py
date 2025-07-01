@@ -110,7 +110,7 @@ def launch_job_array(job_spec: str) -> str:
     suitable_targets = Executor.filter_targets(spec, scheduler)
     if len(suitable_targets) == 0:
         raise NoTargetsAvailableError(job_spec)
-    array_id = scheduler.submit(spec, suitable_targets)
+    array_id = scheduler.submit_job_array(spec, suitable_targets)
     for array_idx in range(0, spec.array_size):
         __start_process(job_spec, array_id, array_idx)
     # TODO consider returning raw array_id, array_idxs, and PIDs

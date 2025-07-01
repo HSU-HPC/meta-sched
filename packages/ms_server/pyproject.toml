@@ -1,11 +1,12 @@
 [project]
 name = "meta-sched-server"
-version = "0.1.0"
+dynamic = ["version"]
 description     = "Meta Scheduler Server"
 authors         = [{name="Ruben Horn"}]
 requires-python = ">=3.12"
 
 dependencies = [
+    "deprecated>=1.2.18",
     # TODO remove fabric/paramiko dependency
     "fabric>=3.2.2",
     "fastapi>=0.115.14",
@@ -36,6 +37,9 @@ include = ["ms_server", "ms_server.config", "ms_server.scheduler", "ms_common"]
 
 [tool.setuptools.package-data]
 "server" = ["config/example.toml"]
+
+[tool.setuptools.dynamic]
+version = {attr = "ms_common.__version__"}
 
 [tool.uv]
 package = true

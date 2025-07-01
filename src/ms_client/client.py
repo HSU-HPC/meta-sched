@@ -45,7 +45,9 @@ class Client(SchedulerClientInterface):
         content = response.json()
         return [Target.model_validate(o) for o in content]
 
-    def submit(self: Self, job_spec: Spec, available_targets: Set[str]) -> str:
+    def submit_job_array(
+        self: Self, job_spec: Spec, available_targets: Set[str]
+    ) -> str:
         """
         Create a new unique identifier for a new job array and schedule the corresponding jobs.
 
@@ -111,3 +113,84 @@ class Client(SchedulerClientInterface):
                 time.sleep(decision.wait_seconds)
             else:
                 return decision
+
+    def cancel_job(self: Self, array_id: str, array_idx: int) -> None:
+        """
+        Cancel a job.
+
+        Parameters
+        ----------
+        array_id : str
+            The unique identifier of the job array
+        array_idx : int
+            The index of the job in the job array
+        """
+        response = requests.delete(
+            f"{self.__endpoint}/jobs/{array_id}/{array_idx}",
+        )
+        if http.HTTPStatus.NO_CONTENT != response.status_code:
+            raise http.client.error(response)
+
+    def update_job_started(
+        self: Self, array_id: str, array_idx: int, timestamp: int
+    ) -> None:
+        """
+        Set the timestamp when a job was started.
+
+        Parameters
+        ----------
+        array_id : str
+            The unique identifier of the job array
+        array_idx : int
+            The index of the job in the job array
+        timestamp : int
+            The start time of the job as a unix timestamp (seconds since epoch)
+        """
+        response = requests.put(
+            f"{self.__endpoint}/jobs/{array_id}/{array_idx}?timestamp_started={timestamp}"
+        )
+        if http.HTTPStatus.NO_CONTENT != response.status_code:
+            raise http.client.error(response)
+
+    def update_job_ended(
+        self: Self, array_id: str, array_idx: int, timestamp: int
+    ) -> None:
+        """
+        Set the timestamp when a job was ended.
+
+        Parameters
+        ----------
+        array_id : str
+            The unique identifier of the job array
+        array_idx : int
+            The index of the job in the job array
+        timestamp : int
+            The end time of the job as a unix timestamp (seconds since epoch)
+        """
+        response = requests.put(
+            f"{self.__endpoint}/jobs/{array_id}/{array_idx}?timestamp_ended={timestamp}"
+        )
+        if http.HTTPStatus.NO_CONTENT != response.status_code:
+            raise http.client.error(response)
+
+    def reschedule_job(
+        self: Self, array_id: str, array_idx: int, available_targets: Set[str]
+    ) -> None:
+        """
+        Reschedule a job with the given array ID and index.
+
+        Parameters
+        ----------
+        array_id : str
+            The unique identifier of the job array
+        array_idx : int
+            The index of the job in the job array
+        available_targets : Set[str]
+            The set of target IDs which this job may be assigned to
+        """
+        response = requests.put(
+            f"{self.__endpoint}/jobs/{array_id}/{array_idx}/reschedule",
+            json={"available_targets": list(available_targets)},
+        )
+        if http.HTTPStatus.NO_CONTENT != response.status_code:
+            raise http.client.error(response)

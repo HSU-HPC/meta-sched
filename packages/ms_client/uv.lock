@@ -205,9 +205,9 @@ wheels = [
 
 [[package]]
 name = "meta-sched-client"
-version = "0.1.0"
 source = { editable = "." }
 dependencies = [
+    { name = "deprecated", marker = "sys_platform == 'linux'" },
     { name = "fabric", marker = "sys_platform == 'linux'" },
     { name = "pandas", marker = "sys_platform == 'linux'" },
     { name = "pydantic", marker = "sys_platform == 'linux'" },
@@ -224,6 +224,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "deprecated", specifier = ">=1.2.18" },
     { name = "fabric", specifier = ">=3.2.2" },
     { name = "pandas", specifier = ">=2.2.3" },
     { name = "pydantic", specifier = ">=2.11.7" },
