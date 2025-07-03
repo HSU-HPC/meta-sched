@@ -2,14 +2,17 @@
 
 import asyncio
 import os
-import signal
 import sys
+from contextlib import asynccontextmanager
+from typing import Any, AsyncGenerator
 
+from ms_common.schemas import JobKey, SchedulingDecisionType
 from ms_common.utils import eprint, try_become_root
 from pydantic import ValidationError
 
 from ms_server.api import API
 from ms_server.config import Config
+from ms_server.db import DataBase
 from ms_server.model import Model
 from ms_server.scheduling import Policy
 
@@ -45,46 +48,6 @@ async def scheduling_loop(
         pass
 
 
-async def __run_server(
-    api: API, scheduler: Policy, model: Model, config: Config
-) -> None:
-    """
-    Run the Meta Scheduler server asynchronously.
-
-    Parameters
-    ----------
-    api : API
-        The HTTP API of the Meta Scheduler server
-    scheduler : Policy
-        The scheduling policy to be applied by the Meta Scheduler
-    model : Model
-        The state of the Meta Scheduler
-    config : Config
-        The configuration for the Meta Scheduler Server
-    """
-    loop = asyncio.get_running_loop()
-    stop_event = asyncio.Event()
-    scheduler_task = asyncio.create_task(
-        scheduling_loop(scheduler, config.scheduling_loop_interval, model)
-    )
-
-    def shutdown() -> None:
-        """Signal handler to shut down the scheduling loop."""
-        stop_event.set()
-
-    loop.add_signal_handler(signal.SIGINT, shutdown)
-    loop.add_signal_handler(signal.SIGTERM, shutdown)
-    server, server_task = api.serve()
-    await stop_event.wait()
-    scheduler_task.cancel()
-    try:
-        await scheduler_task
-    except asyncio.CancelledError:
-        pass
-    server.should_exit = True
-    await server_task
-
-
 def main() -> int:
     """
     Execute Server (HTTP API and scheduling loop).
@@ -112,17 +75,46 @@ def main() -> int:
     except ValidationError as e:
         eprint(e.json(indent=3))
         sys.exit(os.EX_CONFIG)
-    scheduler: Policy = config.scheduler_class(config.targets)
+    model = DataBase(config.db_url)
+
+    async def on_schedule_job(
+        job_key: JobKey, scheduling_decision: SchedulingDecisionType
+    ) -> None:
+        await model.update_job(job_key, dict(scheduling_decision=scheduling_decision))
+
+    @asynccontextmanager
+    async def lifespan(app: API) -> AsyncGenerator[Any, Any]:
+        await model.init_models()
+        scheduler_task = asyncio.create_task(
+            scheduling_loop(scheduler, config.scheduling_loop_interval, model)
+        )
+        yield
+        scheduler_task.cancel()
+        try:
+            await scheduler_task
+        except asyncio.CancelledError:
+            pass
+        await model.dispose()
+
+    scheduler: Policy = config.scheduler_class(config.targets, on_schedule_job)
+    api = API(config.host, config.port, config.targets, model, lifespan=lifespan)
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+    server, server_task = api.serve()
     try:
-        model = Model()
-        api = API(config.host, config.port, config.targets, model)
-        asyncio.run(__run_server(api, scheduler, model, config))
-    except PermissionError as e:
-        eprint(e)
-        eprint()
-        eprint("Maybe try again with the --sudo flag?")
+        loop.run_until_complete(server_task)
+    except KeyboardInterrupt:
+        server.should_exit = True
+    finally:
+        loop.run_until_complete(loop.shutdown_asyncgens())
+        loop.close()
     return os.EX_OK
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    try:
+        sys.exit(main())
+    except PermissionError as e:
+        eprint(e)
+        eprint()
+        eprint("Maybe try again with the --sudo flag?")

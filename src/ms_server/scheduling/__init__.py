@@ -1,10 +1,12 @@
 """Module containing the base class for implementing scheduling policies."""
 
-from typing import List, Self, Set
+from typing import Awaitable, Callable, List, Self
 
-from ms_common.target import Target
+from ms_common.schemas import JobKey, SchedulingDecisionType, Target
 
-from ms_server.job import Job
+from ms_server.model import Job
+
+ScheduleJobCallback = Callable[[JobKey, SchedulingDecisionType], Awaitable[None]]
 
 
 class Policy:
@@ -12,7 +14,9 @@ class Policy:
     Base class for scheduling policies.
     """
 
-    def __init__(self: Self, targets: List[Target]):
+    def __init__(
+        self: Self, targets: List[Target], on_schedule_job: ScheduleJobCallback
+    ):
         """
         Create a new instance of the scheduling policy
 
@@ -20,9 +24,12 @@ class Policy:
         ----------
         targets : List[Target]
             The list of targets which jobs may be assigned to
+        on_schedule_job : ScheduleJobCallback
+            Callback to apply scheduling decision to a job
         """
         if self.__class__ == Policy:
             raise NotImplementedError()
+        self.on_schedule_job = on_schedule_job
         self._targets = {t.id: t for t in targets}
 
     @property
@@ -37,14 +44,14 @@ class Policy:
         """
         return list(self._targets.values())
 
-    async def update(self: Self, pending_jobs: Set[Job]) -> None:
+    async def update(self: Self, pending_jobs: List[Job]) -> None:
         """
         Apply the scheduling policy to update the state of the scheduler.
 
         Parameters
         ----------
-        pending_jobs : Set[Job]
-            The set of jobs which are pending scheduling
+        pending_jobs : List[Job]
+            The jobs which are pending scheduling
 
         Raises
         ------
@@ -75,14 +82,14 @@ class GreedyPolicy(Policy):
         """
         raise NotImplementedError()
 
-    async def update(self: Self, pending_jobs: Set[Job]) -> None:
+    async def update(self: Self, pending_jobs: List[Job]) -> None:
         """
         Apply greedy scheduling policy.
 
         Parameters
         ----------
-        pending_jobs : Set[Job]
-            The set of jobs which are pending scheduling
+        pending_jobs : List[Job]
+            The jobs which are pending scheduling
         """
         for job in pending_jobs:
             await self.schedule_job(job)

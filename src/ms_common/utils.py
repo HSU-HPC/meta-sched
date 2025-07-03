@@ -3,7 +3,7 @@
 import os
 import shlex
 import sys
-from typing import Any
+from typing import Any, Optional
 
 from deprecated import deprecated # type: ignore[attr-defined]
 
@@ -29,7 +29,7 @@ EX_BASH_COMMAND_NOT_FOUND = 127
 
 
 def exponential_backoff(
-    count: int, offset: float = 0, maximum: float | None = 60, base: float = 2
+    count: int, offset: float = 0, maximum: Optional[float] = 60, base: float = 2
 ) -> float:
     """
     Compute the delay according to a clamped exponential backoff function.
@@ -40,7 +40,7 @@ def exponential_backoff(
         How many times the backoff strategy has already been applied
     offset : float
         The starting value of the function added as a constant offset
-    maximum : float | None
+    maximum : Optional[float]
         The maximum value of the backoff function (60 by default) or None if it is unclamped
     base : float
         The base of the exponential function (2 by default)

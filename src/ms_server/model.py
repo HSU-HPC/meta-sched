@@ -1,113 +1,69 @@
-"""Module containing the model for the Meta Scheduler server component."""
+"""Module containing the Job class for the Meta Scheduler server component."""
 
-import asyncio
-from typing import Self, Set, Tuple
+import abc
+from typing import Any, Dict, List, Optional, Self, Set
 
-from ms_common.job import Spec as JobSpec
+from ms_common.schemas import JobKey, SchedulingDecisionType
+from ms_common.schemas import Spec as JobSpec
+from pydantic import BaseModel, ConfigDict
 
-from ms_server.job import Job
 
-
-class Model:
+class Job(BaseModel):
     """
-    Class representing the model for the Meta Scheduler server component.
-    This class is responsible for storing the state (jobs, queues, etc.) used by the policy.
+    Class representing a job for the scheduler.
+
+    Attributes
+    ----------
+    token : str
+        The random string required to look up the job
+    array_id : int
+        The job array identifier
+    array_idx : int
+        The index of the job in the job array
+    spec : JobSpec
+        The specification of the job to be scheduled
+    available_targets : List[str]
+        The set of target IDs which this job may be assigned to
+    scheduling_decision : Optional[SchedulingDecisionType]
+        The decision by the scheduling policy regarding this job or None, if the job has not yet been scheduled
+    timestamp_start : Optional[int]
+        The unix timestamp (seconds since epoch) of the job start or None, if the job has not yet started
+    timestamp_end : Optional[int]
+        The unix timestamp (seconds since epoch) of the job end or None, if the job has not yet ended
     """
 
-    JobKey = Tuple[str, str, int]
+    token: str
+    array_id: int
+    array_idx: int
+    spec: JobSpec
+    available_targets: List[str]
+    scheduling_decision: Optional[SchedulingDecisionType]
+    timestamp_start: Optional[int] = None
+    timestamp_end: Optional[int] = None
 
-    def __init__(self: Self) -> None:
-        """
-        Create a new instance of the model.
-        TODO: In memory model, no persistence is implemented yet. (Make into abstract base class and rename this to InMemoryModel)
-        """
-        # TODO add persistence (e.g. using ZODB)
-        self.__lock = asyncio.Lock()
-        self.__jobs: dict[Model.JobKey, Job] = {}
-        self.__next_array_id: int = 1
+    model_config = ConfigDict(from_attributes=True)
 
+    @property
+    def key(self: Self) -> JobKey:
+        return JobKey(self.token, self.array_id, self.array_idx)
+
+
+class Model(abc.ABC):
     async def create_job_array(
         self: Self, spec: JobSpec, available_targets: Set[str], token: str
-    ) -> str:
-        """
-        Create a new job array with the given specification and available targets for scheduling.
+    ) -> int:
+        raise NotImplementedError()
 
-        Parameters
-        ----------
-        spec : JobSpec
-            The specification of the job array to be created
-        available_targets : Set[str]
-            The set of target IDs which this job array may be assigned to
-        token : str
-            A random string which is required to look up the generated jobs
+    async def get_pending_jobs(self: Self) -> List[Job]:
+        raise NotImplementedError()
 
-        Returns
-        -------
-        str
-            The ID of the newly created job array
-        """
-        async with self.__lock:
-            array_id = str(self.__next_array_id)
-            self.__next_array_id += 1
-            for i in range(spec.array_size):
-                job_key = (token, array_id, i)
-                self.__jobs[job_key] = Job(spec, available_targets)
-            return array_id
-
-    async def get_pending_jobs(self: Self) -> Set[Job]:
-        """
-        Get all pending jobs pending scheduling.
-
-        Returns
-        -------
-        Set[Job]
-            All jobs that are pending scheduling
-        """
-        async with self.__lock:
-            pending_jobs: Set[Job] = set()
-            for job in self.__jobs.values():
-                if await job.is_pending():
-                    pending_jobs.add(job)
-            return pending_jobs
-
-    async def get_job(self: Self, job_key: JobKey) -> Job:
-        """
-        Get a job by its array ID and index.
-
-        Parameters
-        ----------
-        job_key : JobKey
-            The ID of the job to be retrieved, represented as a tuple (array_id, array_idx)
-
-        Returns
-        -------
-        Job
-            The job with the specified array ID and index
-        """
-        async with self.__lock:
-            if job_key not in self.__jobs:
-                raise KeyError(
-                    f"Job with array ID {job_key[0]} and index {job_key[1]} not found."
-                )
-            return self.__jobs[job_key]
+    async def update_job(self: Self, job_key: JobKey, data: Dict[str, Any]) -> None:
+        raise NotImplementedError()
 
     async def remove_job(self: Self, job_key: JobKey) -> None:
-        """
-        Remove a job by its array ID and index.
+        raise NotImplementedError()
 
-        Parameters
-        ----------
-        job_key : JobKey
-            The ID of the job to be removed, represented as a tuple (array_id, array_idx)
-
-        Raises
-        ------
-        KeyError
-            If the job with the specified array ID and index does not exist
-        """
-        async with self.__lock:
-            if job_key not in self.__jobs:
-                raise KeyError(
-                    f"Job with array ID {job_key[0]} and index {job_key[1]} not found."
-                )
-            del self.__jobs[job_key]
+    async def await_scheduling_decision(
+        self: Self, job_key: JobKey
+    ) -> SchedulingDecisionType:
+        raise NotImplementedError()

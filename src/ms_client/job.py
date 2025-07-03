@@ -4,10 +4,10 @@ import abc
 import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Self
+from typing import Any, List, Optional, Self
 
 import pandas as pd
-from ms_common.job import Spec
+from ms_common.schemas import Spec
 from ms_common.utils import eprint
 
 
@@ -64,7 +64,7 @@ def load_job_spec(name: str) -> Spec:
 
 
 def _get_job_output(
-    job_spec: str, array_id: str, array_idx: int, hidden: bool = False
+    job_spec: str, array_id: int, array_idx: int, hidden: bool = False
 ) -> Path:
     """
     Get the output path for a given job.
@@ -73,7 +73,7 @@ def _get_job_output(
     ----------
     job_spec : str
         The name of the job specification corresponding to its folder name
-    array_id : str
+    array_id : int
         The identifier of the job array
     array_idx : int
         The index of the job withing the array
@@ -101,7 +101,7 @@ def get_job_outputs() -> pd.DataFrame:
     _columns = ["job_spec", "array_id", "array_idx"]
     df = pd.DataFrame(columns=_columns)  # pyright: ignore[reportArgumentType]
 
-    def get_pid(job_output_path: Path) -> int | None:
+    def get_pid(job_output_path: Path) -> Optional[int]:
         """
         Get the PID for the process executing a job on the submit host.
 
@@ -112,7 +112,7 @@ def get_job_outputs() -> pd.DataFrame:
 
         Returns
         -------
-        int | None
+        Optional[int]
             The PID if the job is running or None
         """
         pid_file = job_output_path / ".pid"
@@ -123,7 +123,7 @@ def get_job_outputs() -> pd.DataFrame:
         except Exception:
             return None
 
-    def get_status(job_output_path: Path) -> str | None:
+    def get_status(job_output_path: Path) -> Optional[str]:
         """
         Get the status of the job on the submit host.
 
@@ -134,7 +134,7 @@ def get_job_outputs() -> pd.DataFrame:
 
         Returns
         -------
-        str | None
+        Optional[str]
             The status of the job or None if unknown
         """
         status_file = job_output_path / ".status"
@@ -261,7 +261,7 @@ class Instance:
     """Class representing the instance of a single job within an array corresponding to a job specification."""
 
     spec: Spec
-    array_id: str
+    array_id: int
     array_idx: int
 
     @property

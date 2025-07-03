@@ -3,9 +3,8 @@
 import abc
 from typing import List, Self, Set
 
-from ms_common.job import JobKey, ScheduleResponse, Spec
-from ms_common.scheduling_decision import SchedulingDecisionType
-from ms_common.target import Target
+from ms_common.schemas import (JobKey, ScheduleResponse,
+                               SchedulingDecisionType, Spec, Target)
 
 
 class SchedulerClientInterface(abc.ABC):

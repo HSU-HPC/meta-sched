@@ -2,15 +2,13 @@
 
 import http
 import http.client
-import time
 from typing import Dict, List, Self, Set
 
 import ms_common
 import requests
-from ms_common.job import JobKey, ScheduleRequest, ScheduleResponse, Spec
-from ms_common.scheduling_decision import (Deferred, SchedulingDecision,
-                                           SchedulingDecisionType)
-from ms_common.target import Target
+from ms_common.schemas import (JobKey, ScheduleRequest, ScheduleResponse,
+                               SchedulingDecision, SchedulingDecisionType,
+                               Spec, Target)
 
 from ms_client.config import Config
 from ms_client.scheduler_interface import SchedulerClientInterface
@@ -146,14 +144,12 @@ class Client(SchedulerClientInterface):
             except requests.Timeout:
                 # If the request times out, just retry
                 continue
+            if http.HTTPStatus.GATEWAY_TIMEOUT == response.status_code:
+                continue
             if http.HTTPStatus.OK != response.status_code:
                 raise http.client.error(response)
             content = response.json()
-            decision = SchedulingDecision.parse(content)
-            if isinstance(decision, Deferred):
-                time.sleep(decision.wait_seconds)
-            else:
-                return decision
+            return SchedulingDecision.parse(content)
 
     def cancel_job(self: Self, job_key: JobKey) -> None:
         """

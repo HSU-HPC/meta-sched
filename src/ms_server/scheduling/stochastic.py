@@ -3,12 +3,11 @@
 import random
 from typing import List, Self
 
-from ms_common.scheduling_decision import (Assigned, Impossible,
-                                           SchedulingDecisionType)
-from ms_common.target import Target
+from ms_common.schemas import (Assigned, Impossible, SchedulingDecisionType,
+                               Target)
 
-from ms_server.job import Job
-from ms_server.scheduling import GreedyPolicy
+from ms_server.model import Job
+from ms_server.scheduling import GreedyPolicy, ScheduleJobCallback
 
 
 class Uniform(GreedyPolicy):
@@ -32,9 +31,9 @@ class Uniform(GreedyPolicy):
         for target_id in available_targets:
             if target_id in self._targets:
                 target = self._targets[target_id]
-                decision = Assigned(wait_seconds=0, target=target)
+                decision = Assigned(wait_seconds=0, target_id=target.id)
                 break
-        await job.make_scheduling_decision(decision)
+        await self.on_schedule_job(job.key, decision)
 
 
 class WeightedByCores(GreedyPolicy):
@@ -43,7 +42,9 @@ class WeightedByCores(GreedyPolicy):
     (Note that this may result in disproportionate distribution across all targets depending on the available ones.)
     """
 
-    def __init__(self: Self, targets: List[Target]) -> None:
+    def __init__(
+        self: Self, targets: List[Target], on_schedule_job: ScheduleJobCallback
+    ) -> None:
         """
         Create a new instance of the scheduling policy
 
@@ -51,8 +52,10 @@ class WeightedByCores(GreedyPolicy):
         ----------
         targets : List[Target]
             The list of targets used to determine the weighting by core count when applying the scheduling policy
+        on_schedule_job : ScheduleJobCallback
+            Callback to apply scheduling decision to a job
         """
-        super().__init__(targets)
+        super().__init__(targets, on_schedule_job)
         self.__weights = {t.id: t.nodes * t.cores_per_node for t in targets}
 
     async def schedule_job(self: Self, job: Job) -> None:
@@ -70,5 +73,5 @@ class WeightedByCores(GreedyPolicy):
             weights = [self.__weights[t] for t in available_targets]
             target_id = random.choices(available_targets, weights, k=1)[0]
             target = self._targets[target_id]
-            decision = Assigned(wait_seconds=0, target=target)
-        await job.make_scheduling_decision(decision)
+            decision = Assigned(wait_seconds=0, target_id=target.id)
+        await self.on_schedule_job(job.key, decision)

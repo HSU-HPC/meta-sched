@@ -9,6 +9,7 @@ import subprocess
 import sys
 from pathlib import Path
 from types import FrameType
+from typing import Optional
 
 from ms_common.utils import eprint
 from pydantic import ValidationError
@@ -39,7 +40,7 @@ def __get_scheduler() -> SchedulerClientInterface:
     return scheduler
 
 
-def __start_process(job_spec: str, token: str, array_id: str, array_idx: int) -> int:
+def __start_process(job_spec: str, token: str, array_id: int, array_idx: int) -> int:
     """
     Execute a job as a new process running the module containing this function as a script.
 
@@ -48,7 +49,7 @@ def __start_process(job_spec: str, token: str, array_id: str, array_idx: int) ->
         The name of the job spec (folder name) to use
     token : str
         The random string required to modify the job at the server
-    array_id : str
+    array_id : int
         The global identifier of the job array
     array_idx : int
         The job index in the array
@@ -64,7 +65,7 @@ def __start_process(job_spec: str, token: str, array_id: str, array_idx: int) ->
         "-t",
         token,
         "-a",
-        array_id,
+        str(array_id),
         "-i",
         str(array_idx),
         "-r",
@@ -140,7 +141,7 @@ if __name__ == "__main__":
     args = arg_parser.parse_args()
     assert args.array_index >= 0
 
-    def ignore_signal(signalnum: int, frame: FrameType | None) -> None:
+    def ignore_signal(signalnum: int, frame: Optional[FrameType]) -> None:
         """
         Handle a signal sent to the process and do nothing.
 
@@ -148,7 +149,7 @@ if __name__ == "__main__":
         ----------
         signalnum : int
             (Unused)
-        frame : FrameType | None
+        frame : Optional[FrameType]
             (Unused)
 
         """

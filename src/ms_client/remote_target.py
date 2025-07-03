@@ -7,12 +7,12 @@ import time
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, Self, Tuple
+from typing import Any, Dict, List, Optional, Self, Tuple
 
 import invoke
 from fabric import Connection  # type: ignore[attr-defined]
 from fabric.config import Config
-from ms_common.target import Target
+from ms_common.schemas import Target
 from ms_common.utils import (DEFAULT_SSH_PORT, EX_BASH_COMMAND_NOT_FOUND,
                              eprint, expect_ok, exponential_backoff,
                              seconds_to_time)
@@ -281,9 +281,9 @@ class RemoteTarget:
         Callbacks for job execution on the target.
         Attributes
         ----------
-        on_start : Any | None
+        on_start : Any
             Callback to be called when the job starts executing on the target
-        on_end : Any | None
+        on_end : Any
             Callback to be called when the job ends executing on the target
         """
 
@@ -412,7 +412,7 @@ class SlurmRemoteTarget(RemoteTarget):
         slurm_job_id = result.stdout.strip().split()[-1]
 
         backoff_count = 0
-        interrupted_error: InterruptedError | None = None
+        interrupted_error: Optional[InterruptedError] = None
 
         def sleep_or_cancel(seconds: float) -> None:
             """
@@ -445,7 +445,7 @@ class SlurmRemoteTarget(RemoteTarget):
                 break  # Job no longer in queue or has started
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
-        callbacks.on_start()
+        callbacks.on_start() # TODO pass start from sacct
         eprint("--- d. Awaiting job completion ---")
         if interrupted_error is None:
             backoff_count = 0
@@ -460,7 +460,7 @@ class SlurmRemoteTarget(RemoteTarget):
                 break  # Job no longer in queue
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
-        callbacks.on_end()
+        callbacks.on_end() # TODO pass start from sacct
         eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
         time.sleep(1)  # Wait a bit for the output/error to be received
         exit_code = -1
@@ -542,7 +542,7 @@ class PBSRemoteTarget(RemoteTarget):
         pbs_job_id = result.stdout.strip()
 
         backoff_count = 0
-        interrupted_error: InterruptedError | None = None
+        interrupted_error: Optional[InterruptedError] = None
 
         def sleep_or_cancel(seconds: float) -> None:
             """
@@ -576,7 +576,7 @@ class PBSRemoteTarget(RemoteTarget):
                 break  # Job no longer in queue or has started
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
-        callbacks.on_start()
+        callbacks.on_start() # TODO pass start from qstat
         eprint("--- d. Awaiting job completion ---")
         if interrupted_error is None:
             backoff_count = 0
@@ -589,7 +589,7 @@ class PBSRemoteTarget(RemoteTarget):
                 break  # Job no longer in queue
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
-        callbacks.on_end()
+        callbacks.on_end() # TODO pass start from qstat
         eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
         time.sleep(1)  # Wait a bit for the output/error to be received
         exit_code = -1
@@ -649,8 +649,8 @@ class DirectExecutionRemoteTarget(RemoteTarget):
         callbacks.on_start()
         try:
             exit_code = connection.run(cmd, warn=True, env=env).exited
-        except InterruptedError as e:
-            raise e
+        except InterruptedError:
+            raise
         finally:
             callbacks.on_end()
         expect_ok(exit_code)

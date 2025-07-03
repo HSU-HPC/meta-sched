@@ -5,19 +5,20 @@ import signal
 import time
 import traceback
 from types import FrameType
-from typing import Self, Set, Tuple
+from typing import Optional, Self, Set, Tuple
 
-from ms_common import scheduling_decision
-from ms_common.job import Spec as JobSpec
-from ms_common.target import Target
+import ms_common.schemas
+from ms_common import schemas
+from ms_common.schemas import JobKey
+from ms_common.schemas import Spec as JobSpec
+from ms_common.schemas import Target
 from ms_common.utils import StatusException, eprint, time_to_seconds
 
 from ms_client import job, ssh
 from ms_client.job import Instance as Job
-from ms_client.lock_file import LockFile
 from ms_client.remote_target import RemoteTarget
 from ms_client.scheduler_interface import SchedulerClientInterface
-from ms_client.utils import RedirectOutputToFile
+from ms_client.utils import LockFile, RedirectOutputToFile
 
 
 class Executor:
@@ -48,11 +49,13 @@ class Executor:
         """
         self.__job = job
         # Used to look up job at client
-        self.__job_key = (job_token, job.array_id, job.array_idx)
+        self.__job_key = JobKey(job_token, job.array_id, job.array_idx)
         self.__scheduler = scheduler
         self.__redirect_output = redirect_output
 
-    def __signal_handler(self: Self, signalnum: int, frame: FrameType | None) -> None:
+    def __signal_handler(
+        self: Self, signalnum: int, frame: Optional[FrameType]
+    ) -> None:
         """
         Handle a signal sent to the process.
 
@@ -60,7 +63,7 @@ class Executor:
         ----------
         signalnum : int
             The signal that was received
-        frame : FrameType | None
+        frame : Optional[FrameType]
             (Unused)
 
         Raises
@@ -176,13 +179,14 @@ class Executor:
         except Exception:
             raise StatusException(os.EX_UNAVAILABLE)
         match decision:
-            case scheduling_decision.Impossible():
+            case ms_common.schemas.Impossible():
                 raise Exception(
                     f"Can't schedule job spec {self.__job.spec.name} anywhere."
                 )
-            case scheduling_decision.Assigned():  # Must come before Deferred, because is child class # TODO does the logic in poll... work then?
-                # TODO maybe the decision should return the target directly? (Not just the ID)
-                target = decision.target
+            case schemas.Assigned():
+                target = [
+                    t for t in self.__scheduler.targets if t.id == decision.target_id
+                ][0]
                 eprint(
                     f"Scheduler assigned {target.id} ({target.host}) in T minus {decision.wait_seconds} seconds"
                 )

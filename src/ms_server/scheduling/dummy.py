@@ -2,18 +2,19 @@
 
 from typing import List, Self
 
-from ms_common.scheduling_decision import (Assigned, Impossible,
-                                           SchedulingDecisionType)
-from ms_common.target import Target
+from ms_common.schemas import (Assigned, Impossible, SchedulingDecisionType,
+                               Target)
 
-from ms_server.job import Job
-from ms_server.scheduling import GreedyPolicy
+from ms_server.model import Job
+from ms_server.scheduling import GreedyPolicy, ScheduleJobCallback
 
 
 class Dummy(GreedyPolicy):
     """Dummy scheduling policy which always assigns the same target."""
 
-    def __init__(self: Self, targets: List[Target] = []) -> None:
+    def __init__(
+        self: Self, targets: List[Target], on_schedule_job: ScheduleJobCallback
+    ) -> None:
         """
         Create a new instance of the scheduling policy
 
@@ -21,9 +22,11 @@ class Dummy(GreedyPolicy):
         ----------
         targets : List[Target]
             The list of targets (only the first is used)
+        on_schedule_job : ScheduleJobCallback
+            Callback to apply scheduling decision to a job
         """
         super().__init__(
-            targets[:1]
+            targets[:1], on_schedule_job
         )  # Always only the first target (Good for debugging)
 
     async def schedule_job(self: Self, job: Job) -> None:
@@ -39,6 +42,6 @@ class Dummy(GreedyPolicy):
         for target_id in job.available_targets:
             if target_id in self._targets:
                 target = self._targets[target_id]
-                decision = Assigned(wait_seconds=0, target=target)
+                decision = Assigned(wait_seconds=0, target_id=target.id)
                 break
-        await job.make_scheduling_decision(decision)
+        await self.on_schedule_job(job.key, decision)

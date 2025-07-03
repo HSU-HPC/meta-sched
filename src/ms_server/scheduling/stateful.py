@@ -4,11 +4,10 @@ Module containing stateful scheduling policies which update and use information 
 
 from typing import List, Self
 
-from ms_common.scheduling_decision import Assigned, Impossible
-from ms_common.target import Target
+from ms_common.schemas import Assigned, Impossible, Target
 
-from ms_server.job import Job
-from ms_server.scheduling import GreedyPolicy
+from ms_server.model import Job
+from ms_server.scheduling import GreedyPolicy, ScheduleJobCallback
 
 
 class LeastUsed(GreedyPolicy):
@@ -17,7 +16,9 @@ class LeastUsed(GreedyPolicy):
     (Note that this may result in a non-uniform distribution across all targets depending on the available ones.)
     """
 
-    def __init__(self: Self, targets: List[Target]) -> None:
+    def __init__(
+        self: Self, targets: List[Target], on_schedule_job: ScheduleJobCallback
+    ) -> None:
         """
         Create a new instance of the scheduling policy
 
@@ -25,8 +26,10 @@ class LeastUsed(GreedyPolicy):
         ----------
         targets : List[Target]
             The list of targets for which to count assignments
+        on_schedule_job : ScheduleJobCallback
+            Callback to apply scheduling decision to a job
         """
-        super().__init__(targets)
+        super().__init__(targets, on_schedule_job)
         self.__job_count = {t.id: 0 for t in targets}
 
     async def schedule_job(self: Self, job: Job) -> None:
@@ -41,7 +44,7 @@ class LeastUsed(GreedyPolicy):
         available_targets = sorted(list(job.available_targets))
         target_ids = [t for t in available_targets if t in self.__job_count]
         if len(target_ids) == 0:
-            await job.make_scheduling_decision(Impossible())
+            await self.on_schedule_job(job.key, Impossible())
             return
         selected = 0
         for i in range(len(target_ids)):
@@ -49,5 +52,5 @@ class LeastUsed(GreedyPolicy):
                 selected = i
         self.__job_count[target_ids[selected]] += 1
         target = self._targets[target_ids[selected]]
-        decision = Assigned(wait_seconds=0, target=target)
-        await job.make_scheduling_decision(decision)
+        decision = Assigned(wait_seconds=0, target_id=target.id)
+        await self.on_schedule_job(job.key, decision)

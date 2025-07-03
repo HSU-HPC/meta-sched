@@ -5,9 +5,9 @@ import importlib.util
 import tomllib
 from os import PathLike
 from pathlib import Path
-from typing import Any, List, Self, Type
+from typing import Any, List, Optional, Self, Type
 
-from ms_common.target import Target
+from ms_common.schemas import Target
 from pydantic import BaseModel, model_validator
 
 from ms_server.scheduling import Policy
@@ -23,7 +23,9 @@ class Config(BaseModel):
         The host of the API
     port : int
         The port of the API
-    scheduler_class : Type[Policy]
+    db_url : str
+        The connection URL to the Postgres/SQLite database
+    scheduler_class : Optional[Type[Policy]]
         The scheduling policy to be applied
     scheduling_loop_interval : float
         The interval period between applying the scheduling policy in seconds
@@ -33,8 +35,9 @@ class Config(BaseModel):
 
     host: str
     port: int
+    db_url: str
     scheduler_class_name: str
-    _scheduler_class: Type[Policy] | None = None
+    _scheduler_class: Optional[Type[Policy]] = None
     scheduling_loop_interval: float
     targets: List[Target]
 
@@ -108,6 +111,11 @@ class Config(BaseModel):
         Any
             The validated and updated server config
         """
+        db_url_prefixes = ["sqlite://", "postgresql://"]
+        if all(not config.db_url.startswith(p) for p in db_url_prefixes):
+            raise ValueError(
+                f"Database URL must have one of the following prefixes: {', '.join(db_url_prefixes)}"
+            )
         module_filename, class_name = config.scheduler_class_name.split(":")
         try:
             base_path = Path(__file__).parent.parent / "scheduling"
