@@ -445,7 +445,7 @@ class SlurmRemoteTarget(RemoteTarget):
                 break  # Job no longer in queue or has started
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
-        callbacks.on_start() # TODO pass start from sacct
+        callbacks.on_start()  # TODO pass start from sacct
         eprint("--- d. Awaiting job completion ---")
         if interrupted_error is None:
             backoff_count = 0
@@ -460,7 +460,7 @@ class SlurmRemoteTarget(RemoteTarget):
                 break  # Job no longer in queue
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
-        callbacks.on_end() # TODO pass start from sacct
+        callbacks.on_end()  # TODO pass start from sacct
         eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
         time.sleep(1)  # Wait a bit for the output/error to be received
         exit_code = -1
@@ -576,7 +576,7 @@ class PBSRemoteTarget(RemoteTarget):
                 break  # Job no longer in queue or has started
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
-        callbacks.on_start() # TODO pass start from qstat
+        callbacks.on_start()  # TODO pass start from qstat
         eprint("--- d. Awaiting job completion ---")
         if interrupted_error is None:
             backoff_count = 0
@@ -589,7 +589,7 @@ class PBSRemoteTarget(RemoteTarget):
                 break  # Job no longer in queue
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
-        callbacks.on_end() # TODO pass start from qstat
+        callbacks.on_end()  # TODO pass start from qstat
         eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
         time.sleep(1)  # Wait a bit for the output/error to be received
         exit_code = -1

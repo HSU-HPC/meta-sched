@@ -7,7 +7,8 @@ from typing import (Any, Awaitable, Callable, Coroutine, List, Optional, Self,
 
 import ms_common
 import uvicorn
-from fastapi import Depends, FastAPI, Header, HTTPException, Query, status
+from fastapi import (Depends, FastAPI, Header, HTTPException, Query, Request,
+                     status)
 from ms_common.schemas import (JobKey, ScheduleRequest, ScheduleResponse,
                                SchedulingDecisionType, Target)
 
@@ -160,6 +161,7 @@ class API(FastAPI):
         async def get_scheduling_decision(
             array_id: int,
             array_idx: int,
+            request: Request,
             token: str = Depends(get_job_token),
         ) -> SchedulingDecisionType:
             """
@@ -169,6 +171,8 @@ class API(FastAPI):
                 The ID of the job array
             array_idx : int
                 The index of the job within the array
+            request : Request
+                The HTTP request being processed
             token : str
                 The random string required to look up the job
 
@@ -179,17 +183,31 @@ class API(FastAPI):
             """
             job_key = JobKey(token, array_id, array_idx)
             timeout = 30  # seconds
-            try:
-                return await asyncio.wait_for(
-                    await_or_not_found(
-                        lambda: self.__model.await_scheduling_decision(job_key)
-                    ),
-                    timeout=timeout,
+
+            async def disconnect_watcher(
+                cancel_on_disconnect: asyncio.Task[Any],
+            ) -> None:
+                while not await request.is_disconnected():
+                    await asyncio.sleep(0.5)
+                cancel_on_disconnect.cancel()
+
+            task_model = asyncio.create_task(
+                await_or_not_found(
+                    lambda: self.__model.await_scheduling_decision(job_key)
                 )
+            )
+            task_watchdog = asyncio.create_task(disconnect_watcher(task_model))
+
+            try:
+                return await asyncio.wait_for(task_model, timeout=timeout)
             except asyncio.TimeoutError:
                 raise HTTPException(
                     status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                 )
+            except asyncio.CancelledError:
+                raise HTTPException(status_code=status.HTTP_408_REQUEST_TIMEOUT)
+            finally:
+                task_watchdog.cancel()
 
         # UPDATE
         @self.put(

@@ -201,6 +201,9 @@ class JobKey(NamedTuple):
     array_id: int
     array_idx: int
 
+    def __str__(self: Self) -> str:
+        return f"{self.token}_{self.array_id}_{self.array_idx}"
+
 class Impossible(BaseModel):
     """Scheduling decision indicating that a job cannot be scheduled (as requested)."""
     type: Literal["impossible"] = "impossible"

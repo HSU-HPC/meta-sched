@@ -1,8 +1,8 @@
 """Module containing the model interface for the Meta Scheduler server component."""
 
-import asyncio
 from typing import Any, Dict, List, Optional, Self, Set
 
+import zmq
 from ms_common.schemas import JobKey, SchedulingDecisionType
 from ms_common.schemas import Spec as JobSpec
 from pydantic import BaseModel
@@ -10,6 +10,7 @@ from sqlalchemy import JSON, Column, ForeignKey, Integer, String, select
 from sqlalchemy.ext.asyncio import (AsyncAttrs, AsyncSession,
                                     async_sessionmaker, create_async_engine)
 from sqlalchemy.orm import DeclarativeBase, relationship
+from zmq.asyncio import Context, Socket
 
 from ms_server.model import Job as JobSchema
 from ms_server.model import Model
@@ -62,6 +63,10 @@ class DataBase(Model):
         self.__make_async_session = async_sessionmaker(
             self.__engine, expire_on_commit=False
         )
+
+        self.__ctx = Context()
+        self.__pub_socket: Socket = self.__ctx.socket(zmq.PUB)
+        self.__pub_port = self.__pub_socket.bind_to_random_port("tcp://*")
 
     async def init_models(self: Self) -> None:
         async with self.__engine.begin() as connection:
@@ -135,6 +140,8 @@ class DataBase(Model):
                 setattr(job, k, v)
             await session.commit()
             await session.refresh(job)
+            job_json = JobSchema.model_validate(job).model_dump_json()
+        self.__pub_socket.send_string(f"job:{job_key} {job_json}")
 
     async def remove_job(self: Self, job_key: JobKey) -> None:
         async with self.__make_async_session() as session:
@@ -145,10 +152,14 @@ class DataBase(Model):
     async def await_scheduling_decision(
         self: Self, job_key: JobKey
     ) -> SchedulingDecisionType:
-        # TODO re-implement using pub/sub
-        while True:
+        with self.__ctx.socket(zmq.SUB) as socket:
+            socket.connect(f"tcp://localhost:{self.__pub_port}")
+            topic = f"job:{job_key}"
+            socket.setsockopt_string(zmq.SUBSCRIBE, topic)
             job = JobSchema.model_validate(await self.__get_job(job_key))
             decision = job.scheduling_decision
-            if decision is not None:
-                return decision
-            await asyncio.sleep(10)
+            while decision is None:
+                topic_received, job_json = (await socket.recv_string()).split(" ", 1)
+                assert topic_received == topic
+                decision = JobSchema.model_validate_json(job_json).scheduling_decision
+            return decision

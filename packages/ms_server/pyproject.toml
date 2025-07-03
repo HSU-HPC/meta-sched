@@ -11,6 +11,7 @@ dependencies = [
     "deprecated>=1.2.18",
     "fastapi>=0.115.14",
     "pydantic>=2.11.7",
+    "pyzmq>=27.0.0",
     "sqlalchemy[asyncio]>=2.0.41",
     "uvicorn>=0.34.3",
 ]
