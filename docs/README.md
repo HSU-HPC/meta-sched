@@ -39,6 +39,19 @@ To persistently execute the server in the background after the system has booted
 - `TODO customizing the configuration`
 - `TODO implementing scheduling algorithms`
 
+### Required Software on the Targets
+
+- Posix shell (e.g. Bash)
+- rsync or SFTP server
+- SSH server
+- tail, touch, mkdir, rm, date, sed (coreutils)
+- xargs (findutils)
+- grep
+- awk
+- qsub, qdel, qstat (For PBS Pro/OpenPBS)
+- sbatch, scancel, squeue, sacct (For Slurm)
+- module load (Optional, Environment Modules)
+
 ## Users
 
 After [installing the client package](#installation), submit job arrays using `mscli`. 

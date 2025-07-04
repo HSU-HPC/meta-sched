@@ -2,6 +2,7 @@
 
 import http
 import http.client
+import json
 from typing import Dict, List, Self, Set
 
 import ms_common
@@ -132,13 +133,14 @@ class Client(SchedulerClientInterface):
         SchedulingDecision
             The scheduling decision based on the policy
         """
-        connect_timeout = 5 # seconds
-        response_timeout = 300  # seconds
+        connect_timeout = 5  # seconds
+        response_timeout = 30  # seconds
         token, array_id, array_idx = job_key
         while True:
             try:
                 response = requests.get(
                     f"{self.__endpoint}/jobs/{array_id}/{array_idx}/scheduling_decision",
+                    stream=True,
                     timeout=(connect_timeout, response_timeout),
                     headers=self.__get_job_request_headers(token),
                 )
@@ -149,7 +151,8 @@ class Client(SchedulerClientInterface):
                 continue
             if http.HTTPStatus.OK != response.status_code:
                 raise http.client.error(response)
-            content = response.json()
+            last_line = list(response.iter_lines())[-1]
+            content = json.loads(last_line)
             return SchedulingDecision.parse(content)
 
     def cancel_job(self: Self, job_key: JobKey) -> None:

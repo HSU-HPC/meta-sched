@@ -52,5 +52,5 @@ class LeastUsed(GreedyPolicy):
                 selected = i
         self.__job_count[target_ids[selected]] += 1
         target = self._targets[target_ids[selected]]
-        decision = Assigned(wait_seconds=0, target_id=target.id)
+        decision = Assigned(target_id=target.id)
         await self.on_schedule_job(job.key, decision)

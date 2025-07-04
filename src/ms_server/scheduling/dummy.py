@@ -42,6 +42,6 @@ class Dummy(GreedyPolicy):
         for target_id in job.available_targets:
             if target_id in self._targets:
                 target = self._targets[target_id]
-                decision = Assigned(wait_seconds=0, target_id=target.id)
+                decision = Assigned(target_id=target.id)
                 break
         await self.on_schedule_job(job.key, decision)

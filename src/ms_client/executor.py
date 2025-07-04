@@ -187,13 +187,14 @@ class Executor:
                 target = [
                     t for t in self.__scheduler.targets if t.id == decision.target_id
                 ][0]
+                wait_seconds = max(0, decision.timestamp_start - int(time.time()))
                 eprint(
-                    f"Scheduler assigned {target.id} ({target.host}) in T minus {decision.wait_seconds} seconds"
+                    f"Scheduler assigned {target.id} ({target.host}) in T minus {wait_seconds} seconds (at {decision.timestamp_start})"
                 )
                 self.__job.set_status(job.Status.Scheduled(target.id))
-                time.sleep(decision.wait_seconds)
+                time.sleep(wait_seconds)
             case _:
-                raise NotImplementedError()
+                raise NotImplementedError("Unknown scheduling decision type")
         remote_target = RemoteTarget.from_target(target)
         eprint(
             f"=== 2. Copying input files to target {target.id} and run optional setup step ==="
@@ -207,23 +208,37 @@ class Executor:
             remote_target.setup(self.__job)
         eprint(f"=== 3. Executing job on target {target.id} ===")
 
-        def callback_job_started() -> None:
+        def callback_job_started(timestamp: Optional[int] = None) -> None:
             """
             Callback to update the Meta Scheduler server that the job has started executing on the target.
+
+            Parameters
+            ----------
+            timestamp : Optional[int]
+                The timestamp of when the job was started (Defaults to current timestamp)
             """
+            if timestamp is None:
+                timestamp = int(time.time())
             self.__job.set_status(job.Status.Running(target.id))
             try:
-                self.__scheduler.update_job_started(self.__job_key, int(time.time()))
+                self.__scheduler.update_job_started(self.__job_key, timestamp)
             except Exception as e:
                 eprint("Error updating job state:", e)
 
-        def callback_job_ended() -> None:
+        def callback_job_ended(timestamp: Optional[int] = None) -> None:
             """
             Callback to update the Meta Scheduler server that the job has finished executing on the target.
+
+            Parameters
+            ----------
+            timestamp : Optional[int]
+                The timestamp of when the job has ended (Defaults to current timestamp)
             """
+            if timestamp is None:
+                timestamp = int(time.time())
             self.__job.set_status(job.Status.Completed())
             try:
-                self.__scheduler.update_job_ended(self.__job_key, int(time.time()))
+                self.__scheduler.update_job_ended(self.__job_key, timestamp)
             except Exception as e:
                 eprint("Error updating job state:", e)
 
@@ -267,7 +282,9 @@ class Executor:
                 status = -1
                 if isinstance(e, StatusException):
                     status = e.status
-                eprint(traceback.format_exc())
+                    eprint(e)
+                else:
+                    eprint(traceback.format_exc())
                 final_job_status = job.Status.Failed(status)
             finally:
                 try:

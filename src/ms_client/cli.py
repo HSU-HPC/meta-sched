@@ -226,7 +226,7 @@ class CLI:
         Parameters
         ----------
         array_or_job : str
-            Array or job full job id to match against when checking if a job should be canceled
+            Array or job full job ID (array ID and array index) to match against when checking if a job should be canceled
         no_config : bool
             If true, the jobs will be canceled without prompting the user to confirm
 

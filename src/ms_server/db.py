@@ -212,7 +212,7 @@ class DataBase(Model):
             job = result.scalar_one_or_none()
             if job is None:
                 raise KeyError(
-                    f"No job with index {job_key.array_idx} array id {job_key.array_id} exists (or the wrong token was provided)."
+                    f"No job with index {job_key.array_idx} array ID {job_key.array_id} exists (or the wrong token was provided)."
                 )
             return job
         except Exception:
@@ -297,7 +297,7 @@ class DataBase(Model):
                 assert topic_received == topic
                 if job_json == "null":
                     raise KeyError(
-                        f"Job with index {job_key.array_idx} array id {job_key.array_id} was deleted."
+                        f"Job with index {job_key.array_idx} array ID {job_key.array_id} was deleted."
                     )
                 decision = JobSchema.model_validate_json(job_json).scheduling_decision
             return decision

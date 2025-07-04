@@ -137,24 +137,29 @@ def time_to_seconds(time: str | int) -> int:
         return time
     seconds = 0
     # Parse char by char from right to left
-    emit = time[::-1]
+    emit = time[::-1] # emit is time, but backwards ;)
     cs = ""
     seconds_per_unit = 1
+    seconds_per_hour = 3600
+    seconds_per_day = seconds_per_hour * 24
     for c in emit:
-        match c:
-            # Seconds -> Minutes -> Hours
-            case ":":
-                seconds += int(cs[::-1]) * seconds_per_unit
-                seconds_per_unit *= 60
-                cs = ""
+        if c == "-":
             # Hours -> Days
-            case "-":
-                seconds += int(cs[::-1]) * seconds_per_unit
-                seconds_per_unit *= 24
-                cs = ""
-            case _:
-                cs += c
+            if c == "-" and seconds_per_unit != seconds_per_hour:
+                raise ValueError("Error parsing formatted time \"{time}\". (Day separator found at invalid position.)")
+            seconds += int(cs[::-1]) * seconds_per_unit
+            seconds_per_unit *= 24
+            cs = ""
+        elif c == ":":
+            # Seconds -> Minutes -> Hours
+            seconds += int(cs[::-1]) * seconds_per_unit
+            seconds_per_unit *= 60
+            cs = ""
+        else:
+            cs += c
     seconds += int(cs[::-1]) * seconds_per_unit
+    if seconds_per_unit > seconds_per_day:
+        raise ValueError(f"Error parsing formatted time \"{time}\". (Found additional unit separator after days.)")
     return seconds
 
 

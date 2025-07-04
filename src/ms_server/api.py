@@ -2,15 +2,15 @@
 
 import asyncio
 import secrets
-from typing import (Any, Awaitable, Callable, Coroutine, List, Optional, Self,
-                    Set, Tuple, TypeVar)
+from typing import (Any, AsyncGenerator, Awaitable, Coroutine, List, Optional,
+                    Self, Set, Tuple, TypeVar)
 
 import ms_common
 import uvicorn
 from fastapi import (Depends, FastAPI, Header, HTTPException, Query, Request,
                      status)
-from ms_common.schemas import (JobKey, ScheduleRequest, ScheduleResponse,
-                               SchedulingDecisionType, Target)
+from fastapi.responses import StreamingResponse
+from ms_common.schemas import JobKey, ScheduleRequest, ScheduleResponse, Target
 
 from ms_server.model import Model
 
@@ -143,14 +143,14 @@ class API(FastAPI):
         T = TypeVar("T")
 
         async def await_or_not_found(
-            may_raise: Callable[[], Awaitable[T]],
+            may_raise: Awaitable[T],
         ) -> T:
             """
             Await an asynchronous operation or respond with a HTTP 404 error if a KeyError was raised.
 
             Parameters
             ----------
-            may_raise : Callable[[], Awaitable[T]]
+            may_raise : Awaitable[T]
                 The asynchronous operation to await
 
             Returns
@@ -164,7 +164,7 @@ class API(FastAPI):
                 A HTTP 404 status with the details of the error if a KeyError was raised by the asynchronous operation
             """
             try:
-                return await may_raise()
+                return await may_raise
             except KeyError as e:
                 raise HTTPException(
                     status_code=status.HTTP_404_NOT_FOUND,
@@ -172,18 +172,17 @@ class API(FastAPI):
                 )
 
         # READ
-        @self.get(
-            "/jobs/{array_id}/{array_idx}/scheduling_decision",
-            response_model=SchedulingDecisionType,
-        )
+        @self.get("/jobs/{array_id}/{array_idx}/scheduling_decision")
         async def get_scheduling_decision(
             array_id: int,
             array_idx: int,
             request: Request,
             token: str = Depends(get_job_token),
-        ) -> SchedulingDecisionType:
+        ) -> StreamingResponse:
             """
-            Poll the final decision of the scheduler or time out if it is not yet available. (API endpoint)
+            Await the final decision of the scheduler . (API endpoint)
+            While the task has not been scheduled, heartbeat (JSON) lines are sent at a regular interval to keep the connection open.
+            The last line of the response finally contains the scheduling decision as JSON.
 
             array_id : int
                 The ID of the job array
@@ -201,44 +200,67 @@ class API(FastAPI):
             """
             job_key = JobKey(token, array_id, array_idx)
             await_scheduling_timeout = 600  # seconds
+            response_queue: asyncio.Queue[bytes] = asyncio.Queue()
+            heartbeat_msg = b'{"heartbeat": true}\n'  # Must end in newline
 
-            async def disconnect_watcher(
-                cancel_on_disconnect: asyncio.Task[Any],
-            ) -> None:
+            async def generate_heartbeat() -> None:
                 """
-                An asynchronous function which cancels a task if the client for the corresponding request has disconnected.
-                (Polling request state at 1 Hz.)
-
-                Parameters
-                ---------
-                cancel_on_disconnect : asyncio.Task[Any]
-                    The task to be canceled if the client disconnects
+                Generate heartbeat data at a regular interval and send it to the queue. (Asynchronous)
                 """
-                while not await request.is_disconnected():
-                    await asyncio.sleep(1)
-                cancel_on_disconnect.cancel()
+                heartbeat_interval = 10
+                try:
+                    while True:
+                        await asyncio.sleep(heartbeat_interval)
+                        await response_queue.put(heartbeat_msg)
+                except asyncio.CancelledError:
+                    pass
 
-            task_await_scheduling = asyncio.create_task(
-                await_or_not_found(
-                    lambda: self.__model.await_scheduling_decision(job_key)
-                )
-            )
-            task_watchdog = asyncio.create_task(
-                disconnect_watcher(task_await_scheduling)
-            )
+            task_heartbeat = asyncio.create_task(generate_heartbeat())
 
-            try:
-                return await asyncio.wait_for(
-                    task_await_scheduling, timeout=await_scheduling_timeout
-                )
-            except asyncio.TimeoutError:
-                raise HTTPException(
-                    status_code=status.HTTP_504_GATEWAY_TIMEOUT,
-                )
-            except asyncio.CancelledError:
-                raise HTTPException(status_code=status.HTTP_408_REQUEST_TIMEOUT)
-            finally:
-                task_watchdog.cancel()
+            async def await_scheduling_decision() -> None:
+                """
+                Await the scheduling decision and send it to the queue. (Asynchronous)
+                """
+                try:
+                    decision = await asyncio.wait_for(
+                        await_or_not_found(
+                            self.__model.await_scheduling_decision(job_key)
+                        ),
+                        timeout=await_scheduling_timeout,
+                    )
+                except asyncio.TimeoutError:
+                    raise HTTPException(
+                        status_code=status.HTTP_504_GATEWAY_TIMEOUT,
+                    )
+                await response_queue.put(decision.model_dump_json().encode("utf-8"))
+
+            task_await_scheduling = asyncio.create_task(await_scheduling_decision())
+
+            async def response_generator() -> AsyncGenerator[bytes, None]:
+                """
+                Generate returning data (lines of JSON documents) from the queue to be streamed as the response to the HTTP request. (Asynchronous)
+
+                Returns
+                -------
+                AsyncGenerator[bytes, None]
+                    The asynchronous generator for the StreamingResponse of the endpoint
+                """
+                try:
+                    while True:
+                        message = await response_queue.get()
+                        yield message
+                        if message != heartbeat_msg:
+                            break  # Actual data was sent -> stop
+                finally:
+                    task_heartbeat.cancel()
+                    task_await_scheduling.cancel()
+                    await asyncio.gather(
+                        task_heartbeat, task_await_scheduling, return_exceptions=True
+                    )
+
+            return StreamingResponse(
+                response_generator(), media_type="application/x-ndjson"
+            )
 
         # UPDATE
         @self.put(
@@ -282,9 +304,7 @@ class API(FastAPI):
                 update_data = dict(timestamp_end=timestamp_end)
             else:
                 raise RuntimeError("Unreachable code was reached somehow")
-            await await_or_not_found(
-                lambda: self.__model.update_job(job_key, update_data)
-            )
+            await await_or_not_found(self.__model.update_job(job_key, update_data))
 
         @self.post(
             "/jobs/{array_id}/{array_idx}/reschedule",
@@ -312,7 +332,7 @@ class API(FastAPI):
             """
             job_key = JobKey(token, array_id, array_idx)
             await await_or_not_found(
-                lambda: self.__model.update_job(
+                self.__model.update_job(
                     job_key,
                     dict(
                         timestamp_start=None,
@@ -341,7 +361,7 @@ class API(FastAPI):
                 The random string required to look up the job
             """
             job_key = JobKey(token, array_id, array_idx)
-            await await_or_not_found(lambda: self.__model.remove_job(job_key))
+            await await_or_not_found(self.__model.remove_job(job_key))
 
         # endregion job control
 

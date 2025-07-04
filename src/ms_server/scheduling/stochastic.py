@@ -31,7 +31,7 @@ class Uniform(GreedyPolicy):
         for target_id in available_targets:
             if target_id in self._targets:
                 target = self._targets[target_id]
-                decision = Assigned(wait_seconds=0, target_id=target.id)
+                decision = Assigned(target_id=target.id)
                 break
         await self.on_schedule_job(job.key, decision)
 
@@ -73,5 +73,5 @@ class WeightedByCores(GreedyPolicy):
             weights = [self.__weights[t] for t in available_targets]
             target_id = random.choices(available_targets, weights, k=1)[0]
             target = self._targets[target_id]
-            decision = Assigned(wait_seconds=0, target_id=target.id)
+            decision = Assigned(target_id=target.id)
         await self.on_schedule_job(job.key, decision)

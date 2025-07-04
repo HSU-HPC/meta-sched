@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional, Self, Tuple
 import invoke
 from fabric import Connection  # type: ignore[attr-defined]
 from fabric.config import Config
+from ms_common import utils
 from ms_common.schemas import Target
 from ms_common.utils import (DEFAULT_SSH_PORT, EX_BASH_COMMAND_NOT_FOUND,
                              eprint, expect_ok, exponential_backoff,
@@ -224,7 +225,7 @@ class RemoteTarget:
         """
         specific_modules = [self._target.module_map[m] for m in modules]
         cmd = " && ".join(
-            [f"source {script}" for script in self._target.source_scripts]
+            [f". {script}" for script in self._target.source_scripts]
             + [f"module load {module}" for module in specific_modules]
             + [cmd]
         )
@@ -303,6 +304,7 @@ class RemoteTarget:
         callbacks : JobExecutionCallbacks
             Callback functions for job state changes
         """
+        # TODO avoid long living connection -> pass in a function to obtain a new callable "run_remote(...)" (with cd(job.remote_output) and command prefixing)
         with self._connect() as connection:
             expect_ok(connection.run(f"mkdir -p {job.remote_output}", warn=True).exited)
             with connection.cd(job.remote_output):
@@ -390,7 +392,7 @@ class SlurmRemoteTarget(RemoteTarget):
             Optional environment variables to be injected on the target before executing the job
         """
         eprint("--- a. Creating and watching output/error files ---")
-        # TODO consider NOT streaming the output/error files
+        # TODO consider NOT streaming the output/error files (requires long living connection)
         output_files = self._create_oe_files(connection, True)
         eprint("--- b. Submitting job ---")
         argv = ["sbatch"]
@@ -432,20 +434,45 @@ class SlurmRemoteTarget(RemoteTarget):
                     return
                 # Defer handling until Slurm job has been canceled completely
                 eprint(f"Canceling slurm job {slurm_job_id}.")
-                expect_ok(connection.run(f"scancel {slurm_job_id}", warn=True).exited)
+                expect_ok(
+                    connection.run(
+                        self._prefix_cmd(f"scancel {slurm_job_id}"), warn=True
+                    ).exited
+                )
                 backoff_count = 0
                 interrupted_error = e
 
         eprint("--- c. Awaiting job start ---")
+        time.sleep(1)
+        cmd_get_slurm_job_state = self._prefix_cmd(
+            f"squeue -j {slurm_job_id} --format %T --noheader"
+        )
         while True:
-            result = connection.run(
-                f"squeue -j {slurm_job_id} --format %T --noheader", warn=True, hide=True
-            )
-            if len(result.stdout.strip()) == 0 or result.stdout.strip() == "RUNNING":
+            output = connection.run(
+                cmd_get_slurm_job_state, warn=True, hide=True
+            ).stdout.strip()
+            if len(output) == 0 or output == "RUNNING":
                 break  # Job no longer in queue or has started
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
-        callbacks.on_start()  # TODO pass start from sacct
+        cmd_job_timestamp = self._prefix_cmd(
+            "sacct -j SLURM_JOB_ID --noheader --format=FORMAT | head -n 1 | awk '{print $1}' | xargs -I{} date -d {} +%s"
+        )
+        timestamp_start = None
+        try:
+            timestamp_start = int(
+                connection.run(
+                    cmd_job_timestamp.replace("FORMAT", "start").replace(
+                        "SLURM_JOB_ID", slurm_job_id
+                    ),
+                    warn=True,
+                    hide=True,
+                ).stdout.strip()
+            )
+        except Exception:
+            pass
+        finally:
+            callbacks.on_start(timestamp_start)
         eprint("--- d. Awaiting job completion ---")
         if interrupted_error is None:
             backoff_count = 0
@@ -453,20 +480,34 @@ class SlurmRemoteTarget(RemoteTarget):
             # sleep_or_cancel(job.spec.seconds)
         exit_code = 0
         while True:
-            result = connection.run(
-                f"squeue -j {slurm_job_id} --noheader", warn=True, hide=True
-            )
-            if len(result.stdout.strip()) == 0:
+            output = connection.run(
+                cmd_get_slurm_job_state, warn=True, hide=True
+            ).stdout.strip()
+            if len(output) == 0:
                 break  # Job no longer in queue
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
-        callbacks.on_end()  # TODO pass start from sacct
+        timestamp_end = None
+        try:
+            timestamp_end = int(
+                connection.run(
+                    cmd_job_timestamp.replace("FORMAT", "end").replace(
+                        "SLURM_JOB_ID", slurm_job_id
+                    ),
+                    warn=True,
+                    hide=True,
+                ).stdout.strip()
+            )
+        except Exception:
+            pass
+        finally:
+            callbacks.on_end(timestamp_end)
         eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
         time.sleep(1)  # Wait a bit for the output/error to be received
         exit_code = -1
         sacct_cmd = f'sacct -j {slurm_job_id} --format "State,ExitCode" --noheader'
         result = connection.run(
-            sacct_cmd,
+            self._prefix_cmd(sacct_cmd),
             warn=True,
             hide=True,
         )
@@ -532,7 +573,7 @@ class PBSRemoteTarget(RemoteTarget):
         # For non-script jobs, the directory is always $HOME
         argv += [
             "--",
-            "$(which sh)",
+            "$(command -v sh)",
             "-c",
             f"'cd {job.remote_output} && {job.spec.cmd_main}'",
         ]
@@ -561,14 +602,20 @@ class PBSRemoteTarget(RemoteTarget):
                     eprint("Job was already canceled. (Nothing to do.)")
                     return
                 eprint(f"Canceling PBS job {pbs_job_id}.")
-                expect_ok(connection.run(f"qdel {pbs_job_id}", warn=True).exited)
+                expect_ok(
+                    connection.run(
+                        self._prefix_cmd(f"qdel {pbs_job_id}"), warn=True
+                    ).exited
+                )
                 backoff_count = 0
                 interrupted_error = e
 
         eprint("--- c. Awaiting job start ---")
         time.sleep(1)
         while True:
-            result = connection.run(f"qstat {pbs_job_id}", warn=True, hide=True)
+            result = connection.run(
+                self._prefix_cmd(f"qstat {pbs_job_id}"), warn=True, hide=True
+            )
             if (
                 len(result.stdout.strip()) == 0
                 or result.stdout.splitlines()[-1].strip().split()[-2] == "R"
@@ -576,7 +623,21 @@ class PBSRemoteTarget(RemoteTarget):
                 break  # Job no longer in queue or has started
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
-        callbacks.on_start()  # TODO pass start from qstat
+        # Report job start time
+        timestamp_start = None
+        try:
+            cmd = self._prefix_cmd(
+                "qstat PBS_JOB_ID -xf | grep 'stime = ' | sed 's/.*stime = //' | xargs -I{} date -d \"{}\" +%s"
+            )
+            timestamp_start = int(
+                connection.run(
+                    cmd.replace("PBS_JOB_ID", pbs_job_id), warn=True, hide=True
+                ).stdout
+            )
+        except Exception:
+            pass
+        finally:
+            callbacks.on_start(timestamp_start)
         eprint("--- d. Awaiting job completion ---")
         if interrupted_error is None:
             backoff_count = 0
@@ -584,18 +645,39 @@ class PBSRemoteTarget(RemoteTarget):
             # sleep_or_cancel(job.spec.seconds)
         exit_code = 0
         while True:
-            result = connection.run(f"qstat {pbs_job_id}", warn=True, hide=True)
+            result = connection.run(
+                self._prefix_cmd(f"qstat {pbs_job_id}"), warn=True, hide=True
+            )
             if len(result.stdout.strip()) == 0:
                 break  # Job no longer in queue
             sleep_or_cancel(exponential_backoff(backoff_count))
             backoff_count += 1
-        callbacks.on_end()  # TODO pass start from qstat
+        # Report job end time
+        walltime_fmtd = (
+            connection.run(
+                self._prefix_cmd(
+                    f"qstat {pbs_job_id} -xf | grep 'resources_used.walltime = '"
+                ),
+                warn=True,
+                hide=True,
+            )
+            .stdout.split("=")[-1]
+            .strip()
+        )
+        timestamp_end = None
+        try:
+            assert timestamp_start is not None
+            timestamp_end = timestamp_start + utils.time_to_seconds(walltime_fmtd)
+        except Exception:
+            pass
+        finally:
+            callbacks.on_end(timestamp_end)
         eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
         time.sleep(1)  # Wait a bit for the output/error to be received
         exit_code = -1
         qstat_cmd = f"qstat {pbs_job_id} -f -x"
         result = connection.run(
-            qstat_cmd,
+            self._prefix_cmd(qstat_cmd),
             warn=True,
             hide=True,
         )

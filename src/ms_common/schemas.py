@@ -1,5 +1,6 @@
 """Module containing schemas shared by the Meta Scheduler client and server components."""
 
+import time
 from typing import Any, Dict, List, Literal, NamedTuple, Optional, Self, Union
 
 from pydantic import BaseModel, ConfigDict, TypeAdapter, model_validator
@@ -217,16 +218,34 @@ class JobKey(NamedTuple):
         return f"{self.token}_{self.array_id}_{self.array_idx}"
 
 class Impossible(BaseModel):
-    """Scheduling decision indicating that a job cannot be scheduled (as requested)."""
+    """Scheduling decision indicating that a job cannot be scheduled (as requested).
+    
+    Attributes
+    ----------
+    type : str
+        The type of the scheduling decision ("impossible")
+    reason : Optional[str]
+        An optional reason of why the job could not be scheduled
+    """
     type: Literal["impossible"] = "impossible"
     reason: Optional[str] = None
 
 
 class Assigned(BaseModel):
-    """Scheduling decision indicating an assignment to a target for execution of the job."""
+    """Scheduling decision indicating an assignment to a target for execution of the job.
+        
+    Attributes
+    ----------
+    type : str
+        The type of the scheduling decision ("assigned")
+    target_id : str
+        The ID of the target on which the job should be run
+    timestamp_start : int
+        The timestamp when the job may be started (unix epoch in seconds)
+    """
     type: Literal["assigned"] = "assigned"
     target_id: str
-    wait_seconds: int = 0 # TODO change to start at
+    timestamp_start: int = int(time.time())
 
 
 
