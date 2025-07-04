@@ -1,4 +1,4 @@
-"""Module containing the Job class for the Meta Scheduler server component."""
+"""Module containing the model for the Meta Scheduler server component."""
 
 import abc
 from typing import Any, Dict, List, Optional, Self, Set
@@ -41,29 +41,119 @@ class Job(BaseModel):
     timestamp_start: Optional[int] = None
     timestamp_end: Optional[int] = None
 
+    # Used by pydantic to allow instantiation from SQLAlchemy model
     model_config = ConfigDict(from_attributes=True)
 
     @property
     def key(self: Self) -> JobKey:
+        """
+        Get the key of the job.
+
+        Returns
+        -------
+        JobKey
+            The key which uniquely identifies the job (includes token required to look it up)
+        """
         return JobKey(self.token, self.array_id, self.array_idx)
 
 
 class Model(abc.ABC):
+    """
+    Model interface for accessing and modifying the state of the Meta Scheduler server component.
+    """
+
     async def create_job_array(
         self: Self, spec: JobSpec, available_targets: Set[str], token: str
     ) -> int:
+        """
+        Create a new array of jobs for scheduling.
+
+        Parameters
+        ----------
+        spec : job.Spec
+            The job specification (also determines the number of jobs in the array)
+        available_targets: Set[str]
+            The set of targets on which the jobs may be executed
+        token: str
+            The token to associate with the jobs (required to look them up in the database)
+
+        Raises
+        ------
+        NotImplementedError
+            Must be implemented by the concrete model
+        """
         raise NotImplementedError()
 
     async def get_pending_jobs(self: Self) -> List[Job]:
+        """
+        Get a list of jobs which are pending scheduling.
+
+        Returns
+        -------
+        List[Job]
+            The list of pending jobs
+
+        Raises
+        ------
+        NotImplementedError
+            Must be implemented by the concrete model
+        """
         raise NotImplementedError()
 
     async def update_job(self: Self, job_key: JobKey, data: Dict[str, Any]) -> None:
+        """
+        Update an existing job.
+
+        Parameters
+        ----------
+        job_key : JobKey
+            The key of the job to be updated
+        data : Dict[str, Any]
+            The keys and corresponding values which should be updated at the job
+
+        Raises
+        ------
+        KeyError
+            If the job with the corresponding key does not exist
+        NotImplementedError
+            Must be implemented by the concrete model
+        """
         raise NotImplementedError()
 
     async def remove_job(self: Self, job_key: JobKey) -> None:
+        """
+        Remove a job.
+
+        Parameters
+        ----------
+        job_key : JobKey
+            The key of the job to be deleted
+
+        Raises
+        ------
+        KeyError
+            If the job with the corresponding key does not exist
+        NotImplementedError
+            Must be implemented by the concrete model
+        """
         raise NotImplementedError()
 
     async def await_scheduling_decision(
         self: Self, job_key: JobKey
     ) -> SchedulingDecisionType:
+        """
+        Await a scheduling decision for a specific job.
+
+        Parameters
+        ----------
+        job_key : JobKey
+            The key of the job for which to await scheduling
+
+        Raises
+        ------
+        KeyError
+            If the job with the corresponding key does not exist
+        NotImplementedError
+            Must be implemented by the concrete model
+        """
         raise NotImplementedError()

@@ -197,6 +197,18 @@ class ScheduleResponse(BaseModel):
 
 
 class JobKey(NamedTuple):
+    """
+    Class representing the identifier of a job at the server.
+
+    Attributes
+    ----------
+    token : str
+        The random string used to look up jobs in an array
+    array_id : int
+        The ID of the job array this job belongs to
+    array_idx : int
+        The index of the job within its array
+    """
     token: str
     array_id: int
     array_idx: int

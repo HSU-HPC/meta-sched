@@ -145,6 +145,24 @@ class API(FastAPI):
         async def await_or_not_found(
             may_raise: Callable[[], Awaitable[T]],
         ) -> T:
+            """
+            Await an asynchronous operation or respond with a HTTP 404 error if a KeyError was raised.
+
+            Parameters
+            ----------
+            may_raise : Callable[[], Awaitable[T]]
+                The asynchronous operation to await
+
+            Returns
+            -------
+            T
+                The result of the asynchronous operation
+
+            Raises
+            ------
+            HTTPException
+                A HTTP 404 status with the details of the error if a KeyError was raised by the asynchronous operation
+            """
             try:
                 return await may_raise()
             except KeyError as e:
@@ -182,24 +200,37 @@ class API(FastAPI):
                 The scheduling decision for the job with the specified array ID and index
             """
             job_key = JobKey(token, array_id, array_idx)
-            timeout = 30  # seconds
+            await_scheduling_timeout = 600  # seconds
 
             async def disconnect_watcher(
                 cancel_on_disconnect: asyncio.Task[Any],
             ) -> None:
+                """
+                An asynchronous function which cancels a task if the client for the corresponding request has disconnected.
+                (Polling request state at 1 Hz.)
+
+                Parameters
+                ---------
+                cancel_on_disconnect : asyncio.Task[Any]
+                    The task to be canceled if the client disconnects
+                """
                 while not await request.is_disconnected():
-                    await asyncio.sleep(0.5)
+                    await asyncio.sleep(1)
                 cancel_on_disconnect.cancel()
 
-            task_model = asyncio.create_task(
+            task_await_scheduling = asyncio.create_task(
                 await_or_not_found(
                     lambda: self.__model.await_scheduling_decision(job_key)
                 )
             )
-            task_watchdog = asyncio.create_task(disconnect_watcher(task_model))
+            task_watchdog = asyncio.create_task(
+                disconnect_watcher(task_await_scheduling)
+            )
 
             try:
-                return await asyncio.wait_for(task_model, timeout=timeout)
+                return await asyncio.wait_for(
+                    task_await_scheduling, timeout=await_scheduling_timeout
+                )
             except asyncio.TimeoutError:
                 raise HTTPException(
                     status_code=status.HTTP_504_GATEWAY_TIMEOUT,

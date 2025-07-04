@@ -1,4 +1,4 @@
-"""Module containing the model interface for the Meta Scheduler server component."""
+"""Module containing database specific code for the Meta Scheduler server component."""
 
 from typing import Any, Dict, List, Optional, Self, Set
 
@@ -17,10 +17,25 @@ from ms_server.model import Model
 
 
 class _Base(AsyncAttrs, DeclarativeBase):
+    """
+    SQLAlchemy model base class.
+    """
+
     pass
 
 
 class JobArray(_Base):
+    """
+    SQLAlchemy model for job arrays.
+
+    Attributes
+    ----------
+    id : int
+        Unique identifier of the job array (primary key)
+    jobs : list[Job]
+        The collection of Jobs that belong to this array
+    """
+
     __tablename__ = "job_arrays"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -28,6 +43,31 @@ class JobArray(_Base):
 
 
 class Job(_Base):
+    """
+    SQLAlchemy model for jobs.
+
+    Attributes
+    ----------
+    token : str
+        Token for the job array (primary key)
+    array_id : int
+        The ID of the job array this job belongs to (primary key, foreign key referencing JobArray.id)
+    array_idx : int
+        The index of the job within its array (primary key)
+    spec : dict
+        The specification of the job (requirements, commands, etc.)
+    available_targets : dict
+        The targets that the job may be executed on
+    scheduling_decision : dict or None
+        The decision made by the scheduler regarding this job, if any
+    timestamp_start : int or None
+        The timestamp when the job started running
+    timestamp_end : int or None
+        The timestamp when the job finished running
+    job_array : JobArray
+        The job array that this job belongs to
+    """
+
     __tablename__ = "jobs"
 
     token = Column(String, primary_key=True)
@@ -43,7 +83,22 @@ class Job(_Base):
 
 
 class DataBase(Model):
+    """
+    Database class containing the state of the Meta Scheduler server component which implements the model interface.
+    """
+
     def __init__(self: Self, db_url: str) -> None:
+        """
+        Connect to a database to use as the Meta Scheduler server model.
+
+        Parameters
+        ----------
+        db_url : str
+            The connection string for the database
+            For SQLite use sqlite://path/to/my.db
+            For PostgreSQL use postgresql://username:password@host:port/dbname
+            For an ephemeral in-memory database for testing use sqlite://
+        """
         prefix, suffix = db_url.split("://")
         match prefix:
             case "sqlite":
@@ -69,15 +124,29 @@ class DataBase(Model):
         self.__pub_port = self.__pub_socket.bind_to_random_port("tcp://*")
 
     async def init_models(self: Self) -> None:
+        """Create the tables for the model."""
         async with self.__engine.begin() as connection:
             await connection.run_sync(_Base.metadata.create_all)
 
     async def dispose(self: Self) -> None:
+        """Disconnect cleanly from the database."""
         await self.__engine.dispose()
 
     async def create_job_array(
         self: Self, spec: JobSpec, available_targets: Set[str], token: str
     ) -> int:
+        """
+        Create a new array of jobs for scheduling.
+
+        Parameters
+        ----------
+        spec : job.Spec
+            The job specification (also determines the number of jobs in the array)
+        available_targets: Set[str]
+            The set of targets on which the jobs may be executed
+        token: str
+            The token to associate with the jobs (required to look them up in the database)
+        """
         async with self.__make_async_session() as session:
             async with session.begin():
                 job_array = JobArray(
@@ -97,6 +166,14 @@ class DataBase(Model):
             return int(job_array.id)  # pyright: ignore[reportArgumentType]
 
     async def get_pending_jobs(self: Self) -> List[JobSchema]:
+        """
+        Get a list of jobs which are pending scheduling.
+
+        Returns
+        -------
+        List[Job]
+            The list of pending jobs
+        """
         async with self.__make_async_session() as session:
             result = await session.execute(
                 select(Job).where(Job.scheduling_decision.is_(None))
@@ -106,6 +183,21 @@ class DataBase(Model):
     async def __get_job(
         self: Self, job_key: JobKey, session: Optional[AsyncSession] = None
     ) -> Job:
+        """
+        Get a job from the database by key.
+
+        Parameters
+        ----------
+        job_key : JobKey
+            The key of the job that should be looked up from the database
+        session : Optional[AsyncSession]
+            The existing database session to use (will not be closed)
+
+        Returns
+        -------
+        Job
+            The job from the database
+        """
         should_close_session = session is None
         if session is None:
             session = self.__make_async_session()
@@ -131,6 +223,21 @@ class DataBase(Model):
                 await session.close()
 
     async def update_job(self: Self, job_key: JobKey, data: Dict[str, Any]) -> None:
+        """
+        Update an existing job.
+
+        Parameters
+        ----------
+        job_key : JobKey
+            The key of the job to be updated
+        data : Dict[str, Any]
+            The keys and corresponding values which should be updated at the job
+
+        Raises
+        ------
+        KeyError
+            If the job with the corresponding key does not exist
+        """
         async with self.__make_async_session() as session:
             job = await self.__get_job(job_key, session)
             for k, v in data.items():
@@ -144,14 +251,41 @@ class DataBase(Model):
         self.__pub_socket.send_string(f"job:{job_key} {job_json}")
 
     async def remove_job(self: Self, job_key: JobKey) -> None:
+        """
+        Remove a job.
+
+        Parameters
+        ----------
+        job_key : JobKey
+            The key of the job to be deleted
+
+        Raises
+        ------
+        KeyError
+            If the job with the corresponding key does not exist
+        """
         async with self.__make_async_session() as session:
             job = await self.__get_job(job_key, session)
             async with session.begin():
                 await session.delete(job)
+        self.__pub_socket.send_string(f"job:{job_key} null")
 
     async def await_scheduling_decision(
         self: Self, job_key: JobKey
     ) -> SchedulingDecisionType:
+        """
+        Await a scheduling decision for a specific job.
+
+        Parameters
+        ----------
+        job_key : JobKey
+            The key of the job for which to await scheduling
+
+        Raises
+        ------
+        KeyError
+            If the job with the corresponding key does not exist
+        """
         with self.__ctx.socket(zmq.SUB) as socket:
             socket.connect(f"tcp://localhost:{self.__pub_port}")
             topic = f"job:{job_key}"
@@ -161,5 +295,9 @@ class DataBase(Model):
             while decision is None:
                 topic_received, job_json = (await socket.recv_string()).split(" ", 1)
                 assert topic_received == topic
+                if job_json == "null":
+                    raise KeyError(
+                        f"Job with index {job_key.array_idx} array id {job_key.array_id} was deleted."
+                    )
                 decision = JobSchema.model_validate_json(job_json).scheduling_decision
             return decision

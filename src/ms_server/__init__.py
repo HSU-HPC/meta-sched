@@ -80,10 +80,34 @@ def main() -> int:
     async def on_schedule_job(
         job_key: JobKey, scheduling_decision: SchedulingDecisionType
     ) -> None:
+        """
+        Callback for the scheduling policy to apply a decision for a single job.
+
+        Parameters
+        ----------
+        job_key : JobKey
+            The key identifying the job for which a scheduling decision has been made
+        scheduling_decision : SchedulingDecisionType
+            The scheduling decision that should be applied to the job
+        """
         await model.update_job(job_key, dict(scheduling_decision=scheduling_decision))
 
     @asynccontextmanager
     async def lifespan(app: API) -> AsyncGenerator[Any, Any]:
+        """
+        The FastAPI lifespan used for setup and teardown code.
+        (Initializes database and start the scheduling loop)
+
+        Parameters
+        ----------
+        app : API
+            (Unused)
+
+        Returns
+        -------
+        AsyncGenerator[Any, Any]
+            Generator used by FastAPI to distinguish setup and teardown code.
+        """
         await model.init_models()
         scheduler_task = asyncio.create_task(
             scheduling_loop(scheduler, config.scheduling_loop_interval, model)

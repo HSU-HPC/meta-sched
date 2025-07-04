@@ -132,13 +132,14 @@ class Client(SchedulerClientInterface):
         SchedulingDecision
             The scheduling decision based on the policy
         """
-        timeout = 60  # seconds
+        connect_timeout = 5 # seconds
+        response_timeout = 300  # seconds
         token, array_id, array_idx = job_key
         while True:
             try:
                 response = requests.get(
                     f"{self.__endpoint}/jobs/{array_id}/{array_idx}/scheduling_decision",
-                    timeout=timeout,
+                    timeout=(connect_timeout, response_timeout),
                     headers=self.__get_job_request_headers(token),
                 )
             except requests.Timeout:
