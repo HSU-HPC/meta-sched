@@ -6,11 +6,13 @@ from typing import (Any, AsyncGenerator, Awaitable, Coroutine, List, Optional,
                     Self, Set, Tuple, TypeVar)
 
 import ms_common
+import pandas as pd
 import uvicorn
 from fastapi import (Depends, FastAPI, Header, HTTPException, Query, Request,
                      status)
 from fastapi.responses import StreamingResponse
-from ms_common.schemas import JobKey, ScheduleRequest, ScheduleResponse, Target
+from ms_common.schemas import (JobKey, ScheduleRequest, ScheduleResponse,
+                               Target, TargetStatus)
 
 from ms_server.model import Model
 
@@ -26,6 +28,7 @@ class API(FastAPI):
         port: int,
         targets: List[Target],
         model: Model,
+        api_key: str,
         **kwargs: Any,
     ) -> None:
         """
@@ -41,7 +44,8 @@ class API(FastAPI):
             The targets available through the Meta Scheduler
         model : Model
             The model containing the state of the Meta Scheduler
-
+        api_key : str
+            The API key for "global" authenticated endpoints
         kwargs : Any
             Named arguments to be passed on to FastAPI
         """
@@ -50,6 +54,7 @@ class API(FastAPI):
         self.__port = port
         self.__targets = targets
         self.__model = model
+        self.__api_key = api_key
         super().__init__(**kwargs)
         self.set_up_endpoints()
 
@@ -80,6 +85,52 @@ class API(FastAPI):
             """
             return self.__targets
 
+        def get_api_key(x_api_key: Optional[str] = Header(None)) -> str:
+            """
+            Extract the API key from the current request headers.
+
+            Parameters
+            ----------
+            x_api_key : str
+                The API key passed using the X-API-Key header
+
+            Returns
+            -------
+            str
+                The API key
+            """
+            if not x_api_key:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail='Required header "X-API-Key" missing.',
+                )
+            if self.__api_key != x_api_key:
+                raise HTTPException(
+                    status_code=status.HTTP_403_FORBIDDEN,
+                    detail="Invalid API key",
+                )
+            return x_api_key
+
+        @self.put(
+            "/targets/{target_id}/target_status", status_code=status.HTTP_204_NO_CONTENT
+        )
+        def put_target_status(
+            target_status: TargetStatus, api_key: str = Depends(get_api_key)
+        ) -> None:
+            """
+            Update the status of a target of the Meta Scheduler. (API endpoint)
+
+            Parameters
+            ----------
+            target_status : TargetStatus
+                The new status of the target
+            api_key : str
+                The API key
+            """
+            df = pd.DataFrame.from_records(target_status.model_dump()["jobs_status"])
+            print(df)
+            return  # FIXME not implemented
+
         def get_job_token(x_job_token: Optional[str] = Header(None)) -> str:
             """
             Extract the job token from the current request headers.
@@ -99,6 +150,7 @@ class API(FastAPI):
                     status_code=status.HTTP_401_UNAUTHORIZED,
                     detail='Required header "X-Job-Token" missing.',
                 )
+
             return x_job_token
 
         # region job control

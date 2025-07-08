@@ -2,6 +2,7 @@
 
 import abc
 import enum
+import io
 import sys
 import time
 from dataclasses import dataclass
@@ -10,13 +11,14 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Self, Tuple
 
 import invoke
+import pandas as pd
 from fabric import Connection  # type: ignore[attr-defined]
 from fabric.config import Config
 from ms_common import utils
-from ms_common.schemas import Target
+from ms_common.schemas import Target, TargetStatus
 from ms_common.utils import (DEFAULT_SSH_PORT, EX_BASH_COMMAND_NOT_FOUND,
                              eprint, expect_ok, exponential_backoff,
-                             seconds_to_time)
+                             seconds_to_time, time_to_seconds)
 
 from ms_client import ssh
 from ms_client.job import Instance as Job
@@ -366,6 +368,22 @@ class RemoteTarget:
         """
         raise NotImplementedError()
 
+    def get_status(self: Self) -> TargetStatus:
+        """
+        Get the status of the remote target.
+
+        Returns
+        -------
+        TargetStatus
+            The status of the remote target
+
+        Raises
+        ------
+        NotImplementedError
+            Must be implemented by the concrete remote target
+        """
+        raise NotImplementedError()
+
 
 class SlurmRemoteTarget(RemoteTarget):
     """RemoteTarget implementation for a Slurm system."""
@@ -525,6 +543,65 @@ class SlurmRemoteTarget(RemoteTarget):
         if interrupted_error is not None:
             raise interrupted_error
         expect_ok(exit_code)
+
+    def get_status(self: Self) -> TargetStatus:
+        """
+        Get the status of the remote Slurm target.
+
+        Returns
+        -------
+        TargetStatus
+            The status of the remote target
+        """
+        with self._connect() as connection:
+            # Get the job states
+            squeue_format = "%D,%l,%T,%M"  # nodes, time limit, state, time
+            cmd = self._prefix_cmd(
+                f"squeue --partition {self._target.queue} --format '{squeue_format}'"
+            )
+            output = connection.run(cmd, warn=True, hide=True).stdout.strip()
+            df = pd.read_csv(io.StringIO(output.lower()))
+            df["time_limit"] = df["time_limit"].apply(lambda s: time_to_seconds(s))
+            df["time"] = df["time"].apply(lambda s: time_to_seconds(s))
+            df["is_using_nodes"] = df["state"].apply(
+                lambda s: s
+                in [
+                    # https://slurm.schedmd.com/job_state_codes.html
+                    # "completing",
+                    "configuring",
+                    "power_up_nodes",
+                    # "signaling",
+                    "running",
+                ]
+            )
+            df["time_remaining"] = df["time_limit"] - df["time"]
+            records = df[
+                ["nodes", "time_limit", "is_using_nodes", "time_remaining"]
+            ].to_dict("records")  # pyright: ignore[reportCallIssue]
+            # Get the node states
+            cmd = self._prefix_cmd(
+                f"sinfo --partition {self._target.queue} -N --format '%t' --noheader"
+            )
+            nodes_state = (
+                connection.run(cmd, warn=True, hide=True).stdout.strip().splitlines()
+            )
+            node_states = dict(
+                nodes_in_use=0,
+                nodes_unavailable=0,
+                nodes_available=0,
+            )
+            for node_state in nodes_state:
+                # https://slurm.schedmd.com/sinfo.html#SECTION_NODE-STATE-CODES
+                if node_state.startswith("alloc"):
+                    node_states["nodes_in_use"] += 1
+                elif node_state.startswith("idle"):
+                    node_states["nodes_available"] += 1
+                else:
+                    node_states["nodes_unavailable"] += 1
+            assert sum(node_states.values()) == len(nodes_state)
+            return TargetStatus.model_validate(
+                node_states | {"timestamp": int(time.time()), "jobs_status": records}
+            )
 
 
 class PBSRemoteTarget(RemoteTarget):
@@ -701,6 +778,107 @@ class PBSRemoteTarget(RemoteTarget):
         if interrupted_error is not None:
             raise interrupted_error
         expect_ok(exit_code)
+
+    def get_status(self: Self) -> TargetStatus:
+        """
+        Get the status of the remote PBS target.
+
+        Returns
+        -------
+        TargetStatus
+            The status of the remote target
+        """
+        with self._connect() as connection:
+            # Get the job states
+            cmd_template = self._prefix_cmd(
+                # Third column indicates the queue
+                "qstat -a | awk '$3 == \"QUEUE\" { print $1 }'"
+            )
+            assert self._target.queue
+            output = connection.run(
+                cmd_template.replace("QUEUE", self._target.queue), warn=True, hide=True
+            ).stdout.strip()
+            qstat_job_fields = dict(
+                nodes="Resource_List.nodect",
+                time_limit="Resource_List.walltime",
+                state="job_state",
+                time="resources_used.walltime",
+            )
+            data: Dict[str, List[str]] = {k: [] for k in qstat_job_fields}
+            qstat_job_fields = {v: k for k, v in qstat_job_fields.items()}
+            job_ids = [s.strip() for s in output.splitlines()]
+            cmd = self._prefix_cmd(f"qstat -f {' '.join(job_ids)}")
+            output = connection.run(cmd, warn=True, hide=True).stdout.strip()
+            for line in output.splitlines() + [None]:  # Handle end of output
+                if (line is None or line.startswith("Job Id:")) and len(
+                    data["nodes"]
+                ) > len(data["time"]):
+                    data["time"].append(
+                        "0"
+                    )  # Job has not started and has no "resources_used.walltime"
+                    continue
+                try:
+                    k, v = line.strip().split(" = ")
+                    k = qstat_job_fields[k]
+                    data[k].append(v)
+                except Exception:
+                    continue
+            df = pd.DataFrame(data)
+            df["time_limit"] = df["time_limit"].apply(lambda s: time_to_seconds(s))
+            df["time"] = df["time"].apply(lambda s: time_to_seconds(s))
+            df["nodes"] = df["nodes"].apply(lambda s: int(s))
+            df["is_using_nodes"] = df["state"].apply(
+                lambda s: s
+                in [
+                    # cf. https://docs.adaptivecomputing.com/torque/4-1-3/Content/topics/commands/qstat.htm
+                    "R",  # Running
+                    # "E", # Exiting
+                    # "T", # Job is being moved
+                ]
+            )
+            df["time_remaining"] = df["time_limit"] - df["time"]
+            records = df[
+                ["nodes", "time_limit", "is_using_nodes", "time_remaining"]
+            ].to_dict("records")  # pyright: ignore[reportCallIssue]
+            # Get the node states
+            output = connection.run(
+                self._prefix_cmd("pbsnodes -a"), warn=True, hide=True
+            ).stdout.strip()
+            nodes_state = []
+            is_node_in_queue = False
+            state = "state-unknown"
+            for line in output.splitlines():
+                line = line.strip()
+                if line.startswith("resources_available.Qlist = "):
+                    is_node_in_queue = self._target.queue in line.split(" = ")[
+                        -1
+                    ].split(",")
+                elif line.startswith("state ="):
+                    state = line.split(" = ")[-1].split(",")
+                if len(line.strip()) == 0:
+                    if is_node_in_queue:
+                        nodes_state.append(state)
+                    is_node_in_queue = False
+                    state = "state-unknown"
+            node_states = dict(
+                nodes_in_use=0,
+                nodes_unavailable=0,
+                nodes_available=0,
+            )
+            for node_state in nodes_state:
+                # https://linux.die.net/man/8/pbsnodes
+                if any(s in node_state for s in ["job-exclusive", "reserved", "busy"]):
+                    node_states["nodes_in_use"] += 1
+                elif not any(
+                    s in node_state for s in ["down", "offline", "state-unknown"]
+                ):
+                    node_states["nodes_available"] += 1
+                else:
+                    node_states["nodes_unavailable"] += 1
+            assert sum(node_states.values()) == len(nodes_state)
+            return TargetStatus.model_validate(
+                node_states | {"timestamp": int(time.time()), "jobs_status": records}
+            )
 
 
 class DirectExecutionRemoteTarget(RemoteTarget):

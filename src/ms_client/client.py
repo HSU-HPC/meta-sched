@@ -9,7 +9,7 @@ import ms_common
 import requests
 from ms_common.schemas import (JobKey, ScheduleRequest, ScheduleResponse,
                                SchedulingDecision, SchedulingDecisionType,
-                               Spec, Target)
+                               Spec, Target, TargetStatus)
 
 from ms_client.config import Config
 from ms_client.scheduler_interface import SchedulerClientInterface
@@ -48,12 +48,36 @@ class Client(SchedulerClientInterface):
                 f"Could check server version at {self.__endpoint}. (Is it running?)"
             )
         if http.HTTPStatus.OK != response.status_code:
-            raise http.client.error()
+            raise http.client.error(response.status_code, response.text)
         server_version = response.json()
         if ms_common.__version__ != server_version:
             raise ValueError(
                 f"Version mismatch. (Using server version {server_version} with client version {ms_common.__version__}.)"
             )
+
+    def update_target_status(
+        self: Self, target_id: str, target_status: TargetStatus, api_key: str
+    ) -> None:
+        """
+        Update the status of a remote target at the Meta Scheduler server.
+
+        Parameters
+        ----------
+        target_id : str
+            The target for which the status should be updated
+        target_status : TargetStatus
+            The new status of the target
+        api_key : str
+            The API key to authenticate at the Meta Scheduler API
+        """
+        headers = {"X-API-Key": api_key}
+        response = requests.put(
+            f"{self.__endpoint}/targets/{target_id}/target_status",
+            json=target_status.model_dump(),
+            headers=headers,
+        )
+        if http.HTTPStatus.NO_CONTENT != response.status_code:
+            raise http.client.error(response.status_code, response.text)
 
     @property
     def targets(self: Self) -> List[Target]:
@@ -67,7 +91,7 @@ class Client(SchedulerClientInterface):
         """
         response = requests.get(f"{self.__endpoint}/targets")
         if http.HTTPStatus.OK != response.status_code:
-            raise http.client.error()
+            raise http.client.error(response.status_code, response.text)
         content = response.json()
         return [Target.model_validate(o) for o in content]
 
@@ -96,7 +120,7 @@ class Client(SchedulerClientInterface):
             ).model_dump(),
         )
         if http.HTTPStatus.CREATED != response.status_code:
-            raise http.client.error()
+            raise http.client.error(response.status_code, response.text)
         content = response.json()
         return ScheduleResponse.model_validate(content)
 

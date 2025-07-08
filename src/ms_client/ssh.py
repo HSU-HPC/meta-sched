@@ -7,6 +7,26 @@ from typing import Dict, Tuple
 from paramiko import SSHConfig
 
 
+def has_ssh_config_entry(target_id: str) -> bool:
+    """
+    Check if the current user can use a target system.
+
+    Parameters
+    ----------
+    target_id : str
+        The ID of the target system
+
+    Returns
+    -------
+    bool
+        True, if the the current user has SSH credentials for this target
+    """
+    config = get_config()
+    return str(target_id) in config.get_hostnames() and "user" in config.lookup(
+        str(target_id)
+    )
+
+
 def get_config_paths() -> Tuple[Path, Path]:
     """
     Get the paths of the main SSH configuration file and the meta-scheduler SSH configuration file of the current user.

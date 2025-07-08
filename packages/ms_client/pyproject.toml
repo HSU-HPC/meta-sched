@@ -24,6 +24,7 @@ dev = [
 
 [project.scripts]
 mscli = "ms_client.cli:main"
+msprobe = "ms_client.probe:main"
 
 [tool.setuptools]
 package-dir = {"" = "../../src"}

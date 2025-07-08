@@ -29,7 +29,7 @@ from ms_client.run_job import NoTargetsAvailableError, launch_job_array
 # TODO split into Client and CLI
 class CLI:
     """
-    Command line application for creating job specifications, submitting, listing, and canceling jobs.
+    Meta Scheduler command line application for creating job specifications and for job control.
     """
 
     def __init__(self: Self, client: Client) -> None:
@@ -309,7 +309,7 @@ class CLI:
             The exit status of the CLI (0 indicates success/no error).
         """
         argv = sys.argv
-        argparser = argparse.ArgumentParser()
+        argparser = argparse.ArgumentParser(description=(CLI.__doc__ or "").strip())
         command_functions = [
             self.create,
             self.submit,
@@ -355,7 +355,7 @@ class CLI:
 
 def main() -> int:
     """
-    Execute command line tool with parameters from the environment or default values.
+    Execute command line tool.
 
     Returns
     -------
@@ -372,3 +372,7 @@ def main() -> int:
         return os.EX_CONFIG
     client = Client(config)
     return CLI(client).run()
+
+
+if __name__ == "__main__":
+    main()

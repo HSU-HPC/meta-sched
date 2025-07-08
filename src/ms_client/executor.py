@@ -90,26 +90,7 @@ class Executor:
             Suitability of the target for executing the job and reason
         """
 
-        def has_ssh_config_entry(target: Target) -> bool:
-            """
-            Check if the current user can use a target system.
-
-            Parameters
-            ----------
-            target : Target
-                The target system
-
-            Returns
-            -------
-            bool
-                True, if the the current user has SSH credentials for this target
-            """
-            config = ssh.get_config()
-            return str(target.id) in config.get_hostnames() and "user" in config.lookup(
-                str(target.id)
-            )
-
-        if not has_ssh_config_entry(target):
+        if not ssh.has_ssh_config_entry(target.id):
             return False, "Credentials missing"
         if target.max_time is not None and job_spec.seconds > time_to_seconds(
             target.max_time

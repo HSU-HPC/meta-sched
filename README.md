@@ -17,3 +17,4 @@ Please refer to the [administrator](./docs/README.md#administrators) and [user](
 - [ ] Energy reporting (RAPL)
 - [ ] [Documentation](./docs/README.md)
 - [ ] Client side re-scheduling
+- [ ] Use `flock /tmp/lockfile -c "..."` to "queue" tasks on a `DirectExecutionRemoteTarget` and `watch -n 1 "flock -n /tmp/lockfile -c ':' && echo 'free' || echo 'locked'"` to get the state of the target

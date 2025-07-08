@@ -3,9 +3,52 @@
 import time
 from typing import Any, Dict, List, Literal, NamedTuple, Optional, Self, Union
 
-from pydantic import BaseModel, ConfigDict, TypeAdapter, model_validator
+from pydantic import BaseModel, TypeAdapter, model_validator
 from ms_common import utils
 from ms_common.utils import eprint, time_to_seconds
+
+class JobStatus(BaseModel):
+    """
+    Class representing the status of a job on a target.
+
+    Attributes
+    ----------
+    nodes : int
+        The number of nodes requested by the job
+    time_limit : int
+        The walltime in seconds requested by the job
+    is_using_nodes : bool
+        True, if the job is currently occupying the requested number of nodes (running vs. queued)
+    time_ramining : int
+        The remaining walltime in seconds for this job
+    """
+    nodes: int
+    time_limit: int
+    is_using_nodes: bool
+    time_remaining: int
+
+class TargetStatus(BaseModel):
+    """
+    Class representing the status of a target.
+
+    Attributes
+    ----------
+    timestamp : int
+        The unix timestamp (seconds since epoch) for the target status
+    nodes_in_use : int
+        The number of nodes which are currently used to run jobs
+    nodes_available : int
+        The number of nodes which are available for running jobs
+    nodes_unavailable : int
+        The number of nodes which are not in used but are not available for running jobs (e.g. due to maintenance)
+    jobs_status : List[JobStatus]
+        Information about the jobs currently running or scheduled on the target's local batch system
+    """
+    timestamp: int
+    nodes_in_use: int
+    nodes_available:int
+    nodes_unavailable: int
+    jobs_status: List[JobStatus]
 
 class Target(BaseModel):
     """

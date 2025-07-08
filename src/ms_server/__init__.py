@@ -121,7 +121,15 @@ def main() -> int:
         await model.dispose()
 
     scheduler: Policy = config.scheduler_class(config.targets, on_schedule_job)
-    api = API(config.host, config.port, config.targets, model, lifespan=lifespan)
+    if "MS_API_KEY" not in os.environ:
+        eprint(
+            f"API key missing!\n\nUsage:\n\tMS_API_KEY=someSecret msserver {' '.join(sys.argv[1:])}"
+        )
+        exit(os.EX_USAGE)
+    api_key = os.environ["MS_API_KEY"]
+    api = API(
+        config.host, config.port, config.targets, model, api_key, lifespan=lifespan
+    )
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
     server, server_task = api.serve()
