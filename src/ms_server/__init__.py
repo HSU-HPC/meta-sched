@@ -18,14 +18,14 @@ from ms_server.scheduling import Policy
 
 
 async def scheduling_loop(
-    scheduler: Policy, scheduling_loop_interval: float, model: Model
+    policy: Policy, scheduling_loop_interval: float, model: Model
 ) -> None:
     """
     Run the scheduling loop (non-blocking).
 
     Parameters
     ----------
-    scheduler : Policy
+    policy : Policy
         The scheduling policy to be applied
     scheduling_loop_interval : float
         The number of seconds between consecutive applications of the scheduling policy
@@ -37,7 +37,11 @@ async def scheduling_loop(
             # TODO update jobs which have started and who must have finished, but have not been updated accordingly
             loop_start = asyncio.get_event_loop().time()
             pending_jobs = await model.get_pending_jobs()
-            await scheduler.update(pending_jobs)
+            targets_status = await model.get_targets_status()
+            print(
+                {k.id: v for k, v in targets_status.items()}
+            )  # FIXME just for testing
+            await policy.update(pending_jobs, targets_status)
             sleep_time = max(
                 0,
                 scheduling_loop_interval
@@ -75,22 +79,7 @@ def main() -> int:
     except ValidationError as e:
         eprint(e.json(indent=3))
         sys.exit(os.EX_CONFIG)
-    model = DataBase(config.db_url)
-
-    async def on_schedule_job(
-        job_key: JobKey, scheduling_decision: SchedulingDecisionType
-    ) -> None:
-        """
-        Callback for the scheduling policy to apply a decision for a single job.
-
-        Parameters
-        ----------
-        job_key : JobKey
-            The key identifying the job for which a scheduling decision has been made
-        scheduling_decision : SchedulingDecisionType
-            The scheduling decision that should be applied to the job
-        """
-        await model.update_job(job_key, dict(scheduling_decision=scheduling_decision))
+    model = DataBase(config.db_url, config.targets)
 
     @asynccontextmanager
     async def lifespan(app: API) -> AsyncGenerator[Any, Any]:
@@ -120,7 +109,22 @@ def main() -> int:
             pass
         await model.dispose()
 
-    scheduler: Policy = config.scheduler_class(config.targets, on_schedule_job)
+    async def on_schedule_job(
+        job_key: JobKey, scheduling_decision: SchedulingDecisionType
+    ) -> None:
+        """
+        Callback for the scheduling policy to apply a decision for a single job.
+
+        Parameters
+        ----------
+        job_key : JobKey
+            The key identifying the job for which a scheduling decision has been made
+        scheduling_decision : SchedulingDecisionType
+            The scheduling decision that should be applied to the job
+        """
+        await model.update_job(job_key, dict(scheduling_decision=scheduling_decision))
+
+    scheduler: Policy = config.scheduler_class(on_schedule_job)
     if "MS_API_KEY" not in os.environ:
         eprint(
             f"API key missing!\n\nUsage:\n\tMS_API_KEY=someSecret msserver {' '.join(sys.argv[1:])}"

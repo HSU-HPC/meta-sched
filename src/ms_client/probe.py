@@ -7,9 +7,9 @@ import multiprocessing
 import os
 import sys
 import time
-from typing import List
+from typing import List, Optional
 
-from ms_common.schemas import Target
+from ms_common.schemas import Target, TargetStatus
 from ms_common.utils import eprint
 from pydantic import ValidationError
 
@@ -37,13 +37,19 @@ def monitor_target(client: Client, target: Target, interval: float) -> None:
     remote_target = RemoteTarget.from_target(target)
     while True:
         start = time.perf_counter()
+        target_status: Optional[TargetStatus] = None
         try:
             target_status = remote_target.get_status()
-            client.update_target_status(target.id, target_status, api_key)
         except NotImplementedError:
-            print(
+            eprint(
                 f'Getting the queue status is not implemented for target {target.id} with batch system "{target.batch_system}"'
             )
+            break
+        try:
+            assert target_status
+            client.update_target_status(target.id, target_status, api_key)
+        except Exception as e:
+            eprint("Error sending target status to Meta Scheduler API:", e)
             break
         sleep_for = max(0, interval - (time.perf_counter() - start))
         try:
@@ -57,7 +63,13 @@ def main() -> int:
     Small utility which periodically queries the target state and sends it to the Meta Scheduler API.
     """
     arg_parser = argparse.ArgumentParser(description=(main.__doc__ or "").strip())
-    arg_parser.add_argument("-t", "--target-id", type=str, action="append", help="Add the ID of a target to monitor")
+    arg_parser.add_argument(
+        "-t",
+        "--target-id",
+        type=str,
+        action="append",
+        help="Add the ID of a target to monitor",
+    )
     arg_parser.add_argument(
         "-i",
         "--interval",

@@ -1,47 +1,34 @@
 """Module containing a dummy scheduling policy for testing and development."""
 
-from typing import List, Self
+from typing import Self
 
-from ms_common.schemas import (Assigned, Impossible, SchedulingDecisionType,
-                               Target)
+from ms_common.schemas import Assigned, Impossible, SchedulingDecisionType
 
-from ms_server.model import Job
-from ms_server.scheduling import GreedyPolicy, ScheduleJobCallback
+from ms_server.model import Job, TargetsStatus
+from ms_server.scheduling import GreedyPolicy
 
 
 class Dummy(GreedyPolicy):
     """Dummy scheduling policy which always assigns the same target."""
 
-    def __init__(
-        self: Self, targets: List[Target], on_schedule_job: ScheduleJobCallback
+    async def schedule_job(
+        self: Self,
+        job: Job,
+        targets_status: TargetsStatus,
     ) -> None:
         """
-        Create a new instance of the scheduling policy
-
-        Parameters
-        ----------
-        targets : List[Target]
-            The list of targets (only the first is used)
-        on_schedule_job : ScheduleJobCallback
-            Callback to apply scheduling decision to a job
-        """
-        super().__init__(
-            targets[:1], on_schedule_job
-        )  # Always only the first target (Good for debugging)
-
-    async def schedule_job(self: Self, job: Job) -> None:
-        """
-        Schedule a job by assigning it to the only available target.
+        Schedule a job by always assigning it to the first available target.
 
         Parameters
         ----------
         job : Job
-            The job to be scheduled
+            The job to schedule
+        targets_status : TargetsStatus
+            A mapping from target IDs to the corresponding status if available
         """
         decision: SchedulingDecisionType = Impossible()
-        for target_id in job.available_targets:
-            if target_id in self._targets:
-                target = self._targets[target_id]
+        for target in targets_status:
+            if target.id in job.available_targets:
                 decision = Assigned(target_id=target.id)
                 break
         await self.on_schedule_job(job.key, decision)

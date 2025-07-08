@@ -139,4 +139,11 @@ class Config(BaseModel):
                 f'"{config.scheduler_class_name}" is not a subclass of "{Policy.__class__.__qualname__}"'
             )
         config._scheduler_class = scheduler_class
+        target_ids = set()
+        for target in config.targets:
+            if target.id in target_ids:
+                raise ValueError(
+                    f"Target IDs must be unique, but the following ID occurred more than once: {target.id}"
+                )
+            target_ids.add(target.id)
         return config

@@ -5,15 +5,18 @@ from typing import Any, Dict, List, Optional, Self, Set
 import zmq
 from ms_common.schemas import JobKey, SchedulingDecisionType
 from ms_common.schemas import Spec as JobSpec
+from ms_common.schemas import Target
+from ms_common.schemas import TargetStatus as TargetStatusSchema
 from pydantic import BaseModel
-from sqlalchemy import JSON, Column, ForeignKey, Integer, String, select
+from sqlalchemy import (JSON, Column, ForeignKey, Integer, String, delete,
+                        select, update)
 from sqlalchemy.ext.asyncio import (AsyncAttrs, AsyncSession,
                                     async_sessionmaker, create_async_engine)
 from sqlalchemy.orm import DeclarativeBase, relationship
 from zmq.asyncio import Context, Socket
 
 from ms_server.model import Job as JobSchema
-from ms_server.model import Model
+from ms_server.model import Model, TargetsStatus
 
 
 class _Base(AsyncAttrs, DeclarativeBase):
@@ -22,6 +25,25 @@ class _Base(AsyncAttrs, DeclarativeBase):
     """
 
     pass
+
+
+class TargetStatus(_Base):
+    """
+    SQLAlchemy model for the status of targets.
+
+    Attributes
+    ----------
+    target_id : str
+        The ID of the corresponding target
+    status : dict
+        The status of the target
+    """
+
+    __tablename__ = "targets_status"
+
+    target_id = Column(String, primary_key=True, index=True)
+    # Instead, delete the status if it becomes unknown
+    status = Column(JSON, nullable=False)
 
 
 class JobArray(_Base):
@@ -87,7 +109,7 @@ class DataBase(Model):
     Database class containing the state of the Meta Scheduler server component which implements the model interface.
     """
 
-    def __init__(self: Self, db_url: str) -> None:
+    def __init__(self: Self, db_url: str, targets: List[Target]) -> None:
         """
         Connect to a database to use as the Meta Scheduler server model.
 
@@ -98,6 +120,8 @@ class DataBase(Model):
             For SQLite use sqlite://path/to/my.db
             For PostgreSQL use postgresql://username:password@host:port/dbname
             For an ephemeral in-memory database for testing use sqlite://
+        targets : List[Target]
+            The targets available to the Meta Scheduler
         """
         prefix, suffix = db_url.split("://")
         match prefix:
@@ -123,10 +147,20 @@ class DataBase(Model):
         self.__pub_socket: Socket = self.__ctx.socket(zmq.PUB)
         self.__pub_port = self.__pub_socket.bind_to_random_port("tcp://*")
 
+        self.__targets = {t.id: t for t in targets}
+
     async def init_models(self: Self) -> None:
         """Create the tables for the model."""
         async with self.__engine.begin() as connection:
             await connection.run_sync(_Base.metadata.create_all)
+
+        async with self.__make_async_session() as session:
+            async with session.begin():
+                # Initially the status of all targets is unknown
+                await session.execute(delete(TargetStatus))
+                session.add_all(
+                    [TargetStatus(target_id=t, status=None) for t in self.__targets]
+                )
 
     async def dispose(self: Self) -> None:
         """Disconnect cleanly from the database."""
@@ -301,3 +335,52 @@ class DataBase(Model):
                     )
                 decision = JobSchema.model_validate_json(job_json).scheduling_decision
             return decision
+
+    async def update_targets_status(
+        self: Self, target_id: str, status: TargetStatusSchema
+    ) -> None:
+        """
+        Update the status of a target.
+
+        Parameters
+        ----------
+        target_id : str
+            The ID of the target for which to update the status
+        status : TargetStatus
+            The new last known status of the target
+        """
+        if target_id not in self.__targets:
+            raise KeyError("No target with this ID: {target_id}")
+        async with self.__make_async_session() as session:
+            async with session.begin():
+                await session.execute(
+                    update(TargetStatus)
+                    .where(TargetStatus.target_id == target_id)
+                    .values(status=status.model_dump())
+                )
+
+    async def get_targets_status(
+        self: Self,
+    ) -> TargetsStatus:
+        """
+        Get all targets and their last known status.
+
+        Returns
+        -------
+        TargetsStatus
+            A mapping from target to last known status
+
+        Raises
+        ------
+        NotImplementedError
+            Must be implemented by the concrete model
+        """
+        async with self.__make_async_session() as session:
+            targets_status = {
+                str(s.target_id): None
+                if s.status is None
+                else TargetStatusSchema.model_validate(s.status)
+                for s in (await session.execute(select(TargetStatus))).scalars().all()
+            }
+            assert len(targets_status) == len(self.__targets)
+            return {v: targets_status[k] for k, v in self.__targets.items()}

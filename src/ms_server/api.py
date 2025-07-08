@@ -6,7 +6,7 @@ from typing import (Any, AsyncGenerator, Awaitable, Coroutine, List, Optional,
                     Self, Set, Tuple, TypeVar)
 
 import ms_common
-import pandas as pd
+import pandas as pd  # noqa: F401
 import uvicorn
 from fastapi import (Depends, FastAPI, Header, HTTPException, Query, Request,
                      status)
@@ -114,22 +114,25 @@ class API(FastAPI):
         @self.put(
             "/targets/{target_id}/target_status", status_code=status.HTTP_204_NO_CONTENT
         )
-        def put_target_status(
-            target_status: TargetStatus, api_key: str = Depends(get_api_key)
+        async def put_target_status(
+            target_id: str, status: TargetStatus, api_key: str = Depends(get_api_key)
         ) -> None:
             """
             Update the status of a target of the Meta Scheduler. (API endpoint)
 
             Parameters
             ----------
-            target_status : TargetStatus
+            target_id : str
+                The ID of the target
+            status : TargetStatus
                 The new status of the target
             api_key : str
                 The API key
             """
-            df = pd.DataFrame.from_records(target_status.model_dump()["jobs_status"])
-            print(df)
-            return  # FIXME not implemented
+            await self.__model.update_targets_status(target_id, status)
+            # For debugging:
+            # df = pd.DataFrame.from_records(status.model_dump()["jobs_status"])
+            # print(df)
 
         def get_job_token(x_job_token: Optional[str] = Header(None)) -> str:
             """
@@ -175,7 +178,9 @@ class API(FastAPI):
                 The id of the created job array, its size and the token required to access the jobs
             """
             target_ids = set([t.id for t in self.__targets])
-            if any([t not in target_ids for t in request.available_targets]):
+            if len(request.available_targets) == 0 or any(
+                [t not in target_ids for t in request.available_targets]
+            ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Unknown target(s)",

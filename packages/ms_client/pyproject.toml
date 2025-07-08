@@ -8,6 +8,7 @@ requires-python = ">=3.12"
 dependencies = [
     "deprecated>=1.2.18",
     "fabric>=3.2.2",
+    "frozendict>=2.4.6",
     "pandas>=2.2.3",
     "pydantic>=2.11.7",
     "requests>=2.32.3",

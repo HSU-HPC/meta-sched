@@ -5,6 +5,7 @@ from typing import Any, Dict, List, Optional, Self, Set
 
 from ms_common.schemas import JobKey, SchedulingDecisionType
 from ms_common.schemas import Spec as JobSpec
+from ms_common.schemas import Target, TargetStatus
 from pydantic import BaseModel, ConfigDict
 
 
@@ -55,6 +56,9 @@ class Job(BaseModel):
             The key which uniquely identifies the job (includes token required to look it up)
         """
         return JobKey(self.token, self.array_id, self.array_idx)
+
+
+TargetsStatus = Dict[Target, Optional[TargetStatus]]
 
 
 class Model(abc.ABC):
@@ -153,6 +157,44 @@ class Model(abc.ABC):
         ------
         KeyError
             If the job with the corresponding key does not exist
+        NotImplementedError
+            Must be implemented by the concrete model
+        """
+        raise NotImplementedError()
+
+    async def update_targets_status(
+        self: Self, target_id: str, status: TargetStatus
+    ) -> None:
+        """
+        Update the status of a target.
+
+        Parameters
+        ----------
+        target_id : str
+            The ID of the target for which to update the status
+        status : TargetStatus
+            The new last known status of the target
+
+        Raises
+        ------
+        NotImplementedError
+            Must be implemented by the concrete model
+        """
+        raise NotImplementedError()
+
+    async def get_targets_status(
+        self: Self,
+    ) -> TargetsStatus:
+        """
+        Get all targets and their last known status.
+
+        Returns
+        -------
+        TargetsStatus
+            A mapping from target to last known status
+
+        Raises
+        ------
         NotImplementedError
             Must be implemented by the concrete model
         """

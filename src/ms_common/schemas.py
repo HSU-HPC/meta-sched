@@ -1,9 +1,11 @@
 """Module containing schemas shared by the Meta Scheduler client and server components."""
 
 import time
-from typing import Any, Dict, List, Literal, NamedTuple, Optional, Self, Union
+from types import MappingProxyType
+from typing import Any, Dict, List, Literal, NamedTuple, Optional, Self, Tuple, Union
 
-from pydantic import BaseModel, TypeAdapter, model_validator
+from frozendict import frozendict
+from pydantic import BaseModel, TypeAdapter, field_validator, model_validator
 from ms_common import utils
 from ms_common.utils import eprint, time_to_seconds
 
@@ -74,12 +76,12 @@ class Target(BaseModel):
         The maximum time for which a job may run on this target formatted as "d-hh:MM:ss"
     max_nodes : Optional[int]
         The maximum number of compute nodes which may be allocated to a job
-    source_scripts : List[str]
+    source_scripts : Tuple[str, ...]
         A list of files which should be sourced after connecting to the target before running any commands
     module_map : Dict[str, str]
         A mapping of abstract environment modules such as "MPI" to concrete ones such as "mpi/openmpi",
         which should be loaded after connecting to the target
-    tags : List[str]
+    tags : Tuple[str, ...]
         A list of tags for the target such as "gpu", "x86", "green", etc.
     """
     id: str
@@ -91,14 +93,43 @@ class Target(BaseModel):
     port: int = utils.DEFAULT_SSH_PORT
     max_time: Optional[str] = None
     max_nodes: Optional[int] = None
-    source_scripts: List[str] = []
-    module_map: Dict[str, str] = {}
-    tags: List[str] = []
+    source_scripts: Tuple[str, ...] = ()
+    module_map: frozendict[str, str] = frozendict[str, str]()
+    tags: Tuple[str, ...] = ()
+
+    model_config = dict(frozen=True, arbitrary_types_allowed=True)
+
+    @field_validator("module_map", mode="before")
+    def convert_module_map(cls, v: Any) -> frozendict[str,str]:
+        """
+        Validates "module_map" attribute of the target.
+
+        Parameters
+        ----------
+        v : Any
+            The value assigned to the attribute "module_map" of the target before validation
+
+        Returns
+        -------
+        frozendict[str,str]
+            The validated value of the attribute "module_map" assigned to the target
+        """
+        is_valid = True
+        if isinstance(v, frozendict) or isinstance(v, dict):
+            for k, val in v.items():
+                if not isinstance(k, str) or not isinstance(val, str):
+                    is_valid = False
+                    break
+        else:
+            is_valid = False
+        if not is_valid:
+            raise TypeError("\"module_map\" must be a dict or frozendict with keys and values only of type str")
+        return frozendict(v)
 
     @model_validator(mode="after")
     def validate_attributes(cls, target: Any) -> Any:
         """
-        Validates an adjusts (!) target attributes. (Is idempotent.)
+        Validates target attributes.
 
         Parameters
         ----------
