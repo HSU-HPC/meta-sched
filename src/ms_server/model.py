@@ -104,6 +104,22 @@ class Model(abc.ABC):
         """
         raise NotImplementedError()
 
+    async def get_decided_jobs(self: Self) -> List[Job]:
+        """
+        Get a list of jobs for which a scheduling decision has been made.
+
+        Returns
+        -------
+        List[Job]
+            The list of scheduled jobs
+
+        Raises
+        ------
+        NotImplementedError
+            Must be implemented by the concrete model
+        """
+        raise NotImplementedError()
+
     async def update_job(self: Self, job_key: JobKey, data: Dict[str, Any]) -> None:
         """
         Update an existing job.

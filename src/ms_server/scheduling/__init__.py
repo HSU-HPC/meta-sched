@@ -30,6 +30,7 @@ class Policy:
     async def update(
         self: Self,
         pending_jobs: List[Job],
+        decided_jobs: List[Job],
         targets_status: TargetsStatus,
     ) -> None:
         """
@@ -39,6 +40,8 @@ class Policy:
         ----------
         pending_jobs : List[Job]
             The jobs which are pending scheduling
+        decided_jobs : List[Job]
+            The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available
         Raises
@@ -57,6 +60,7 @@ class GreedyPolicy(Policy):
     async def schedule_job(
         self: Self,
         job: Job,
+        decided_jobs: List[Job],
         targets_status: TargetsStatus,
     ) -> None:
         """
@@ -66,6 +70,8 @@ class GreedyPolicy(Policy):
         ----------
         job : Job
             The job to schedule
+        decided_jobs : List[Job]
+            The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available
 
@@ -79,6 +85,7 @@ class GreedyPolicy(Policy):
     async def update(
         self: Self,
         pending_jobs: List[Job],
+        decided_jobs: List[Job],
         targets_status: TargetsStatus,
     ) -> None:
         """
@@ -88,6 +95,8 @@ class GreedyPolicy(Policy):
         ----------
         pending_jobs : List[Job]
             The jobs which are pending scheduling
+        decided_jobs : List[Job]
+            The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available
         Raises
@@ -96,4 +105,4 @@ class GreedyPolicy(Policy):
             Must be implemented in concrete scheduling policy
         """
         for job in pending_jobs:
-            await self.schedule_job(job, targets_status)
+            await self.schedule_job(job, decided_jobs, targets_status)

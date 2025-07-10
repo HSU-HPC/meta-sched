@@ -1,7 +1,7 @@
 """Module containing scheduling policy implementations which use randomness."""
 
 import random
-from typing import Self
+from typing import List, Self
 
 from ms_common.schemas import Assigned
 
@@ -15,7 +15,9 @@ class Uniform(GreedyPolicy):
     (Note that this may result in a non-uniform distribution across all targets depending on the available ones.)
     """
 
-    async def schedule_job(self: Self, job: Job, targets_status: TargetsStatus) -> None:
+    async def schedule_job(
+        self: Self, job: Job, decided_jobs: List[Job], targets_status: TargetsStatus
+    ) -> None:
         """
         Schedule a job by assigning it to a random target from the available ones.
 
@@ -23,6 +25,8 @@ class Uniform(GreedyPolicy):
         ----------
         job : Job
             The job to be scheduled
+        decided_jobs : List[Job]
+            The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available
         """
@@ -48,7 +52,9 @@ class WeightedByCores(GreedyPolicy):
             Callback to apply scheduling decision to a job
         """
 
-    async def schedule_job(self: Self, job: Job, targets_status: TargetsStatus) -> None:
+    async def schedule_job(
+        self: Self, job: Job, decided_jobs: List[Job], targets_status: TargetsStatus
+    ) -> None:
         """
         Schedule a job by assigning it to a target using a weighted random selection based on core count.
 
@@ -56,6 +62,8 @@ class WeightedByCores(GreedyPolicy):
         ----------
         job : Job
             The job to be scheduled
+        decided_jobs : List[Job]
+            The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available
         """

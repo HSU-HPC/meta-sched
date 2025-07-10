@@ -214,6 +214,21 @@ class DataBase(Model):
             )
             return [JobSchema.model_validate(s) for s in result.scalars().all()]
 
+    async def get_decided_jobs(self: Self) -> List[JobSchema]:
+        """
+        Get a list of jobs for which a scheduling decision has been made.
+
+        Returns
+        -------
+        List[Job]
+            The list of scheduled jobs
+        """
+        async with self.__make_async_session() as session:
+            result = await session.execute(
+                select(Job).where(Job.scheduling_decision.is_not(None))
+            )
+            return [JobSchema.model_validate(s) for s in result.scalars().all()]
+
     async def __get_job(
         self: Self, job_key: JobKey, session: Optional[AsyncSession] = None
     ) -> Job:

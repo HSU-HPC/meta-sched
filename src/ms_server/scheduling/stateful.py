@@ -2,7 +2,7 @@
 Module containing stateful scheduling policies which update and use information across scheduling requests.
 """
 
-from typing import Dict, Self
+from typing import Dict, List, Self
 
 from ms_common.schemas import Assigned
 
@@ -31,6 +31,7 @@ class LeastUsed(GreedyPolicy):
     async def schedule_job(
         self: Self,
         job: Job,
+        decided_jobs: List[Job],
         targets_status: TargetsStatus,
     ) -> None:
         """
@@ -40,6 +41,8 @@ class LeastUsed(GreedyPolicy):
         ----------
         job : Job
             The job to be scheduled
+        decided_jobs : List[Job]
+            The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available
         """

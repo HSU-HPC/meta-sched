@@ -37,11 +37,9 @@ async def scheduling_loop(
             # TODO update jobs which have started and who must have finished, but have not been updated accordingly
             loop_start = asyncio.get_event_loop().time()
             pending_jobs = await model.get_pending_jobs()
+            decided_jobs = await model.get_decided_jobs()
             targets_status = await model.get_targets_status()
-            print(
-                {k.id: v for k, v in targets_status.items()}
-            )  # FIXME just for testing
-            await policy.update(pending_jobs, targets_status)
+            await policy.update(pending_jobs, decided_jobs, targets_status)
             sleep_time = max(
                 0,
                 scheduling_loop_interval

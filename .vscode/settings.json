@@ -9,5 +9,7 @@
         "packages/ms_client/build": true,
         "packages/ms_server/build": true,
     },
-    "python.analysis.autoImportCompletions": true
+    "python.analysis.autoImportCompletions": true,
+    "python.terminal.activateEnvInCurrentTerminal": false,
+    "python.terminal.activateEnvironment": false
 }
