@@ -5,7 +5,7 @@ import signal
 import time
 import traceback
 from types import FrameType
-from typing import Optional, Self, Set, Tuple
+from typing import List, Optional, Self, Set, Tuple
 
 import ms_common.schemas
 from ms_common import schemas
@@ -15,6 +15,7 @@ from ms_common.schemas import Target
 from ms_common.utils import StatusException, eprint, time_to_seconds
 
 from ms_client import job, ssh
+from ms_client.config import TargetAdditionalConfigs
 from ms_client.job import Instance as Job
 from ms_client.remote_target import RemoteTarget
 from ms_client.scheduler_interface import SchedulerClientInterface
@@ -75,7 +76,11 @@ class Executor:
         raise InterruptedError(signalnum)
 
     @staticmethod
-    def is_target_suitable(target: Target, job_spec: JobSpec) -> Tuple[bool, str]:
+    def is_target_suitable(
+        target: Target,
+        job_spec: JobSpec,
+        additional_configs: Optional[TargetAdditionalConfigs] = None,
+    ) -> Tuple[bool, str]:
         """
         Check if the target is suitable for executing a specific job.
 
@@ -83,6 +88,8 @@ class Executor:
         ----------
         job_spec : Spec
             The specification of the job considered for execution on the target
+        additional_configs : Optional[TargetAdditionalConfigs]
+            Additional user configurations by which to evaluate the target
 
         Returns
         -------
@@ -104,8 +111,11 @@ class Executor:
         cores_per_node = job_spec.ranks_per_node * job_spec.cores_per_rank
         if cores_per_node > target.cores_per_node:
             return False, "Too many cores required"
+        tags = target.tags
+        if additional_configs:
+            tags += additional_configs.tags
         for t in job_spec.required_tags:
-            if t not in target.tags:
+            if t not in tags:
                 return False, f'Required tag "{t}" missing'
         for m in job_spec.required_modules:
             if m not in target.module_map:
@@ -114,7 +124,9 @@ class Executor:
 
     @staticmethod
     def filter_targets(
-        job_spec: JobSpec, scheduler: SchedulerClientInterface
+        job_spec: JobSpec,
+        scheduler: SchedulerClientInterface,
+        targets_additional_configs: List[TargetAdditionalConfigs],
     ) -> Set[str]:
         """
         Obtain the set of available targets of the scheduler for a given job specification.
@@ -125,6 +137,8 @@ class Executor:
             The job specification on which to filter the targets
         scheduler : SchedulerInterface
             The scheduler from which to obtain the targets to be filtered
+        targets_additional_configs : List[TargetAdditionalConfigs]
+            Additional user configurations by which to filter the targets
 
         Returns
         -------

@@ -58,7 +58,7 @@ This state can be used by the scheduling policy to optimize job distribution acr
 
 ## Users
 
-After [installing the client package](#installation), submit job arrays using `mscli`. 
+After [installing the client package](#installation), submit job arrays using `mscli`.
 
 ### Folder Structure
 
@@ -79,6 +79,14 @@ Upon running the command for the first time, the default config file at `$HOME/.
 
 First, run `mscli ssh-config` to create/update `~/.ssh/config.d/meta-sched` with the targets of the Meta Scheduler server.  
 Then, edit this SSH configuration file (e.g. using `vim` or `nano`), providing credentials to the target systems which should be used to execute jobs. (Test this by manually connecting to target using the SSH configuration entry name.)
+
+For additional filtering of targets used for scheduling of a particular job, custom tags can be added to the user configuration:
+
+```toml
+[[targets]]
+id = "windhpc-hsu"
+tags = ["test"]
+```
 
 ### Job Control
 

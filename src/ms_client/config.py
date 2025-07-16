@@ -2,11 +2,27 @@
 
 import tomllib
 from pathlib import Path
-from typing import Any, Self
+from typing import Any, List, Self, Tuple
 
 from pydantic import BaseModel, model_validator
 
 import ms_client.data as data
+
+
+class TargetAdditionalConfigs(BaseModel):
+    """
+    Class containing additional user configurations for a target from the Meta Scheduler server.
+
+    Attributes
+    ----------
+    id : str
+        The target ID
+    tags : Tuple[str, ...]
+        Additional user defined tags to filter this target by
+    """
+
+    id: str
+    tags: Tuple[str, ...] = ()
 
 
 class Config(BaseModel):
@@ -20,11 +36,15 @@ class Config(BaseModel):
     host : str
         The host of the Meta Scheduler server
     port : int
+    targets: List[_TargetAdditionalConfigs]
+        Additional user configurations for targets from the Meta Scheduler server
     """
 
     protocol: str = "http"
     host: str
     port: int
+
+    targets: List[TargetAdditionalConfigs]
 
     @model_validator(mode="after")
     def validate_attributes(cls, config: Any) -> Any:

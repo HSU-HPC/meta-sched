@@ -19,25 +19,22 @@ from ms_client.config import Config
 from ms_client.executor import Executor
 from ms_client.job import Instance as Job
 from ms_client.job import load_job_spec
-from ms_client.scheduler_interface import SchedulerClientInterface
 
 
-def __get_scheduler() -> SchedulerClientInterface:
+def __get_config_or_exit() -> Config:
     """
-    Instantiates a client for access to the scheduler.
+    Load the client config or exit if a validation error was raised.
 
     Returns
     -------
-    Client
-        The scheduler client
+    Config
+        The Meta Scheduler client config
     """
     try:
-        config = Config.load()
+        return Config.load()
     except ValidationError as e:
         eprint(e.json(indent=3))
         sys.exit(os.EX_CONFIG)
-    scheduler = Client(config)
-    return scheduler
 
 
 def __start_process(job_spec: str, token: str, array_id: int, array_idx: int) -> int:
@@ -119,8 +116,9 @@ def launch_job_array(job_spec: str) -> str:
         If no targets are available to run the job spec
     """
     spec = load_job_spec(job_spec)
-    scheduler = __get_scheduler()
-    suitable_targets = Executor.filter_targets(spec, scheduler)
+    config = __get_config_or_exit()
+    scheduler = Client(config)
+    suitable_targets = Executor.filter_targets(spec, scheduler, config.targets)
     if len(suitable_targets) == 0:
         raise NoTargetsAvailableError(job_spec)
     response = scheduler.submit_job_array(spec, suitable_targets)
@@ -160,7 +158,7 @@ if __name__ == "__main__":
 
     os.chdir(Path.home())
     job = Job(load_job_spec(args.job_spec), args.array_id, args.array_index)
-    scheduler = __get_scheduler()
+    scheduler = Client(__get_config_or_exit())
     Executor(
         job,
         args.token,
