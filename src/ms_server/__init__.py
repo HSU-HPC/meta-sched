@@ -1,7 +1,10 @@
 """Module containing the Meta Scheduler HTTP API."""
 
 import asyncio
+import itertools
 import os
+import secrets
+import string
 import sys
 from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator
@@ -33,12 +36,14 @@ async def scheduling_loop(
         The state of the Meta Scheduler
     """
     try:
-        while True:
+        for i in itertools.count():
             # TODO update jobs which have started and who must have finished, but have not been updated accordingly
             loop_start = asyncio.get_event_loop().time()
             pending_jobs = await model.get_pending_jobs()
             decided_jobs = await model.get_decided_jobs()
             targets_status = await model.get_targets_status()
+            # For debugging
+            # print(f"Scheduling loop #{i} ({len(pending_jobs)} pending, {len(decided_jobs)} decided)")
             await policy.update(pending_jobs, decided_jobs, targets_status)
             sleep_time = max(
                 0,
@@ -124,10 +129,11 @@ def main() -> int:
 
     scheduler: Policy = config.scheduler_class(on_schedule_job)
     if "MS_API_KEY" not in os.environ:
-        eprint(
-            f"API key missing!\n\nUsage:\n\tMS_API_KEY=someSecret msserver {' '.join(sys.argv[1:])}"
-        )
-        exit(os.EX_USAGE)
+        characters = string.ascii_letters + string.digits  # A-Z, a-z, 0-9
+        api_key = "".join(secrets.choice(characters) for _ in range(32))
+        os.environ["MS_API_KEY"] = api_key
+        eprint("No API key specified in environment. (Generating randomly.)")
+        eprint(f"MS_API_KEY={api_key}")
     api_key = os.environ["MS_API_KEY"]
     api = API(
         config.host, config.port, config.targets, model, api_key, lifespan=lifespan

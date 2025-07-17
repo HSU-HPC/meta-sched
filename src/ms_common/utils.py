@@ -1,11 +1,11 @@
 """Module containing general purpose utility functions and classes."""
 
+import functools
 import os
 import shlex
 import sys
-from typing import Any, Optional
-
-from deprecated import deprecated # type: ignore[attr-defined]
+from typing import Any, Callable, Optional, TypeVar, cast
+import warnings
 
 DEFAULT_SSH_PORT = 22
 
@@ -92,7 +92,39 @@ def expect_ok(status: int) -> None:
     if status != os.EX_OK:
         raise StatusException(status)
 
-@deprecated(reason="Maybe not needed anymore") # type: ignore[no-untyped-call,misc]
+F = TypeVar("F", bound=Callable[..., Any])
+
+def deprecated(reason: str) -> Callable[[F], F]:
+    """
+    Mark a function as deprecated.
+
+    Parameters
+    ----------
+    reason : str
+        The reason for deprecation
+
+
+    Returns
+    -------
+    Callable
+        The decorated function
+    """
+    def decorator(func: F) -> F:
+        @functools.wraps(func)
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            """
+            Deprecation wrapper for the function
+            """
+            warnings.warn(
+                f"{func.__name__}() is deprecated: {reason}",
+                category=DeprecationWarning,
+                stacklevel=2
+            )
+            return func(*args, **kwargs)
+        return cast(F, wrapper)
+    return decorator
+
+@deprecated(reason="Maybe not needed anymore")
 def try_become_root(required: bool = False) -> None:
     """
     Try to restart the current application as the root user if not already and "--sudo" was given as a command line parameter.

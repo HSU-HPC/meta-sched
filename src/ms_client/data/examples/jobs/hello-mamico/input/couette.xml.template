@@ -71,14 +71,6 @@
         compute-macroscopic-quantities-every-timestep="0"
         fix-seed="no"
     ></simulation-configuration>
-    <!--TODO
-    <vtk-configuration filename="Molecules" write-every-timestep="0"></vtk-configuration>
-  <checkpoint-configuration filename="CheckpointSimpleMD"
-    write-every-timestep="0"></checkpoint-configuration>-->
-
-    <!--TODO
-        qinit-from-sequential-checkpoint="ls1_CheckpointSimpleMDForAmartyaPeriodic_0__10000_0"
-    -->
     <domain-configuration
         molecules-per-direction="28 ; 28 ; 28"
         domain-size="MD_SIZE ; MD_SIZE ; MD_SIZE"

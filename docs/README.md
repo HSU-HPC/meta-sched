@@ -25,7 +25,7 @@ The core concepts of the Meta Scheduler are illustrated in the diagrams below:
 
 1. Use [direnv](https://direnv.net/) or `source .envrc` to set up the project environment and to set up [uv](https://docs.astral.sh/uv/), if it isn't already installed.
 2. During development, use `mscli-dev` and `msserver-dev` to test the CLI and server respectively.
-3. Build the installable Python package under `./src/<component>/dist/` using `package <all|client|server>`
+3. Run static type checking, linting and formatting, and build the installable Python package under `./src/<component>/dist/` using `package <all|client|server>`
 4. Install the Python packages using `install <all|client|server>`. This also installs Python 3.12 (through [pyenv](https://github.com/pyenv/pyenv)) and [pipx](https://pipx.pypa.io/stable/).
 
 ## Administrators

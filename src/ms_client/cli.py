@@ -26,7 +26,6 @@ from ms_client.job import (get_job_outputs, get_jobs_dir, list_job_spec_names,
 from ms_client.run_job import NoTargetsAvailableError, launch_job_array
 
 
-# TODO split into Client and CLI
 class CLI:
     """
     Meta Scheduler command line application for creating job specifications and for job control.

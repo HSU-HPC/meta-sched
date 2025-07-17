@@ -18,6 +18,7 @@ from ms_client import job, ssh
 from ms_client.config import TargetAdditionalConfigs
 from ms_client.job import Instance as Job
 from ms_client.remote_target import RemoteTarget
+from ms_client.remote_target.factory import remote_target_from_target
 from ms_client.scheduler_interface import SchedulerClientInterface
 from ms_client.utils import LockFile, RedirectOutputToFile
 
@@ -190,7 +191,7 @@ class Executor:
                 time.sleep(wait_seconds)
             case _:
                 raise NotImplementedError("Unknown scheduling decision type")
-        remote_target = RemoteTarget.from_target(target)
+        remote_target = remote_target_from_target(target)
         eprint(
             f"=== 2. Copying input files to target {target.id} and run optional setup step ==="
         )

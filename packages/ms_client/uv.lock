@@ -218,7 +218,6 @@ wheels = [
 name = "meta-sched-client"
 source = { editable = "." }
 dependencies = [
-    { name = "deprecated", marker = "sys_platform == 'linux'" },
     { name = "fabric", marker = "sys_platform == 'linux'" },
     { name = "frozendict", marker = "sys_platform == 'linux'" },
     { name = "pandas", marker = "sys_platform == 'linux'" },
@@ -236,7 +235,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "deprecated", specifier = ">=1.2.18" },
     { name = "fabric", specifier = ">=3.2.2" },
     { name = "frozendict", specifier = ">=2.4.6" },
     { name = "pandas", specifier = ">=2.2.3" },

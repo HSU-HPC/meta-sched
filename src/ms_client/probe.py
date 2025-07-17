@@ -15,7 +15,7 @@ from pydantic import ValidationError
 
 from ms_client.client import Client
 from ms_client.config import Config
-from ms_client.remote_target import RemoteTarget
+from ms_client.remote_target.factory import remote_target_from_target
 from ms_client.ssh import has_ssh_config_entry
 
 
@@ -34,7 +34,7 @@ def monitor_target(client: Client, target: Target, interval: float) -> None:
     """
     api_key = os.environ["MS_API_KEY"]
     print(f"Started monitor for {target.id} ({target.host})")
-    remote_target = RemoteTarget.from_target(target)
+    remote_target = remote_target_from_target(target)
     while True:
         start = time.perf_counter()
         target_status: Optional[TargetStatus] = None

@@ -6,7 +6,7 @@ from typing import List, Self
 from ms_common.schemas import Assigned
 
 from ms_server.model import Job, TargetsStatus
-from ms_server.scheduling import GreedyPolicy, ScheduleJobCallback
+from ms_server.scheduling import GreedyPolicy
 
 
 class Uniform(GreedyPolicy):
@@ -41,16 +41,6 @@ class WeightedByCores(GreedyPolicy):
     This scheduling policy assigns jobs randomly per scheduling request proportional to the core count of each target.
     (Note that this may result in disproportionate distribution across all targets depending on the available ones.)
     """
-
-    def __init__(self: Self, on_schedule_job: ScheduleJobCallback) -> None:
-        """
-        Create a new instance of the scheduling policy
-
-        Parameters
-        ----------
-        on_schedule_job : ScheduleJobCallback
-            Callback to apply scheduling decision to a job
-        """
 
     async def schedule_job(
         self: Self, job: Job, decided_jobs: List[Job], targets_status: TargetsStatus
