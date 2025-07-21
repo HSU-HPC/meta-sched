@@ -11,7 +11,7 @@ from ms_client.remote_target import RemoteTarget
 class DirectExecutionRemoteTarget(RemoteTarget):
     """RemoteTarget implementation a target without any batch system."""
 
-    def _execute_batch_system(
+    def _execute(
         self: Self,
         job: Job,
         callbacks: RemoteTarget.JobExecutionCallbacks,
@@ -36,12 +36,19 @@ class DirectExecutionRemoteTarget(RemoteTarget):
 
         # TODO avoid long running SSH connection using nohup
 
-        cmd = self._prefix_cmd(job.spec.cmd_main, job.spec.required_modules)
+        cmd = job.spec.cmd_main
         callbacks.on_start()
         try:
             with self._connect() as connection:
+                expect_ok(
+                    self._run(
+                        connection, f"mkdir -p {job.remote_output}", warn=True
+                    ).exited
+                )
                 with connection.cd(job.remote_output):
-                    exit_code = connection.run(cmd, warn=True, env=env).exited
+                    exit_code = self._run(
+                        connection, cmd, env=env, modules=job.spec.required_modules
+                    ).exited
         except InterruptedError:
             raise
         finally:

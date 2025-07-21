@@ -110,6 +110,19 @@ def deprecated(reason: str) -> Callable[[F], F]:
         The decorated function
     """
     def decorator(func: F) -> F:
+        """
+        Deprecation decorator.
+
+        Parameters
+        ----------
+        func : F
+            The function to be deprecated
+
+        Returns
+        -------
+        F
+            The deprecated function
+        """
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             """

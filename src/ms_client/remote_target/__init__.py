@@ -7,11 +7,12 @@ import time
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, Self, Tuple
+from typing import Any, Dict, List, Self, TextIO, Tuple
 
 import invoke
 from fabric import Connection  # type: ignore[attr-defined]
 from fabric.config import Config
+from invoke.runners import Result
 from ms_common.schemas import Target, TargetStatus
 from ms_common.utils import (DEFAULT_SSH_PORT, EX_BASH_COMMAND_NOT_FOUND,
                              eprint, expect_ok)
@@ -125,7 +126,7 @@ class RemoteTarget:
             case self.TransferMode.UPLOAD:
                 with self._connect() as connection:
                     expect_ok(
-                        connection.run(f"mkdir -p $(dirname {dst})", warn=True).exited
+                        self._run(connection, f"mkdir -p $(dirname {dst})").exited
                     )
                 dst = f"{str(self._target.id)}:{dst}"
             case self.TransferMode.DOWNLOAD:
@@ -159,7 +160,7 @@ class RemoteTarget:
             src = f"{str(src)}/*"
             with self._connect() as connection:
                 remote_dst = str(dst).split(":")[-1]
-                expect_ok(connection.run(f"mkdir -p {remote_dst}", warn=True).exited)
+                expect_ok(self._run(connection, f"mkdir -p {remote_dst}").exited)
             cmd = f"scp {' '.join(scp_flags)} {src} {dst} 1>&2"
             result = invoke.run(cmd, warn=True, pty=False)
         status = -1 if result is None else result.exited
@@ -175,7 +176,7 @@ class RemoteTarget:
             The job of which related files should be deleted on the target
         """
         with self._connect() as connection:
-            expect_ok(connection.run(f"rm -rf {job.remote_output}", warn=True).exited)
+            expect_ok(self._run(connection, f"rm -rf {job.remote_output}").exited)
 
     def _create_oe_files(
         self: Self, connection: Connection, stream_contents: bool
@@ -195,15 +196,15 @@ class RemoteTarget:
         output_files = {f"output{suffix}": sys.stdout, f"error{suffix}": sys.stderr}
         for k, v in output_files.items():
             expect_ok(
-                connection.run(
+                self._run(
+                    connection,
                     f"touch {k}",
-                    warn=True,
                 ).exited
             )
             if stream_contents:
-                connection.run(
+                self._run(
+                    connection,
                     f"tail -f {k} &",
-                    warn=True,
                     asynchronous=True,
                     out_stream=v,
                 )
@@ -211,32 +212,63 @@ class RemoteTarget:
         assert len(oe) == 2
         return oe
 
-    def _prefix_cmd(self: Self, cmd: str, modules: List[str] = []) -> str:
+    def _run(
+        self: Self,
+        connection: Connection,
+        cmd: str,
+        warn: bool = True,
+        hide: bool = False,
+        asynchronous: bool = False,
+        env: Dict[str, Any] = {},
+        out_stream: TextIO | Any = sys.stdout,
+        modules: List[str] = [],
+    ) -> Result:
         """
-        Prefix a shell command with commands to source target shell scripts and load environment modules.
+        Prefix a shell command with commands to source target shell scripts and load environment modules before executing it.
 
         Parameters
         ----------
+        connection : Connection
+            The connection over which the command should be executed
         cmd : str
-            The command to be prefixed
+            The command to be prefixed and executed
+        warn : bool
+            If true, do not raise UnexpectedExit when the exit code of the command is non-zero (Default to True)
+        hide : bool
+            If true, both the standard output and standard error of the command will be suppressed (Defaults to False)
+        asynchronous : bool
+            If true, run the command in the background without blocking and return a Promise instead of a Result (Defaults to False)
+        env : Dict[str, Any]
+            Shell environment used for command execution
+        out_stream : TextIO | Any
+            The target where the standard output of the command should be sent (Defaults to sys.stdout)
         modules : List[str]
             Optional environment modules to be loaded before executing the command
 
         Returns
         -------
-        str
-            The prefixed command
+        Result
+            The result of the command
         """
+        # Prefix command with source scripts and modules before execution
         specific_modules = [self._target.module_map[m] for m in modules]
         cmd = " && ".join(
             [f". {script}" for script in self._target.source_scripts]
             + [f"module load {module}" for module in specific_modules]
             + [cmd]
         )
-        return cmd
+        result: Result = connection.run(
+            cmd,
+            warn=warn,
+            hide=hide,
+            asynchronous=asynchronous,
+            env=env,
+            out_stream=out_stream,
+        )
+        return result
 
     @staticmethod
-    def __get_env(job: Job) -> Dict[str, Any]:
+    def __get_job_env(job: Job) -> Dict[str, Any]:
         """
         Get the environment variables for a job to be set on the target.
 
@@ -269,14 +301,16 @@ class RemoteTarget:
             The job which to set up on the target
         """
         with self._connect() as connection:
-            expect_ok(connection.run(f"mkdir -p {job.remote_output}", warn=True).exited)
+            expect_ok(self._run(connection, f"mkdir -p {job.remote_output}").exited)
             with connection.cd(job.remote_output):
                 if job.spec.cmd_setup:
-                    cmd = self._prefix_cmd(
-                        job.spec.cmd_setup, job.spec.required_modules
-                    )
-                    result = connection.run(
-                        cmd, warn=True, env=RemoteTarget.__get_env(job)
+                    cmd = job.spec.cmd_setup
+                    result = self._run(
+                        connection,
+                        cmd,
+                        warn=True,
+                        env=RemoteTarget.__get_job_env(job),
+                        modules=job.spec.required_modules,
                     )
                     expect_ok(result.exited)
 
@@ -309,11 +343,11 @@ class RemoteTarget:
             Callback functions for job state changes
         """
         with self._connect() as connection:
-            expect_ok(connection.run(f"mkdir -p {job.remote_output}", warn=True).exited)
-        self._execute_batch_system(job, callbacks, RemoteTarget.__get_env(job))
+            expect_ok(self._run(connection, f"mkdir -p {job.remote_output}").exited)
+        self._execute(job, callbacks, RemoteTarget.__get_job_env(job))
 
     @abc.abstractmethod
-    def _execute_batch_system(
+    def _execute(
         self: Self,
         job: Job,
         callbacks: JobExecutionCallbacks,

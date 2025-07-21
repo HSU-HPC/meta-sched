@@ -194,7 +194,7 @@ class BatchSystemTarget(RemoteTarget):
         """
         raise NotImplementedError()
 
-    def _execute_batch_system(
+    def _execute(
         self: Self,
         job: Job,
         callbacks: RemoteTarget.JobExecutionCallbacks,
@@ -281,15 +281,15 @@ class BatchSystemTarget(RemoteTarget):
                         output_error_files, (sys.stdout, sys.stderr)
                     ):
                         expect_ok(
-                            connection.run(
+                            self._run(
+                                connection,
                                 f"cat {filename} && rm {filename}",
-                                warn=True,
                                 out_stream=stream,
                             ).exited
                         )
                 expect_ok(
-                    connection.run(
-                        f"rm -f {' '.join(output_error_files)}", warn=True
+                    self._run(
+                        connection, f"rm -f {' '.join(output_error_files)}"
                     ).exited
                 )
         sys.stdout.flush()

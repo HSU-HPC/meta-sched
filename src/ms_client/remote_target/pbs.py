@@ -2,44 +2,47 @@
 
 import sys
 import time
-from typing import Any, Dict, List, Optional, Self
+from typing import Any, Dict, List, Optional, Self, Tuple
 
 import pandas as pd
+from fabric import Connection  # type: ignore[attr-defined]
 from ms_common import utils
 from ms_common.schemas import TargetStatus
-from ms_common.utils import (eprint, expect_ok, exponential_backoff,
-                             seconds_to_time, time_to_seconds)
+from ms_common.utils import eprint, expect_ok, seconds_to_time, time_to_seconds
 
 from ms_client.job import Instance as Job
-from ms_client.remote_target import RemoteTarget
+from ms_client.remote_target.batch_system import BatchSystemTarget
 
 
-# TODO FIXME change parent class
-class PBSRemoteTarget(RemoteTarget):
+class PBSRemoteTarget(BatchSystemTarget):
     """RemoteTarget implementation for a PBS Pro/OpenPBS system."""
 
-    def _execute_batch_system(
+    def _submit_job(
         self: Self,
+        connection: Connection,
         job: Job,
-        callbacks: RemoteTarget.JobExecutionCallbacks,
-        env: Dict[str, Any] = {},
-    ) -> None:
+        oe: Tuple[str, str],
+        env: Dict[str, Any],
+    ) -> str:
         """
-        Execute the job on the target using PBS.
+        Submit a job for execution using the batch system.
 
         Parameters
         ----------
+        connection : Connection
+            The SSH connection to the remote target
         job : Job
-            The job to be executed on the target
+            The job to be executed
+        oe : Tuple[str, str]
+            The filename for the output and error files to be used by the job
         env : Dict[str, Any]
-            Optional environment variables to be injected on the target before executing the job
+            Environment variables to be set
+
+        Returns
+        -------
+        str
+            The local job ID
         """
-        eprint("--- a. Creating and watching output/error files ---")
-        # Do not NOT stream the output/error files
-        with self._connect() as connection:
-            with connection.cd(job.remote_output):
-                output_files = self._create_oe_files(connection, False)
-        eprint("--- b. Submitting job ---")
         argv = ["qsub"]
         if self._target.queue:
             argv += ["-q", self._target.queue]
@@ -51,8 +54,8 @@ class PBSRemoteTarget(RemoteTarget):
             f"select={job.spec.nodes}:ncpus={cores_per_node}:mpiprocs={job.spec.ranks_per_node}:ompthreads={job.spec.cores_per_rank}",
         ]
         argv += ["-l", f"walltime={seconds_to_time(job.spec.seconds, False)}"]
-        argv += ["-o", "output"]
-        argv += ["-e", "error"]
+        argv += ["-o", oe[0]]
+        argv += ["-e", oe[1]]
         argv += ["-koed"]  # Stream output files from execution host
         argv += ["-N", job.spec.name]
         # argv += ["-v", ",".join(f"{k}={v}" for k,v in env.items())]
@@ -64,124 +67,164 @@ class PBSRemoteTarget(RemoteTarget):
             "-c",
             f"'cd {job.remote_output} && {job.spec.cmd_main}'",
         ]
-        cmd = self._prefix_cmd(" ".join(argv), job.spec.required_modules)
-        with self._connect() as connection:
-            with connection.cd(job.remote_output):
-                result = connection.run(cmd, warn=True, env=env, out_stream=sys.stderr)
+        cmd = " ".join(argv)
+        result = self._run(
+            connection,
+            cmd,
+            warn=True,
+            env=env,
+            out_stream=sys.stderr,
+            modules=job.spec.required_modules,
+        )
         expect_ok(result.exited)
         pbs_job_id = result.stdout.strip()
+        return str(pbs_job_id)
 
-        backoff_count = 0
-        interrupted_error: Optional[InterruptedError] = None
+    def _has_job_started(self: Self, connection: Connection, local_job_id: str) -> bool:
+        """
+        Check if the job has started being executed by the batch system.
 
-        def sleep_or_cancel(seconds: float) -> None:
-            """
-            Sleep some time or, if receiving a SIGINT, cancel the PBS job.
+        Parameters
+        ----------
+        connection : Connection
+            The SSH connection to the remote target
+        local_job_id : str
+            The ID of the job that was submitted
 
-            Parameters
-            ----------
-            seconds : float
-                The time to sleep for in seconds
-            """
-            try:
-                time.sleep(seconds)
-            except InterruptedError as e:
-                nonlocal backoff_count, interrupted_error
-                if interrupted_error is not None:
-                    eprint("Job was already canceled. (Nothing to do.)")
-                    return
-                eprint(f"Canceling PBS job {pbs_job_id}.")
-                with self._connect() as connection:
-                    with connection.cd(job.remote_output):
-                        expect_ok(
-                            connection.run(
-                                self._prefix_cmd(f"qdel {pbs_job_id}"), warn=True
-                            ).exited
-                        )
-                backoff_count = 0
-                interrupted_error = e
+        Returns
+        -------
+        bool
+            True, if the job has started to be executed (may already have finished/failed)
+        """
+        result = self._run(connection, f"qstat {local_job_id}", hide=True)
+        # Job no longer in queue or has started
+        return (
+            len(result.stdout.strip()) == 0
+            or result.stdout.splitlines()[-1].strip().split()[-2] == "R"
+        )
 
-        eprint("--- c. Awaiting job start ---")
-        time.sleep(1)
-        while True:
-            with self._connect() as connection:
-                with connection.cd(job.remote_output):
-                    result = connection.run(
-                        self._prefix_cmd(f"qstat {pbs_job_id}"), warn=True, hide=True
-                    )
-            if (
-                len(result.stdout.strip()) == 0
-                or result.stdout.splitlines()[-1].strip().split()[-2] == "R"
-            ):
-                break  # Job no longer in queue or has started
-            sleep_or_cancel(exponential_backoff(backoff_count))
-            backoff_count += 1
-        # Report job start time
+    def _get_job_start_time(
+        self: Self, connection: Connection, local_job_id: str
+    ) -> Optional[int]:
+        """
+        Get the timestamp of when the job started executing.
+
+        Parameters
+        ----------
+        connection : Connection
+            The SSH connection to the remote target
+        local_job_id : str
+            The ID of the job that was submitted
+
+        Returns
+        -------
+        Optional[int]
+            The unix timestamp (seconds since epoch) of when the job has started or None if it could not be determined
+        """
         timestamp_start = None
         try:
-            cmd = self._prefix_cmd(
+            cmd = (
                 "qstat PBS_JOB_ID -xf | grep 'stime = ' | sed 's/.*stime = //' | xargs -I{} date -d \"{}\" +%s"
-            )
-            with self._connect() as connection:
-                with connection.cd(job.remote_output):
-                    timestamp_start = int(
-                        connection.run(
-                            cmd.replace("PBS_JOB_ID", pbs_job_id), warn=True, hide=True
-                        ).stdout
-                    )
+            ).replace("PBS_JOB_ID", local_job_id)
+            timestamp_start = int(self._run(connection, cmd, hide=True).stdout)
         except Exception:
             pass
-        finally:
-            callbacks.on_start(timestamp_start)
-        eprint("--- d. Awaiting job completion ---")
-        if interrupted_error is None:
-            backoff_count = 0
-            # Do not wait requested time in case job completes earlier
-            # sleep_or_cancel(job.spec.seconds)
-        exit_code = 0
-        while True:
-            with self._connect() as connection:
-                with connection.cd(job.remote_output):
-                    result = connection.run(
-                        self._prefix_cmd(f"qstat {pbs_job_id}"), warn=True, hide=True
-                    )
-            if len(result.stdout.strip()) == 0:
-                break  # Job no longer in queue
-            sleep_or_cancel(exponential_backoff(backoff_count))
-            backoff_count += 1
-        # Report job end time
-        with self._connect() as connection:
-            with connection.cd(job.remote_output):
-                walltime_fmtd = (
-                    connection.run(
-                        self._prefix_cmd(
-                            f"qstat {pbs_job_id} -xf | grep 'resources_used.walltime = '"
-                        ),
-                        warn=True,
-                        hide=True,
-                    )
-                    .stdout.split("=")[-1]
-                    .strip()
-                )
+        return timestamp_start
+
+    def _has_job_ended(self: Self, connection: Connection, local_job_id: str) -> bool:
+        """
+        Check if the job has stopped being executed by the batch system.
+
+        Parameters
+        ----------
+        connection : Connection
+            The SSH connection to the remote target
+        local_job_id : str
+            The ID of the job that was submitted
+
+        Returns
+        -------
+        bool
+            True, if the job has finished to be executed (may also have failed)
+        """
+        result = self._run(connection, f"qstat {local_job_id}", hide=True)
+        # Job no longer in queue
+        return len(result.stdout.strip()) == 0
+
+    def _get_job_end_time(
+        self: Self, connection: Connection, local_job_id: str
+    ) -> Optional[int]:
+        """
+        Get the timestamp of when the job stopped executing.
+
+        Parameters
+        ----------
+        connection : Connection
+            The SSH connection to the remote target
+        local_job_id : str
+            The ID of the job that was submitted
+
+        Returns
+        -------
+        Optional[int]
+            The unix timestamp (seconds since epoch) of when the job has stopped executing or None if it could not be determined
+        """
+        walltime_fmtd = (
+            self._run(
+                connection,
+                f"qstat {local_job_id} -xf | grep 'resources_used.walltime = '",
+                hide=True,
+            )
+            .stdout.split("=")[-1]
+            .strip()
+        )
         timestamp_end = None
         try:
+            timestamp_start = self._get_job_start_time(connection, local_job_id)
             assert timestamp_start is not None
             timestamp_end = timestamp_start + utils.time_to_seconds(walltime_fmtd)
         except Exception:
             pass
-        finally:
-            callbacks.on_end(timestamp_end)
-        eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
-        time.sleep(1)  # Wait a bit for the output/error to be received
-        exit_code = -1
-        qstat_cmd = f"qstat {pbs_job_id} -f -x"
-        with self._connect() as connection:
-            with connection.cd(job.remote_output):
-                result = connection.run(
-                    self._prefix_cmd(qstat_cmd),
-                    warn=True,
-                    hide=True,
-                )
+        return timestamp_end
+
+    def _cancel_job(self: Self, connection: Connection, local_job_id: str) -> None:
+        """
+        Cancel the job submitted to the batch system.
+
+        Parameters
+        ----------
+        connection : Connection
+            The SSH connection to the remote target
+        local_job_id : str
+            The ID of the job that was submitted
+        """
+        expect_ok(self._run(connection, f"qdel {local_job_id}").exited)
+
+    def _get_job_exit_code(
+        self: Self, connection: Connection, local_job_id: str
+    ) -> Optional[int]:
+        """
+        Check if the job has started being executed by the batch system.
+
+        Parameters
+        ----------
+        connection : Connection
+            The SSH connection to the remote target
+        local_job_id : str
+            The ID of the job that was submitted
+
+        Returns
+        -------
+        Optional[int]
+            The exit code of the job or None if it could not be determined
+        """
+        exit_code = None
+        cmd = f"qstat {local_job_id} -f -x"
+        result = self._run(
+            connection,
+            cmd,
+            hide=True,
+        )
         try:
             expect_ok(result.exited)
             has_exit_code = False
@@ -193,19 +236,8 @@ class PBSRemoteTarget(RemoteTarget):
                     break
             assert has_exit_code
         except Exception:
-            eprint(
-                f"Job completed, but could not determine exit code using {qstat_cmd}:"
-            )
-        sys.stdout.flush()
-        sys.stderr.flush()
-        with self._connect() as connection:
-            with connection.cd(job.remote_output):
-                expect_ok(
-                    connection.run(f"rm -f {' '.join(output_files)}", warn=True).exited
-                )
-        if interrupted_error is not None:
-            raise interrupted_error
-        expect_ok(exit_code)
+            eprint(f"Job completed, but could not determine exit code using {cmd}:")
+        return exit_code
 
     def get_status(self: Self) -> TargetStatus:
         """
@@ -218,14 +250,12 @@ class PBSRemoteTarget(RemoteTarget):
         """
         with self._connect() as connection:
             # Get the job states
-            cmd_template = self._prefix_cmd(
-                # Third column indicates the queue
-                "qstat -a | awk '$3 == \"QUEUE\" { print $1 }'"
-            )
             assert self._target.queue
-            output = connection.run(
-                cmd_template.replace("QUEUE", self._target.queue), warn=True, hide=True
-            ).stdout.strip()
+            # Third column indicates the queue
+            cmd = "qstat -a | awk '$3 == \"QUEUE\" { print $1 }'".replace(
+                "QUEUE", self._target.queue
+            )
+            output = self._run(connection, cmd, hide=True).stdout.strip()
             qstat_job_fields = dict(
                 nodes="Resource_List.nodect",
                 time_limit="Resource_List.walltime",
@@ -235,8 +265,8 @@ class PBSRemoteTarget(RemoteTarget):
             data: Dict[str, List[str]] = {k: [] for k in qstat_job_fields}
             qstat_job_fields = {v: k for k, v in qstat_job_fields.items()}
             job_ids = [s.strip() for s in output.splitlines()]
-            cmd = self._prefix_cmd(f"qstat -f {' '.join(job_ids)}")
-            output = connection.run(cmd, warn=True, hide=True).stdout.strip()
+            cmd = f"qstat -f {' '.join(job_ids)}"
+            output = self._run(connection, cmd, hide=True).stdout.strip()
             for line in output.splitlines() + [None]:  # Handle end of output
                 if (line is None or line.startswith("Job Id:")) and len(
                     data["nodes"]
@@ -246,6 +276,7 @@ class PBSRemoteTarget(RemoteTarget):
                     )  # Job has not started and has no "resources_used.walltime"
                     continue
                 try:
+                    assert line is not None
                     k, v = line.strip().split(" = ")
                     k = qstat_job_fields[k]
                     data[k].append(v)
@@ -269,12 +300,10 @@ class PBSRemoteTarget(RemoteTarget):
                 ["nodes", "time_limit", "is_using_nodes", "time_remaining"]
             ].to_dict("records")  # pyright: ignore[reportCallIssue]
             # Get the node states
-            output = connection.run(
-                self._prefix_cmd("pbsnodes -a"), warn=True, hide=True
-            ).stdout.strip()
+            output = self._run(connection, "pbsnodes -a", hide=True).stdout.strip()
             nodes_state = []
             is_node_in_queue = False
-            state = "state-unknown"
+            state = ["state-unknown"]
             for line in output.splitlines():
                 line = line.strip()
                 if line.startswith("resources_available.Qlist = "):
@@ -284,10 +313,11 @@ class PBSRemoteTarget(RemoteTarget):
                 elif line.startswith("state ="):
                     state = line.split(" = ")[-1].split(",")
                 if len(line.strip()) == 0:
+                    # Complete parsing node and reset state
                     if is_node_in_queue:
                         nodes_state.append(state)
                     is_node_in_queue = False
-                    state = "state-unknown"
+                    state = ["state-unknown"]
             node_states = dict(
                 nodes_in_use=0,
                 nodes_unavailable=0,

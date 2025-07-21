@@ -58,8 +58,14 @@ class SlurmRemoteTarget(BatchSystemTarget):
         argv.append(f"--error={oe[1]}")
         argv.append(f"--wrap='{job.spec.cmd_main}'")
         argv.append(f"--job-name={job.spec.name}")
-        cmd = self._prefix_cmd(" ".join(argv), job.spec.required_modules)
-        result = connection.run(cmd, warn=True, env=env, out_stream=sys.stderr)
+        cmd = " ".join(argv)
+        result = self._run(
+            connection,
+            cmd,
+            env=env,
+            out_stream=sys.stderr,
+            modules=job.spec.required_modules,
+        )
         expect_ok(result.exited)
         slurm_job_id = result.stdout.strip().split()[-1]
         return str(slurm_job_id)
@@ -80,8 +86,8 @@ class SlurmRemoteTarget(BatchSystemTarget):
         bool
             True, if the job has started to be executed (may already have finished/failed)
         """
-        cmd = self._prefix_cmd(f"squeue -j {local_job_id} --format %T --noheader")
-        output = connection.run(cmd, warn=True, hide=True).stdout.strip()
+        cmd = f"squeue -j {local_job_id} --format %T --noheader"
+        output = self._run(connection, cmd, hide=True).stdout.strip()
         # Job no longer in queue or has started
         return len(output) == 0 or output == "RUNNING"
 
@@ -109,9 +115,9 @@ class SlurmRemoteTarget(BatchSystemTarget):
         timestamp_start = None
         try:
             timestamp_start = int(
-                connection.run(
-                    self._prefix_cmd(cmd),
-                    warn=True,
+                self._run(
+                    connection,
+                    cmd,
                     hide=True,
                 ).stdout.strip()
             )
@@ -135,8 +141,8 @@ class SlurmRemoteTarget(BatchSystemTarget):
         bool
             True, if the job has finished to be executed (may also have failed)
         """
-        cmd = self._prefix_cmd(f"squeue -j {local_job_id} --format %T --noheader")
-        output = connection.run(cmd, warn=True, hide=True).stdout.strip()
+        cmd = f"squeue -j {local_job_id} --format %T --noheader"
+        output = self._run(connection, cmd, hide=True).stdout.strip()
         # Job no longer in queue
         return len(output) == 0
 
@@ -164,9 +170,9 @@ class SlurmRemoteTarget(BatchSystemTarget):
         timestamp_end = None
         try:
             timestamp_end = int(
-                connection.run(
+                self._run(
+                    connection,
                     cmd,
-                    warn=True,
                     hide=True,
                 ).stdout.strip()
             )
@@ -185,11 +191,7 @@ class SlurmRemoteTarget(BatchSystemTarget):
         local_job_id : str
             The ID of the job that was submitted
         """
-        expect_ok(
-            connection.run(
-                self._prefix_cmd(f"scancel {local_job_id}"), warn=True
-            ).exited
-        )
+        expect_ok(self._run(connection, f"scancel {local_job_id}").exited)
 
     def _get_job_exit_code(
         self: Self, connection: Connection, local_job_id: str
@@ -211,9 +213,9 @@ class SlurmRemoteTarget(BatchSystemTarget):
         """
         exit_code = None
         cmd = f'sacct -j {local_job_id} --format "State,ExitCode" --noheader'
-        result = connection.run(
-            self._prefix_cmd(cmd),
-            warn=True,
+        result = self._run(
+            connection,
+            cmd,
             hide=True,
         )
         try:
@@ -236,10 +238,8 @@ class SlurmRemoteTarget(BatchSystemTarget):
         with self._connect() as connection:
             # Get the job states
             squeue_format = "%D,%l,%T,%M"  # nodes, time limit, state, time
-            cmd = self._prefix_cmd(
-                f"squeue --partition {self._target.queue} --format '{squeue_format}'"
-            )
-            output = connection.run(cmd, warn=True, hide=True).stdout.strip()
+            cmd = f"squeue --partition {self._target.queue} --format '{squeue_format}'"
+            output = self._run(connection, cmd, hide=True).stdout.strip()
             df = pd.read_csv(io.StringIO(output.lower()))
             df["time_limit"] = df["time_limit"].apply(lambda s: time_to_seconds(s))
             df["time"] = df["time"].apply(lambda s: time_to_seconds(s))
@@ -259,11 +259,9 @@ class SlurmRemoteTarget(BatchSystemTarget):
                 ["nodes", "time_limit", "is_using_nodes", "time_remaining"]
             ].to_dict("records")  # pyright: ignore[reportCallIssue]
             # Get the node states
-            cmd = self._prefix_cmd(
-                f"sinfo --partition {self._target.queue} -N --format '%t' --noheader"
-            )
+            cmd = f"sinfo --partition {self._target.queue} -N --format '%t' --noheader"
             nodes_state = (
-                connection.run(cmd, warn=True, hide=True).stdout.strip().splitlines()
+                self._run(connection, cmd, hide=True).stdout.strip().splitlines()
             )
             node_states = dict(
                 nodes_in_use=0,
