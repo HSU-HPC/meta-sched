@@ -151,8 +151,14 @@ class Executor:
             targets = scheduler.targets
         except Exception:
             raise StatusException(os.EX_UNAVAILABLE)
+        additional_configs_dict = {t.id: t for t in targets_additional_configs}
         for t in targets:
-            is_suitable, reason = Executor.is_target_suitable(t, job_spec)
+            additional_configs = None
+            if t.id in additional_configs_dict:
+                additional_configs = additional_configs_dict[t.id]
+            is_suitable, reason = Executor.is_target_suitable(
+                t, job_spec, additional_configs
+            )
             # Uncomment for debugging:
             # eprint(f'Job may run on {t.id}: {"Yes" if is_suitable else "No"} ({reason})')
             if is_suitable:
