@@ -68,4 +68,5 @@ echo "--- Done ---"
 echo "--- Build distributable module ---"
 cd "$BASE_DIR/packages/$PACKAGE"
 uv build --wheel --quiet
-unzip -l "$BASE_DIR/packages/$PACKAGE/dist/*.whl"
+echo "Contents of $BASE_DIR/packages/$PACKAGE/dist/*.whl:"
+python3 -m zipfile -l "$(ls "$BASE_DIR"/packages/"$PACKAGE"/dist/*.whl)" | awk '{ print $1 }'
