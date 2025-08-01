@@ -7,6 +7,7 @@ import os
 import secrets
 import string
 import sys
+import time
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any, AsyncGenerator
@@ -39,10 +40,17 @@ async def scheduling_loop(
     """
     try:
         for i in itertools.count():
-            # TODO update jobs which have started and who must have finished, but have not been updated accordingly
             loop_start = asyncio.get_event_loop().time()
             pending_jobs = await model.get_pending_jobs()
             decided_jobs = await model.get_decided_jobs()
+            # Filter out jobs which SHOULD already have completed (not yet reported), since they are irrelevant for scheduling new jobs
+            decided_jobs = [
+                job
+                for job in decided_jobs
+                if job.timestamp_start is None
+                or job.timestamp_start + job.spec.seconds + scheduling_loop_interval
+                > int(time.time())
+            ]
             targets_status = await model.get_targets_status()
             # For debugging
             # print(f"Scheduling loop #{i} ({len(pending_jobs)} pending, {len(decided_jobs)} decided)")
