@@ -76,7 +76,9 @@ def main() -> int:
     """
     try_become_root(False)
 
-    arg_parser = argparse.ArgumentParser(description="Meta Scheduler server application for scheduling jobs across multiple remote targets.")
+    arg_parser = argparse.ArgumentParser(
+        description="Meta Scheduler server application for scheduling jobs across multiple remote targets."
+    )
     arg_parser.add_argument(
         "-c",
         "--config",

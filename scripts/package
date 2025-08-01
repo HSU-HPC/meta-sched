@@ -9,7 +9,7 @@ if [[ "$COMPONENT" == "all" ]]; then
         echo "=== Building ms_$COMPONENT package ==="
         $0 $COMPONENT
     done
-    echo "=== Done ==="
+    echo "=== All done ==="
     exit 0
 elif [[ "$COMPONENT" != "client" && "$COMPONENT" != "server" ]]; then
     echo "Usage: $0 <all|client|server>"
@@ -39,13 +39,15 @@ cd "$BASE_DIR/packages/$PACKAGE"
 uv add mypy pyright --dev # Make sure type checkers are installed as development dependencies
 # shellcheck source=/dev/null
 source .venv/bin/activate
+# Workaround for virtual environment not activating correctly in some cases
+PYTHON=$(pwd)/.venv/bin/python
 cd "$BASE_DIR/src"
-echo -n "mypy " && python3 -m mypy --package $PACKAGE --package ms_common \
+echo -n "mypy " && $PYTHON -m mypy --package $PACKAGE --package ms_common \
     --strict \
     --follow-untyped-imports \
     --platform linux \
     --python-version 3.12
-echo -n "pyright " && PYRIGHT_PYTHON_FORCE_VERSION=latest python3 -m pyright --project $PACKAGE
+echo -n "pyright " && PYRIGHT_PYTHON_FORCE_VERSION=latest $PYTHON -m pyright --project $PACKAGE
 
 check-coverage-and-annotations() {
     echo "... Check docstring coverage ..."
@@ -63,10 +65,11 @@ check-coverage-and-annotations || :
 echo "--- Analyze ms_common package ---"
 cd "$BASE_DIR/src/ms_common"
 check-coverage-and-annotations || :
-echo "--- Done ---"
+echo "--- Done analyzing $PACKAGE package ---"
 
 echo "--- Build distributable module ---"
 cd "$BASE_DIR/packages/$PACKAGE"
 uv build --wheel --quiet
 echo "Contents of $BASE_DIR/packages/$PACKAGE/dist/*.whl:"
 python3 -m zipfile -l "$(ls "$BASE_DIR"/packages/"$PACKAGE"/dist/*.whl)" | awk '{ print $1 }'
+echo "--- Done ---"
