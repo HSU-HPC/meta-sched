@@ -44,7 +44,7 @@ class Config(BaseModel):
     host: str
     port: int
 
-    targets: List[TargetAdditionalConfigs]
+    targets: List[TargetAdditionalConfigs] = []
 
     @model_validator(mode="after")
     def validate_attributes(cls, config: Any) -> Any:
