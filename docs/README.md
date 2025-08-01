@@ -67,6 +67,8 @@ tags           = ["x86"]
 # Specify concrete environment modules available
 [targets.module_map]
 MPI            = "intel-oneapi-mpi"
+# Optionally source system wide scripts
+# source_scripts = ["/etc/profile"]
 
 # Additional targets below
 [[targets]]

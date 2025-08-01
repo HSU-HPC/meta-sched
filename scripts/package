@@ -40,12 +40,12 @@ uv add mypy pyright --dev # Make sure type checkers are installed as development
 # shellcheck source=/dev/null
 source .venv/bin/activate
 cd "$BASE_DIR/src"
-echo -n "mypy " && python -m mypy --package $PACKAGE --package ms_common \
+echo -n "mypy " && python3 -m mypy --package $PACKAGE --package ms_common \
     --strict \
     --follow-untyped-imports \
     --platform linux \
     --python-version 3.12
-echo -n "pyright " && PYRIGHT_PYTHON_FORCE_VERSION=latest python -m pyright --project $PACKAGE
+echo -n "pyright " && PYRIGHT_PYTHON_FORCE_VERSION=latest python3 -m pyright --project $PACKAGE
 
 check-coverage-and-annotations() {
     echo "... Check docstring coverage ..."
