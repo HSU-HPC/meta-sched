@@ -225,7 +225,10 @@ class DataBase(Model):
         """
         async with self.__make_async_session() as session:
             result = await session.execute(
-                select(Job).where(Job.scheduling_decision.is_not(None))
+                select(Job).where(
+                    Job.scheduling_decision.is_not(None)  # Was already scheduled
+                    & Job.timestamp_end.is_not(None)  # ...and must still complete
+                )
             )
             return [JobSchema.model_validate(s) for s in result.scalars().all()]
 

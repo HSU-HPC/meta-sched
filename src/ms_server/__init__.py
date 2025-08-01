@@ -1,5 +1,6 @@
 """Module containing the Meta Scheduler HTTP API."""
 
+import argparse
 import asyncio
 import itertools
 import os
@@ -7,6 +8,7 @@ import secrets
 import string
 import sys
 from contextlib import asynccontextmanager
+from pathlib import Path
 from typing import Any, AsyncGenerator
 
 from ms_common.schemas import JobKey, SchedulingDecisionType
@@ -65,18 +67,34 @@ def main() -> int:
         The exit code (Always 0, but server runs forever and does not return)
     """
     try_become_root(False)
-    config_path = Config.get_config_path()
+
+    arg_parser = argparse.ArgumentParser()
+    arg_parser.add_argument(
+        "-c",
+        "--config",
+        type=Path,
+        default=Config.get_default_config_path(),
+        help="Path to the configuration file",
+    )
+    arg_parser.add_argument(
+        "--use-example-config",
+        action="store_true",
+        help="Use the example configuration file",
+    )
+    args, _ = arg_parser.parse_known_args()
+
+    config_path = args.config
     if not config_path.is_file():
-        if "--use-default-config" not in sys.argv:
-            eprint(f"No scheduler configuration was found at {config_path}.")
+        if not args.use_example_config:
+            eprint(f"No configuration file was found at {config_path}.")
             eprint(
-                "Using the following default configuration, requires the flag --use-default-config:"
+                "Using the following example configuration, requires the flag --use-example-config:"
             )
             eprint()
             config_str = config_path.read_text()
             eprint(config_str)
             return os.EX_NOINPUT
-        config_path = Config.get_default_config_path()
+        config_path = Config.get_example_config_path()
     try:
         config = Config.load(config_path)
     except ValidationError as e:

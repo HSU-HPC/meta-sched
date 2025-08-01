@@ -42,9 +42,9 @@ class Config(BaseModel):
     targets: List[Target]
 
     @classmethod
-    def get_config_path(cls) -> Path:
+    def get_default_config_path(cls) -> Path:
         """
-        Get the path to the config file.
+        Get the default path to the config file.
 
         Returns
         -------
@@ -54,9 +54,9 @@ class Config(BaseModel):
         return Path("/") / "etc" / "meta-sched.toml"
 
     @classmethod
-    def get_default_config_path(cls) -> Path:
+    def get_example_config_path(cls) -> Path:
         """
-        Get the path to the default config file.
+        Get the path to the example config file.
 
         Returns
         -------

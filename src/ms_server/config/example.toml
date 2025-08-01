@@ -30,7 +30,7 @@ nodes = 3
 cores_per_node = 48
 max_time = "7-00:00:00"
 source_scripts = ["/etc/profile"]
-tags = ["x86", "test"]
+tags = ["x86"]
 [targets.module_map]
 MPI = "mpi"
 

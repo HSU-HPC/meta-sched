@@ -111,14 +111,14 @@ class CLI:
             return os.EX_CANTCREAT
         return os.EX_OK
 
-    def submit(self: Self, job_spec: str) -> int:
+    def validate(self: Self, job_spec: str) -> int:
         """
-        Submit a job array for an existing job spec
+        Validate a job spec
 
         Parameters
         ----------
         job_spec : str
-            The name of the job spec (folder name) to use
+            The name of the job spec (folder name) to validate
 
         Returns
         -------
@@ -140,7 +140,26 @@ class CLI:
             eprint("Could not load job spec:", job_spec)
             print(e)
             return os.EX_NOINPUT
+        return os.EX_OK
+
+    def submit(self: Self, job_spec: str) -> int:
+        """
+        Submit a job array for an existing job spec
+
+        Parameters
+        ----------
+        job_spec : str
+            The name of the job spec (folder name) to use
+
+        Returns
+        -------
+        int
+            The exit status of the operation
+        """
+        status = self.validate(job_spec)
         self.require_can_use_client()
+        if status != os.EX_OK:
+            return status
         try:
             response = launch_job_array(job_spec)
             print(response)
@@ -312,6 +331,7 @@ class CLI:
         command_functions = [
             self.create,
             self.submit,
+            self.validate,
             self.status,
             self.cancel,
             self.ssh_config,

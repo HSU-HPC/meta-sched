@@ -30,8 +30,9 @@ The core concepts of the Meta Scheduler are illustrated in the diagrams below:
 
 ## Administrators
 
-After [installing the server package](#installation), execute it using `MS_API_KEY=someSecret msserver`.  
+After [installing the server package](#installation), execute it using `MS_API_KEY=someSecret msserver`. 
 A [default configuration file](../src/server/server/config/default.toml) is displayed, if no configuration is found at `/etc/meta-sched.toml`.
+(Alternatively a different path can be used with `--config <path/to/config.toml>`.)
 If the application is running under a non-root user and requires `sudo`, add the flag `--sudo`.
 
 To persistently execute the server in the background after the system has booted, create a new [systemd unit](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html) or use a terminal multiplexer like [tmux](https://github.com/tmux/tmux/wiki) to manually run it in the background.
@@ -39,8 +40,51 @@ To persistently execute the server in the background after the system has booted
 The state of the Meta Scheduler can be updated with the state of the targets using `MS_API_KEY=someSecret msprobe -t [<target ID>,...] [-i <interval>]` from the client package.
 This state can be used by the scheduling policy to optimize job distribution across targets.
 
-- `TODO customizing the configuration`
-- `TODO implementing scheduling algorithms`
+The structure of the configuration file is explained by example below:
+
+```toml
+host = "localhost"
+port = 8001
+# Use ephemeral in-memory database or flat file (e.g. "sqlite:///var/opt/meta-sched.db")
+db_url = "sqlite://" 
+
+# Scheduling policy
+scheduler_class_name = "stochastic.py:WeightedByCores"
+# Time between invoking the scheduling policy
+scheduling_loop_interval = 10
+
+# List of targets available for scheduling
+[[targets]]
+id             = "hsuper-small"
+host           = "hsuper-login01.hsu-hh.de"
+batch_system   = "slurm" # Alternative: pbs, none
+queue          = "small" # (The Slurm partition)
+nodes          = 571
+cores_per_node = 72
+max_time       = "72:00:00" # Formated as d-hh:MM:ss
+max_nodes      = 5
+tags           = ["x86"]
+# Specify concrete environment modules available
+[targets.module_map]
+MPI            = "intel-oneapi-mpi"
+
+# Additional targets below
+[[targets]]
+id             = "windhpc-hlrs"
+# ...
+```
+
+Scheduling decisions are made independently for each job of an array in two steps:
+
+1. **Filter** suitable target subset (client side).
+2. **Select** execution target (server side).  
+This is done by the scheduling policy which may be either stateful or stateless (stochastic).  
+
+The scheduling policy implements [`Policy`](/src/ms_server/scheduling/__init__.py) and is specified using the Python module file (relative to [`/src/ms_server/scheduling/`](/src/ms_server/scheduling/) or as an absolute path) and class name in the configuration:
+
+```toml
+scheduler_class_name = "stochastic.py:WeightedByCores"
+```
 
 ### Required Software on the Targets
 
@@ -75,18 +119,18 @@ For each `job spec` this directory contains a `<job spec>/input/` folder where j
 
 ### Configuration
 
-Upon running the command for the first time, the default config file at `$HOME/.config/meta-sched.toml` is created.
-
-First, run `mscli ssh-config` to create/update `~/.ssh/config.d/meta-sched` with the targets of the Meta Scheduler server.  
-Then, edit this SSH configuration file (e.g. using `vim` or `nano`), providing credentials to the target systems which should be used to execute jobs. (Test this by manually connecting to target using the SSH configuration entry name.)
-
+Upon running the command for the first time, the default configuration file at `$HOME/.config/meta-sched.toml` is created.  
+This file contains the endpoint of the Meta Scheduler server component used by the client.
 For additional filtering of targets used for scheduling of a particular job, custom tags can be added to the user configuration:
 
 ```toml
 [[targets]]
-id = "windhpc-hsu"
+id   = "windhpc-hlrs"
 tags = ["test"]
 ```
+
+First, run `mscli ssh-config` to create/update `~/.ssh/config.d/meta-sched` with the targets of the Meta Scheduler server.  
+Then, edit this SSH configuration file (e.g. using `vim` or `nano`), providing credentials to the target systems which should be used to execute jobs. (Test this by manually connecting to target using the SSH configuration entry name.)
 
 ### Job Control
 
@@ -102,5 +146,30 @@ tags = ["test"]
 
 ### Job Specifications
 
-* TODO
+The job spec in `$HOME/meta-sched/jobs/<job spec>/spec.toml` defines the requirements of a job array, the number of jobs, the input files, and the command to be executed.  
+An example is given below:
 
+```toml
+# Compile source code copied from $HOME/meta-sched/jobs/<job spec>/input/
+# The current working directory is the job output folder ($MS_OUTPUT).
+# (Here the binary will be included in the results downloaded from the target unless deleted.)
+# Note: The setup step is only executed after the job has been scheduled on a target.
+cmd_setup        = "mpicxx $MS_INPUT/example.cpp -o example"
+# Run the example three times on two nodes through the batch system
+# (Each job in the array may run on a different target.)
+cmd_main         = "mpiexec ./example --seed $MS_ARRAY_IDX"
+array_size       = 3
+nodes            = 2
+ranks_per_node   = 1
+# Optionally, supply number of cores (OpenMP) or node exclusivity
+# cores_per_rank   = 12
+# exclusive        = False
+# Only use targets providing an MPI implementation module like OpenMPI or MPICH (will be loaded)
+required_modules = ["MPI"]
+# Provide required wall time in the format d-hh:MM:ss or as "seconds = <seconds>"
+time             = "0-00:05:00" 
+# Only consider a subset of targets (e.g. using renewable energy)
+required_tags    = ["green"]
+```
+
+The job spec can be validated with `mscli validate <job spec>`.

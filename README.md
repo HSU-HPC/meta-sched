@@ -14,7 +14,7 @@ Besides Linux and any Python3 version (for bootstrapping) the only[^1] other req
 Please refer to the [administrator](./docs/README.md#administrators) and [user](./docs/README.md#users) documentation.
 
 ## To-Dos
+
 - [ ] (Green) scheduling algorithms
 - [ ] Energy reporting plugin
-- [ ] [Documentation](./docs/README.md)
 - [ ] Client side re-scheduling
