@@ -32,7 +32,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["../../src"]
-include = ["ms_server", "ms_server.config", "ms_server.scheduler", "ms_common"]
+include = ["ms_server", "ms_server.config", "ms_server.scheduling", "ms_common"]
 
 [tool.setuptools.package-data]
 "server" = ["config/example.toml"]
