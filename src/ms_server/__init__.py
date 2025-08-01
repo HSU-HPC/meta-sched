@@ -95,6 +95,7 @@ def main() -> int:
 
     config_path = args.config
     if not config_path.is_file():
+        config_path = Config.get_example_config_path()
         if not args.use_example_config:
             eprint(f"No configuration file was found at {config_path}.")
             eprint(
@@ -104,7 +105,6 @@ def main() -> int:
             config_str = config_path.read_text()
             eprint(config_str)
             return os.EX_NOINPUT
-        config_path = Config.get_example_config_path()
     try:
         config = Config.load(config_path)
     except ValidationError as e:

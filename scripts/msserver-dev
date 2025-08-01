@@ -6,4 +6,5 @@ SCRIPT_PATH="$(readlink -f "$0")"
 cd "$(dirname "$(dirname "$SCRIPT_PATH")")"
 
 cd packages/ms_server
+uv sync --quiet # Ensure .venv is set up
 uv run msserver --use-example-config "$@"

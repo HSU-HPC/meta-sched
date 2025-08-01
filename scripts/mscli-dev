@@ -5,7 +5,6 @@ set -e
 SCRIPT_PATH="$(readlink -f "$0")"
 cd "$(dirname "$(dirname "$SCRIPT_PATH")")"
 
-(cd packages/ms_client && uv sync --quiet) # Ensure .venv is set up
-# shellcheck source=/dev/null
-source packages/ms_client/.venv/bin/activate
+cd packages/ms_client
+uv sync --quiet # Ensure .venv is set up
 uv run mscli "$@"
