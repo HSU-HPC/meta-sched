@@ -94,10 +94,13 @@ def main() -> int:
     args, _ = arg_parser.parse_known_args()
 
     config_path = args.config
+    if not str(config_path).startswith("/"):
+        eprint("Argument value for -c or --config must be an ABSOLUTE path.")
+        sys.exit(os.EX_CONFIG)
     if not config_path.is_file():
+        eprint(f"No configuration file was found at {config_path}.")
         config_path = Config.get_example_config_path()
         if not args.use_example_config:
-            eprint(f"No configuration file was found at {config_path}.")
             eprint(
                 "Using the following example configuration, requires the flag --use-example-config:"
             )
@@ -105,6 +108,8 @@ def main() -> int:
             config_str = config_path.read_text()
             eprint(config_str)
             return os.EX_NOINPUT
+        else:
+            eprint(f"(Falling back on {config_path}.)")
     try:
         config = Config.load(config_path)
     except ValidationError as e:
