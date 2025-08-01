@@ -45,7 +45,7 @@ The structure of the configuration file is explained by example below:
 ```toml
 host = "localhost"
 port = 8001
-# Use ephemeral in-memory database or flat file (e.g. "sqlite:///var/opt/meta-sched.db")
+# Use ephemeral in-memory database or flat file (e.g. "sqlite:////var/opt/meta-sched.db")
 db_url = "sqlite://" 
 
 # Scheduling policy

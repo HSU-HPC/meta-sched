@@ -1,6 +1,6 @@
 host = "localhost"
 port = 8001
-db_url = "sqlite://" # Use an ephemeral in-memory database
+db_url = "sqlite:///:memory:" # Use an ephemeral in-memory database
 
 scheduler_class_name = "stochastic.py:WeightedByCores"
 scheduling_loop_interval = 10
