@@ -4,7 +4,7 @@ import tomllib
 from pathlib import Path
 from typing import Any, List, Self, Tuple
 
-from pydantic import BaseModel, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 import ms_client.data as data
 
@@ -44,7 +44,7 @@ class Config(BaseModel):
     host: str
     port: int
 
-    targets: List[TargetAdditionalConfigs] = []
+    targets: List[TargetAdditionalConfigs] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_attributes(cls, config: Any) -> Any:
