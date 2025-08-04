@@ -261,7 +261,8 @@ class BatchSystemTarget(RemoteTarget):
                     break
             sleep_or_cancel(backoff())
             backoff += 1
-        callbacks.on_start(self._get_job_start_time(connection, local_job_id))
+        with self._connect() as connection:
+            callbacks.on_start(self._get_job_start_time(connection, local_job_id))
         eprint("--- d. Awaiting job completion ---")
         # Do not wait requested time in case job completes earlier
         # sleep_or_cancel(job.spec.seconds)
@@ -272,10 +273,12 @@ class BatchSystemTarget(RemoteTarget):
                     break
             sleep_or_cancel(backoff())
             backoff += 1
-        callbacks.on_end(self._get_job_end_time(connection, local_job_id))
+        with self._connect() as connection:
+            callbacks.on_end(self._get_job_end_time(connection, local_job_id))
         eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
         time.sleep(1)  # Wait a bit for the output/error to be received when streaming
-        exit_code = self._get_job_exit_code(connection, local_job_id)
+        with self._connect() as connection:
+            exit_code = self._get_job_exit_code(connection, local_job_id)
         if exit_code is None:
             exit_code = -1
         with self._connect() as connection:
