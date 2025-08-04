@@ -1,11 +1,29 @@
 """Module containing general purpose utility classes and functions for the submit component."""
 
 import fcntl
+import os
 import sys
 from io import TextIOWrapper
 from os import PathLike
 from pathlib import Path
 from typing import Any, Optional, Self
+
+
+class SuppressStderr:
+    """
+    Context manager to suppresses all output to stderr.
+    NOTE: This is NOT thread safe.
+    """
+
+    def __enter__(self: Self) -> Self:
+        self._stderr = sys.stderr
+        self._devnull = open(os.devnull, "w")
+        sys.stderr = self._devnull
+        return self
+
+    def __exit__(self: Self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
+        sys.stderr = self._stderr
+        self._devnull.close()
 
 
 class RedirectOutputToFile:

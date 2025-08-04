@@ -16,11 +16,12 @@ from fabric.config import Config
 from invoke.runners import Result
 from ms_common.schemas import Target, TargetStatus
 from ms_common.utils import (DEFAULT_SSH_PORT, EX_BASH_COMMAND_NOT_FOUND,
-                             eprint, expect_ok)
+                             eprint, expect_ok, exponential_backoff)
 from paramiko.ssh_exception import SSHException
 
 from ms_client import ssh
 from ms_client.job import Instance as Job
+from ms_client.utils import SuppressStderr
 
 
 class RemoteTarget:
@@ -50,9 +51,7 @@ class RemoteTarget:
             )
         self._target = target
 
-    def _connect(
-        self: Self, retry: int = 5, delay: float = 10, timeout: float = 30
-    ) -> Connection:
+    def _connect(self: Self, retry: int = 5, timeout: float = 30) -> Connection:
         """
         Connect to the target over SSH.
 
@@ -60,9 +59,6 @@ class RemoteTarget:
         ----------
         retry : int
             The maximum number of connection attempts
-
-        delay : float
-            The time between successive connection attempts (to increase chance of success)
 
         timeout : float
             The connection timeout in seconds
@@ -110,12 +106,15 @@ class RemoteTarget:
                     connect_kwargs=connect_kwargs,
                     connect_timeout=timeout,
                 )
-                #  Explicitly open the connection (eager instead of lazy)
-                connection.open()  # type: ignore[no-untyped-call]
+                with SuppressStderr(): # Paramiko dumps entire stack trace on stderr
+                    #  Explicitly open the connection (eager instead of lazy)
+                    connection.open()  # type: ignore[no-untyped-call]
                 return connection  # Do not try to reconnect again
             except (SSHException, socket.error, EOFError, ConnectionResetError) as e:
-                eprint(f"Connection failed on attempt #{attempt}.")
+                eprint(f"Connection failed on attempt #{attempt}:")
+                eprint(e)
                 if attempt < retry:
+                    delay = exponential_backoff(attempt)
                     eprint(f"(Will try again in {delay} seconds.)")
                     time.sleep(delay)
                 else:
