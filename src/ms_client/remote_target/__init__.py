@@ -48,7 +48,7 @@ class RemoteTarget:
             )
         self._target = target
 
-    def _connect(self: Self, timeout: float = 5) -> Connection:
+    def _connect(self: Self, timeout: float = 10) -> Connection:
         """
         Connect to the target over SSH.
 
@@ -67,7 +67,9 @@ class RemoteTarget:
         RuntimeError
             The port must match the port in the corresponding SSH configuration entry
         """
-        connect_kwargs = dict(allow_agent=False, look_for_keys=False)
+        connect_kwargs = dict(
+            allow_agent=False, look_for_keys=False, banner_timeout=timeout
+        )
         ssh_config = ssh.get_config()
         target_ssh_config = ssh_config.lookup(self._target.id)
         host = (
