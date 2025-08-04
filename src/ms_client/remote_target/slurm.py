@@ -8,10 +8,11 @@ from typing import Any, Dict, Optional, Self, Tuple
 import pandas as pd
 from fabric import Connection  # type: ignore[attr-defined]
 from ms_common.schemas import TargetStatus
-from ms_common.utils import eprint, expect_ok, seconds_to_time, time_to_seconds
+from ms_common.utils import eprint, seconds_to_time, time_to_seconds
 
 from ms_client.job import Instance as Job
 from ms_client.remote_target.batch_system import BatchSystemTarget
+from ms_client.utils import expect_ok
 
 
 class SlurmRemoteTarget(BatchSystemTarget):

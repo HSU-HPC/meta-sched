@@ -2,10 +2,9 @@
 
 from typing import Any, Dict, Self
 
-from ms_common.utils import expect_ok
-
 from ms_client.job import Instance as Job
 from ms_client.remote_target import RemoteTarget
+from ms_client.utils import expect_ok
 
 
 class DirectExecutionRemoteTarget(RemoteTarget):

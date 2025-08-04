@@ -111,3 +111,99 @@ class LockFile:
             fcntl.flock(self.__file.fileno(), fcntl.LOCK_UN)
             self.__file.close()
             self.__file = None
+
+
+class ExponentialBackoff:
+    """(Clamped) exponential backoff function."""
+
+    def __init__(
+        self: Self, offset: float = 0, maximum: Optional[float] = 60, base: float = 2
+    ) -> None:
+        """
+        Create a new instance of the exponential backoff function.
+
+        Parameters
+        ----------
+        offset : float
+            The starting value of the function added as a constant offset
+        maximum : Optional[float]
+            The maximum value of the backoff function (60 by default) or None if it is unclamped
+        base : float
+            The base of the exponential function (2 by default)
+        """
+        self.count = 0
+        self.offset = offset
+        self.maximum = maximum
+        self.base = base
+
+    def __call__(self: Self) -> float:
+        """Get the current backoff function value.
+
+        Returns
+        -------
+        float
+            The current backoff value
+        """
+        delay = self.offset + self.base**self.count
+        if self.maximum is not None:
+            delay = min(delay, self.maximum)
+        return delay
+
+    def __iadd__(self: Self, other: int) -> Self:
+        """Increment the internal counter (e.g., backoff += 1).
+
+        Parameters
+        ----------
+        other : int
+            The steps by which to increment the backoff function
+        """
+        if other < 0:
+            raise ValueError("Increment must be positive.")
+        if not isinstance(other, int):
+            raise TypeError("Increment must be an integer.")
+        self.count += other
+        return self
+
+    def reset(self: Self) -> None:
+        """Reset the backoff function."""
+        self.count = 0
+
+
+class StatusException(Exception):
+    """
+    Exception for an exit code of a process.
+    """
+
+    def __init__(self, status: int, details: Optional[str] = None) -> None:
+        """
+        Create a new instance of the exception.
+
+        Parameters
+        ----------
+        status : int
+            The exit code of the corresponding process
+        details : Optional[str]
+            Additional information about the error
+        """
+        self.status = status
+        self.details = details
+
+
+def expect_ok(status: int, details: Optional[str] = None) -> None:
+    """
+    Assert that status is exit code for success.
+
+    Parameters
+    ----------
+    status : int
+        The exit code of a previously executed process
+    details : Optional[str]
+        Additional information about the (possible) error
+
+    Raises
+    ------
+    StatusException
+        The corresponding process did not exit with status code for success.
+    """
+    if status != os.EX_OK:
+        raise StatusException(status, details)

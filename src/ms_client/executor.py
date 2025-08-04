@@ -12,7 +12,7 @@ from ms_common import schemas
 from ms_common.schemas import JobKey
 from ms_common.schemas import Spec as JobSpec
 from ms_common.schemas import Target
-from ms_common.utils import StatusException, eprint, expect_ok, time_to_seconds
+from ms_common.utils import eprint, time_to_seconds
 
 from ms_client import job, ssh
 from ms_client.config import TargetAdditionalConfigs
@@ -20,7 +20,8 @@ from ms_client.job import Instance as Job
 from ms_client.remote_target import RemoteTarget
 from ms_client.remote_target.factory import remote_target_from_target
 from ms_client.scheduler_interface import SchedulerClientInterface
-from ms_client.utils import LockFile, RedirectOutputToFile
+from ms_client.utils import (LockFile, RedirectOutputToFile, StatusException,
+                             expect_ok)
 
 
 class Executor:

@@ -7,6 +7,8 @@ import sys
 from typing import Any, Callable, Optional, TypeVar, cast
 import warnings
 
+# See https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html
+EX_BASH_COMMAND_NOT_FOUND = 127
 DEFAULT_SSH_PORT = 22
 
 def eprint(*args: Any, **kwargs: Any) -> None:
@@ -23,79 +25,6 @@ def eprint(*args: Any, **kwargs: Any) -> None:
     kwargs["flush"] = True
     print(*args, **kwargs, file=sys.stderr)
 
-
-# See https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html
-EX_BASH_COMMAND_NOT_FOUND = 127
-
-
-def exponential_backoff(
-    count: int, offset: float = 0, maximum: Optional[float] = 60, base: float = 2
-) -> float:
-    """
-    Compute the delay according to a clamped exponential backoff function.
-
-    Parameters
-    ----------
-    count : int
-        How many times the backoff strategy has already been applied
-    offset : float
-        The starting value of the function added as a constant offset
-    maximum : Optional[float]
-        The maximum value of the backoff function (60 by default) or None if it is unclamped
-    base : float
-        The base of the exponential function (2 by default)
-
-    Returns
-    -------
-    float
-        The next wait duration
-    """
-    if count < 0:
-        raise ValueError()
-    time = offset + base**count
-    if maximum is not None:
-        time = min(time, maximum)
-    return time
-
-
-class StatusException(Exception):
-    """
-    Exception for an exit code of a process.
-    """
-
-    def __init__(self, status: int, details: Optional[str] = None) -> None:
-        """
-        Create a new instance of the exception.
-
-        Parameters
-        ----------
-        status : int
-            The exit code of the corresponding process
-        details : Optional[str]
-            Additional information about the error
-        """
-        self.status = status
-        self.details = details
-
-
-def expect_ok(status: int, details: Optional[str] = None) -> None:
-    """
-    Assert that status is exit code for success.
-
-    Parameters
-    ----------
-    status : int
-        The exit code of a previously executed process
-    details : Optional[str]
-        Additional information about the (possible) error
-
-    Raises
-    ------
-    StatusException
-        The corresponding process did not exit with status code for success.
-    """
-    if status != os.EX_OK:
-        raise StatusException(status, details)
 
 F = TypeVar("F", bound=Callable[..., Any])
 

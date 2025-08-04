@@ -6,10 +6,11 @@ import time
 from typing import Any, Dict, Optional, Self, Tuple
 
 from fabric import Connection  # type: ignore[attr-defined]
-from ms_common.utils import eprint, expect_ok, exponential_backoff
+from ms_common.utils import eprint
 
 from ms_client.job import Instance as Job
 from ms_client.remote_target import RemoteTarget
+from ms_client.utils import ExponentialBackoff, expect_ok
 
 
 class BatchSystemTarget(RemoteTarget):
@@ -217,7 +218,7 @@ class BatchSystemTarget(RemoteTarget):
         int
             The exit code of the job or -1 if it could not be determined
         """
-        backoff_count = 0
+        backoff = ExponentialBackoff()
         interrupted_error: Optional[InterruptedError] = None
 
         def sleep_or_cancel(seconds: float) -> None:
@@ -232,7 +233,7 @@ class BatchSystemTarget(RemoteTarget):
             try:
                 time.sleep(seconds)
             except InterruptedError as e:
-                nonlocal backoff_count, interrupted_error
+                nonlocal backoff, interrupted_error
                 if interrupted_error is not None:
                     eprint("Job was already canceled. (Nothing to do.)")
                     return
@@ -240,7 +241,7 @@ class BatchSystemTarget(RemoteTarget):
                 eprint(f"Canceling job with local ID {local_job_id}.")
                 with self._connect() as connection:
                     self._cancel_job(connection, local_job_id)
-                backoff_count = 0
+                backoff.reset()
                 interrupted_error = e
 
         output_error_files: Tuple[str, str]
@@ -254,24 +255,23 @@ class BatchSystemTarget(RemoteTarget):
                 )
         eprint("--- c. Awaiting job start ---")
         time.sleep(1)
-        backoff_count = 0
         while True:
             with self._connect() as connection:
                 if self._has_job_started(connection, local_job_id):
                     break
-            sleep_or_cancel(exponential_backoff(backoff_count))
-            backoff_count += 1
+            sleep_or_cancel(backoff())
+            backoff += 1
         callbacks.on_start(self._get_job_start_time(connection, local_job_id))
         eprint("--- d. Awaiting job completion ---")
         # Do not wait requested time in case job completes earlier
         # sleep_or_cancel(job.spec.seconds)
-        backoff_count = 0
+        backoff.reset()
         while True:
             with self._connect() as connection:
                 if self._has_job_ended(connection, local_job_id):
                     break
-            sleep_or_cancel(exponential_backoff(backoff_count))
-            backoff_count += 1
+            sleep_or_cancel(backoff())
+            backoff += 1
         callbacks.on_end(self._get_job_end_time(connection, local_job_id))
         eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
         time.sleep(1)  # Wait a bit for the output/error to be received when streaming
