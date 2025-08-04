@@ -53,7 +53,7 @@ class RemoteTarget:
     def _connect(
         self: Self,
         retry: int = 5,
-        backoff: ExponentialBackoff = ExponentialBackoff(10, 60),
+        backoff: ExponentialBackoff = ExponentialBackoff(offset=10, factor=10),
         timeout: float = 30,
     ) -> Connection:
         """

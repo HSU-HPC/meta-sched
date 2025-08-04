@@ -117,24 +117,32 @@ class ExponentialBackoff:
     """(Clamped) exponential backoff function."""
 
     def __init__(
-        self: Self, offset: float = 0, maximum: Optional[float] = 60, base: float = 2
+        self: Self,
+        offset: float = 0,
+        factor: float = 1,
+        base: float = 2,
+        maximum: Optional[float] = 60,
     ) -> None:
         """
-        Create a new instance of the exponential backoff function.
+        Create a new instance of the exponential backoff function:
+        backoff = min(maximum, offset + factor * base**count)
 
         Parameters
         ----------
         offset : float
-            The starting value of the function added as a constant offset
-        maximum : Optional[float]
-            The maximum value of the backoff function (60 by default) or None if it is unclamped
+            The starting value of the function added as a constant offset (0 by default)
+        factor : float
+            The factor to be applied to the exponential function (1 by default)
         base : float
             The base of the exponential function (2 by default)
+        maximum : Optional[float]
+            The maximum value of the backoff function (60 by default) or None if it is unclamped
         """
         self.count = 0
         self.offset = offset
-        self.maximum = maximum
+        self.factor = factor
         self.base = base
+        self.maximum = maximum
 
     def __call__(self: Self) -> float:
         """Get the current backoff function value.
@@ -144,7 +152,7 @@ class ExponentialBackoff:
         float
             The current backoff value
         """
-        delay = self.offset + self.base**self.count
+        delay = self.offset + self.factor * self.base**self.count
         if self.maximum is not None:
             delay = min(delay, self.maximum)
         return delay
