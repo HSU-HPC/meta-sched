@@ -2,6 +2,7 @@
 
 import abc
 import enum
+import socket
 import sys
 import time
 from dataclasses import dataclass
@@ -16,6 +17,7 @@ from invoke.runners import Result
 from ms_common.schemas import Target, TargetStatus
 from ms_common.utils import (DEFAULT_SSH_PORT, EX_BASH_COMMAND_NOT_FOUND,
                              eprint, expect_ok)
+from paramiko.ssh_exception import SSHException
 
 from ms_client import ssh
 from ms_client.job import Instance as Job
@@ -48,12 +50,20 @@ class RemoteTarget:
             )
         self._target = target
 
-    def _connect(self: Self, timeout: float = 10) -> Connection:
+    def _connect(
+        self: Self, retry: int = 5, delay: float = 10, timeout: float = 30
+    ) -> Connection:
         """
         Connect to the target over SSH.
 
         Parameters
         ----------
+        retry : int
+            The maximum number of connection attempts
+
+        delay : float
+            The time between successive connection attempts (to increase chance of success)
+
         timeout : float
             The connection timeout in seconds
 
@@ -67,6 +77,8 @@ class RemoteTarget:
         RuntimeError
             The port must match the port in the corresponding SSH configuration entry
         """
+        # connect_kwargs are forwarded to
+        # https://docs.paramiko.org/en/latest/api/client.html#paramiko.client.SSHClient.connect
         connect_kwargs = dict(
             allow_agent=False, look_for_keys=False, banner_timeout=timeout
         )
@@ -90,13 +102,27 @@ class RemoteTarget:
                 f"Cannot connect to target {self._target.id} (Non-default Port missing in SSH config)"
             )
         config = Config(ssh_config=ssh_config)  # type: ignore[no-untyped-call]
-        connection = Connection(  # type: ignore[no-untyped-call]
-            str(self._target.id),
-            config=config,
-            connect_kwargs=connect_kwargs,
-            connect_timeout=timeout,
-        )
-        return connection
+        for attempt in range(1, retry + 1):
+            try:
+                connection = Connection(  # type: ignore[no-untyped-call]
+                    self._target.id,
+                    config=config,
+                    connect_kwargs=connect_kwargs,
+                    connect_timeout=timeout,
+                )
+                #  Explicitly open the connection (eager instead of lazy)
+                connection.open()  # type: ignore[no-untyped-call]
+                return connection  # Do not try to reconnect again
+            except (SSHException, socket.error, EOFError, ConnectionResetError) as e:
+                eprint(f"Connection failed on attempt #{attempt}.")
+                if attempt < retry:
+                    eprint(f"(Will try again in {delay} seconds.)")
+                    time.sleep(delay)
+                else:
+                    raise RuntimeError(
+                        f"Failed to connect to {self._target.id} after {attempt} attempts."
+                    ) from e
+        raise RuntimeError("Unreachable code somehow reached")
 
     class TransferMode(enum.Enum):
         """
@@ -333,7 +359,7 @@ class RemoteTarget:
 
     def execute(
         self: Self, job: Job, callbacks: JobExecutionCallbacks = JobExecutionCallbacks()
-    ) -> None:
+    ) -> int:
         """
         Execute the job on the target.
 
@@ -343,10 +369,15 @@ class RemoteTarget:
             The job which to execute on the target
         callbacks : JobExecutionCallbacks
             Callback functions for job state changes
+
+        Returns
+        -------
+        int
+            The exit code of the job or -1 if it could not be determined
         """
         with self._connect() as connection:
             expect_ok(self._run(connection, f"mkdir -p {job.remote_output}").exited)
-        self._execute(job, callbacks, RemoteTarget.__get_job_env(job))
+        return self._execute(job, callbacks, RemoteTarget.__get_job_env(job))
 
     @abc.abstractmethod
     def _execute(
@@ -354,7 +385,7 @@ class RemoteTarget:
         job: Job,
         callbacks: JobExecutionCallbacks,
         env: Dict[str, Any] = {},
-    ) -> None:
+    ) -> int:
         """
         Execute the job on the remote target.
 
@@ -366,6 +397,11 @@ class RemoteTarget:
             Callback functions for job state changes
         env : Dict[str, Any]
             Optional environment variables to be injected on the target before executing the job
+
+        Returns
+        -------
+        int
+            The exit code of the job or -1 if it could not be determined
 
         Raises
         ------

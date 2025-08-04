@@ -63,7 +63,7 @@ class StatusException(Exception):
     Exception for an exit code of a process.
     """
 
-    def __init__(self, status: int) -> None:
+    def __init__(self, status: int, details: Optional[str] = None) -> None:
         """
         Create a new instance of the exception.
 
@@ -71,11 +71,14 @@ class StatusException(Exception):
         ----------
         status : int
             The exit code of the corresponding process
+        details : Optional[str]
+            Additional information about the error
         """
         self.status = status
+        self.details = details
 
 
-def expect_ok(status: int) -> None:
+def expect_ok(status: int, details: Optional[str] = None) -> None:
     """
     Assert that status is exit code for success.
 
@@ -83,6 +86,8 @@ def expect_ok(status: int) -> None:
     ----------
     status : int
         The exit code of a previously executed process
+    details : Optional[str]
+        Additional information about the (possible) error
 
     Raises
     ------
@@ -90,7 +95,7 @@ def expect_ok(status: int) -> None:
         The corresponding process did not exit with status code for success.
     """
     if status != os.EX_OK:
-        raise StatusException(status)
+        raise StatusException(status, details)
 
 F = TypeVar("F", bound=Callable[..., Any])
 

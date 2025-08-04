@@ -12,7 +12,7 @@ from ms_common import schemas
 from ms_common.schemas import JobKey
 from ms_common.schemas import Spec as JobSpec
 from ms_common.schemas import Target
-from ms_common.utils import StatusException, eprint, time_to_seconds
+from ms_common.utils import StatusException, eprint, expect_ok, time_to_seconds
 
 from ms_client import job, ssh
 from ms_client.config import TargetAdditionalConfigs
@@ -248,7 +248,7 @@ class Executor:
             on_start=callback_job_started,
             on_end=callback_job_ended,
         )
-        remote_target.execute(self.__job, callbacks)
+        job_exit_code = remote_target.execute(self.__job, callbacks)
         eprint(f"=== 4. Fetching results from target {target.id} ===")
         src = self.__job.remote_output
         dst = self.__job.local_output.parent
@@ -256,6 +256,9 @@ class Executor:
         eprint(f"=== 5. Cleaning up files on target {target.id} ===")
         # TODO: Consider always cleaning up (even if job failed/was canceled)
         remote_target.clean_up(self.__job)
+        eprint("=== 6. Validating job exit code ===")
+        expect_ok(job_exit_code, "Non-zero job exit code")
+        eprint("=== All done ===")
 
     def run(self: Self) -> None:
         """

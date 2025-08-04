@@ -199,7 +199,7 @@ class BatchSystemTarget(RemoteTarget):
         job: Job,
         callbacks: RemoteTarget.JobExecutionCallbacks,
         env: Dict[str, Any] = {},
-    ) -> None:
+    ) -> int:
         """
         Execute the job directly on the target.
 
@@ -211,6 +211,11 @@ class BatchSystemTarget(RemoteTarget):
             Callback functions for job state changes
         env : Dict[str, Any]
             Optional environment variables to be injected on the target before executing the job
+
+        Returns
+        -------
+        int
+            The exit code of the job or -1 if it could not be determined
         """
         backoff_count = 0
         interrupted_error: Optional[InterruptedError] = None
@@ -296,4 +301,4 @@ class BatchSystemTarget(RemoteTarget):
         sys.stderr.flush()
         if interrupted_error is not None:
             raise interrupted_error
-        expect_ok(exit_code)
+        return exit_code
