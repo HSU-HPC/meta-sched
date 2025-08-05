@@ -21,7 +21,7 @@ from ms_client.remote_target import RemoteTarget
 from ms_client.remote_target.factory import remote_target_from_target
 from ms_client.scheduler_interface import SchedulerClientInterface
 from ms_client.utils import (LockFile, RedirectOutputToFile, StatusException,
-                             expect_ok)
+                             expect_ok, unwrap_error)
 
 
 class Executor:
@@ -57,7 +57,7 @@ class Executor:
         self.__redirect_output = redirect_output
 
     def __signal_handler(
-        self: Self, signalnum: int, frame: Optional[FrameType]
+        self: Self, signal_number: int, frame: Optional[FrameType]
     ) -> None:
         """
         Handle a signal sent to the process.
@@ -74,8 +74,13 @@ class Executor:
         InterruptedError
             Error containing the signal that was sent to the process
         """
-        eprint(f"{self.__class__.__name__} received signal {signalnum}.", flush=True)
-        raise InterruptedError(signalnum)
+        signal_name = str(signal_number)
+        if signal_number == signal.SIGINT:
+            signal_name = "SIGINT"
+        if signal_number == signal.SIGTERM:
+            signal_name = "SIGTERM"
+        eprint(f"{self.__class__.__name__} received signal {signal_name}.", flush=True)
+        raise InterruptedError(signal_number)
 
     @staticmethod
     def is_target_suitable(
@@ -150,8 +155,11 @@ class Executor:
         available_targets: Set[str] = set()
         try:
             targets = scheduler.targets
-        except Exception:
-            raise StatusException(os.EX_UNAVAILABLE)
+        except Exception as e:
+            interrupted_error = unwrap_error(e, InterruptedError)
+            if interrupted_error:
+                raise interrupted_error
+            raise StatusException(os.EX_UNAVAILABLE, "Could not get list of targets")
         additional_configs_dict = {t.id: t for t in targets_additional_configs}
         for t in targets:
             additional_configs = None
@@ -179,8 +187,13 @@ class Executor:
         target: Target
         try:
             decision = self.__scheduler.poll_scheduling_decision(self.__job_key)
-        except Exception:
-            raise StatusException(os.EX_UNAVAILABLE)
+        except Exception as e:
+            interrupted_error = unwrap_error(e, InterruptedError)
+            if interrupted_error:
+                raise interrupted_error
+            raise StatusException(
+                os.EX_UNAVAILABLE, "Could not get scheduling decision"
+            )
         match decision:
             case ms_common.schemas.Impossible():
                 raise Exception(
@@ -202,6 +215,7 @@ class Executor:
         eprint(
             f"=== 2. Copying input files to target {target.id} and run optional setup step ==="
         )
+        # Try to avoid race conditions outside of the scope of a batch system
         with LockFile(
             f"meta-sched/{os.getuid()}/{target.id}:{self.__job.spec.name}.lock"
         ):

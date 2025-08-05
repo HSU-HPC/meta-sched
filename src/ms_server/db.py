@@ -318,8 +318,8 @@ class DataBase(Model):
         """
         async with self.__make_async_session() as session:
             job = await self.__get_job(job_key, session)
-            async with session.begin():
-                await session.delete(job)
+            await session.delete(job)
+            await session.commit()
         self.__pub_socket.send_string(f"job:{job_key} null")
 
     async def await_scheduling_decision(

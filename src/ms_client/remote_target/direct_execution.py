@@ -53,8 +53,6 @@ class DirectExecutionRemoteTarget(RemoteTarget):
                     exit_code = self._run(
                         connection, cmd, env=env, modules=job.spec.required_modules
                     ).exited
-        except InterruptedError:
-            raise
         finally:
             callbacks.on_end()
         return exit_code

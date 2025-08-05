@@ -76,7 +76,7 @@ class Client(SchedulerClientInterface):
             json=target_status.model_dump(),
             headers=headers,
         )
-        if http.HTTPStatus.NO_CONTENT != response.status_code:
+        if response.status_code not in [http.HTTPStatus.OK, http.HTTPStatus.NO_CONTENT]:
             raise http.client.error(response.status_code, response.text)
 
     @property
@@ -193,7 +193,7 @@ class Client(SchedulerClientInterface):
             f"{self.__endpoint}/jobs/{array_id}/{array_idx}",
             headers=self.__get_job_request_headers(token),
         )
-        if http.HTTPStatus.NO_CONTENT != response.status_code:
+        if response.status_code not in [http.HTTPStatus.OK, http.HTTPStatus.NO_CONTENT]:
             raise http.client.error(response)
 
     def update_job_started(self: Self, job_key: JobKey, timestamp: int) -> None:
@@ -212,7 +212,7 @@ class Client(SchedulerClientInterface):
             f"{self.__endpoint}/jobs/{array_id}/{array_idx}?timestamp_start={timestamp}",
             headers=self.__get_job_request_headers(token),
         )
-        if http.HTTPStatus.NO_CONTENT != response.status_code:
+        if response.status_code not in [http.HTTPStatus.OK, http.HTTPStatus.NO_CONTENT]:
             raise http.client.error(response)
 
     def update_job_ended(self: Self, job_key: JobKey, timestamp: int) -> None:
@@ -231,7 +231,7 @@ class Client(SchedulerClientInterface):
             f"{self.__endpoint}/jobs/{array_id}/{array_idx}?timestamp_end={timestamp}",
             headers=self.__get_job_request_headers(token),
         )
-        if http.HTTPStatus.NO_CONTENT != response.status_code:
+        if response.status_code not in [http.HTTPStatus.OK, http.HTTPStatus.NO_CONTENT]:
             raise http.client.error(response)
 
     def reschedule_job(
@@ -255,5 +255,5 @@ class Client(SchedulerClientInterface):
             json={"available_targets": list(available_targets)},
             headers=self.__get_job_request_headers(token),
         )
-        if http.HTTPStatus.NO_CONTENT != response.status_code:
+        if response.status_code not in [http.HTTPStatus.OK, http.HTTPStatus.NO_CONTENT]:
             raise http.client.error(response)

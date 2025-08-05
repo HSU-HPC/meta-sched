@@ -286,7 +286,10 @@ class CLI:
             return os.EX_OK
         pids = df["pid"].astype(int).values
         for pid in pids:
-            os.kill(pid, signal.SIGINT)
+            try:
+                os.kill(pid, signal.SIGINT)
+            except ProcessLookupError:
+                pass  # Process no longer alive anyway
 
         def wait_pid(pid: int, check_interval: float = 1) -> None:
             """

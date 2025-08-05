@@ -6,7 +6,49 @@ import sys
 from io import TextIOWrapper
 from os import PathLike
 from pathlib import Path
-from typing import Any, Optional, Self
+from typing import Any, Optional, Self, Set, Type, TypeVar
+
+E = TypeVar("E", bound=BaseException)
+
+
+def unwrap_error(
+    error: BaseException, target_type: Type[E], max_depth: int = 10
+) -> Optional[E]:
+    """
+    Traverse the exception chain to find an exception of a specific type.
+
+    Parameters
+    ----------
+    error : BaseException
+        The error to be searched.
+    target_type : Type[BaseException]
+        The type of exception to look for.
+    max_depth : int
+        Maximum depth to traverse (default: 10).
+
+    Returns
+    -------
+    Optional[BaseException]
+        The first matching exception of the specified type, or None if not found.
+    """
+    seen: Set[int] = set()
+    for _ in range(max_depth):
+        seen.add(id(error))
+        if isinstance(error, target_type):
+            return error
+        # Traverse __cause__, __context__, or args
+        next_error: Optional[BaseException] = getattr(
+            error, "__cause__", None
+        ) or getattr(error, "__context__", None)
+        if not next_error and hasattr(error, "args"):
+            for arg in error.args:
+                if isinstance(arg, BaseException):
+                    next_error = arg
+                    break
+        if not next_error or id(next_error) in seen:
+            break
+        error = next_error
+    return None
 
 
 class SuppressStderr:

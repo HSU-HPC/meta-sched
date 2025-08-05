@@ -401,7 +401,10 @@ class API(FastAPI):
             )
 
         # DELETE
-        @self.delete("/jobs/{array_id}/{array_idx}")
+        @self.delete(
+            "/jobs/{array_id}/{array_idx}",
+            status_code=status.HTTP_204_NO_CONTENT,
+        )
         async def cancel_job(
             array_id: int, array_idx: int, token: str = Depends(get_job_token)
         ) -> None:

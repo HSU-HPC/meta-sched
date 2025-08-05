@@ -53,8 +53,9 @@ class RemoteTarget:
     def _connect(
         self: Self,
         retry: int = 5,
-        backoff: ExponentialBackoff = ExponentialBackoff(offset=10, factor=10),
+        backoff: ExponentialBackoff = ExponentialBackoff(factor=10),
         timeout: float = 30,
+        ignore_interrupted_error: bool = False,
     ) -> Connection:
         """
         Connect to the target over SSH.
@@ -63,12 +64,12 @@ class RemoteTarget:
         ----------
         retry : int
             The maximum number of connection attempts
-
         backoff : ExponentialBackoff
             Exponential backoff strategy to ensure connection is eventually established
-
         timeout : float
             The connection timeout in seconds
+        ignore_interrupted_error : bool
+            If true, ignore InterruptedError (default is False)
 
         Returns
         -------
@@ -105,7 +106,8 @@ class RemoteTarget:
                 f"Cannot connect to target {self._target.id} (Non-default Port missing in SSH config)"
             )
         config = Config(ssh_config=ssh_config)  # type: ignore[no-untyped-call]
-        for attempt in range(1, retry + 1):
+        attempt = 0
+        while attempt < retry:
             try:
                 connection = Connection(  # type: ignore[no-untyped-call]
                     self._target.id,
@@ -117,7 +119,11 @@ class RemoteTarget:
                     #  Explicitly open the connection (eager instead of lazy)
                     connection.open()  # type: ignore[no-untyped-call]
                 return connection  # Do not try to reconnect again
+            except InterruptedError:  # If ignored, does not count toward attempts
+                if not ignore_interrupted_error:
+                    raise
             except (SSHException, socket.error, EOFError, ConnectionResetError) as e:
+                attempt += 1
                 eprint(f"Connection failed on attempt #{attempt}:")
                 eprint(e)
                 if attempt < retry:
@@ -361,8 +367,8 @@ class RemoteTarget:
             Callback to be called when the job ends executing on the target
         """
 
-        on_start: Any = lambda: None
-        on_end: Any = lambda: None
+        on_start: Any = lambda *args, **kwargs: None
+        on_end: Any = lambda *args, **kwargs: None
 
     def execute(
         self: Self, job: Job, callbacks: JobExecutionCallbacks = JobExecutionCallbacks()

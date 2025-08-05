@@ -14,7 +14,9 @@ from ms_client.utils import ExponentialBackoff, expect_ok
 
 
 class BatchSystemTarget(RemoteTarget):
-    """Abstract base class for remote targets which have a local batch system for job execution."""
+    """
+    Abstract base class for remote targets which have a local batch system for job execution.
+    """
 
     @abc.abstractmethod
     def _submit_job(
@@ -218,90 +220,116 @@ class BatchSystemTarget(RemoteTarget):
         int
             The exit code of the job or -1 if it could not be determined
         """
-        backoff = ExponentialBackoff()
-        interrupted_error: Optional[InterruptedError] = None
-
-        def sleep_or_cancel(seconds: float) -> None:
-            """
-            Sleep some time or, if receiving a SIGINT, cancel the Slurm job.
-
-            Parameters
-            ----------
-            seconds : float
-                The time to sleep for in seconds
-            """
-            try:
-                time.sleep(seconds)
-            except InterruptedError as e:
-                nonlocal backoff, interrupted_error
-                if interrupted_error is not None:
-                    eprint("Job was already canceled. (Nothing to do.)")
-                    return
-                # Defer handling until Slurm job has been canceled completely
-                eprint(f"Canceling job with local ID {local_job_id}.")
-                with self._connect() as connection:
-                    self._cancel_job(connection, local_job_id)
-                backoff.reset()
-                interrupted_error = e
-
         output_error_files: Tuple[str, str]
         local_job_id: str
         stream_oe = False  # Must be false if not using long living connection
+
+        eprint("--- a. Submitting job ---")
         with self._connect() as connection:
             with connection.cd(job.remote_output):
                 output_error_files = self._create_oe_files(connection, stream_oe)
                 local_job_id = self._submit_job(
                     connection, job, output_error_files, env
                 )
-        eprint("--- c. Awaiting job start ---")
-        time.sleep(1)
-        while True:
+
+        def await_job_start() -> None:
+            """
+            Wait until the job has been started by the local batch system.
+            """
+            eprint("--- b. Awaiting job start ---")
+            time.sleep(1)
+            backoff = ExponentialBackoff()
+            while True:
+                with self._connect() as connection:
+                    if self._has_job_started(connection, local_job_id):
+                        break
+                time.sleep(backoff())
+                backoff += 1
             with self._connect() as connection:
-                if self._has_job_started(connection, local_job_id):
-                    break
-            sleep_or_cancel(backoff())
-            backoff += 1
-        with self._connect() as connection:
-            callbacks.on_start(self._get_job_start_time(connection, local_job_id))
-        eprint("--- d. Awaiting job completion ---")
-        # Do not wait requested time in case job completes earlier
-        # sleep_or_cancel(job.spec.seconds)
-        backoff.reset()
-        while True:
+                callbacks.on_start(self._get_job_start_time(connection, local_job_id))
+
+        def await_job_completion() -> None:
+            """
+            Wait until the job is no longer being executed by the local bach system.
+            """
+            eprint("--- c. Awaiting job completion ---")
+            # Do not wait requested time in case job completes earlier
+            # time.sleep(job.spec.seconds)
+            backoff = ExponentialBackoff()
+            while True:
+                with self._connect() as connection:
+                    if self._has_job_ended(connection, local_job_id):
+                        break
+                time.sleep(backoff())
+                backoff += 1
             with self._connect() as connection:
-                if self._has_job_ended(connection, local_job_id):
-                    break
-            sleep_or_cancel(backoff())
-            backoff += 1
-        with self._connect() as connection:
-            callbacks.on_end(self._get_job_end_time(connection, local_job_id))
-        eprint("--- e. Obtaining exit code and cleaning up output/error files ---")
-        time.sleep(1)  # Wait a bit for the output/error to be received when streaming
-        with self._connect() as connection:
-            exit_code = self._get_job_exit_code(connection, local_job_id)
-        if exit_code is None:
-            exit_code = -1
-        with self._connect() as connection:
-            with connection.cd(job.remote_output):
-                if not stream_oe:
-                    eprint()  # Separate with blank line
-                    for filename, stream in zip(
-                        output_error_files, (sys.stdout, sys.stderr)
-                    ):
-                        expect_ok(
-                            self._run(
-                                connection,
-                                f"cat {filename} && rm {filename}",
-                                out_stream=stream,
-                            ).exited
-                        )
-                expect_ok(
-                    self._run(
-                        connection, f"rm -f {' '.join(output_error_files)}"
-                    ).exited
-                )
-        sys.stdout.flush()
-        sys.stderr.flush()
-        if interrupted_error is not None:
-            raise interrupted_error
-        return exit_code
+                callbacks.on_end(self._get_job_end_time(connection, local_job_id))
+
+        def clean_up_and_get_job_status(
+            interrupted_error: Optional[InterruptedError],
+        ) -> int:
+            """
+            Deletes temporary job output files (stdout, stderr) and determines job exit code.
+
+            Parameters
+            ----------
+            interrupted_error : Optional[InterruptedError]
+                The InterruptedError that may have occurred during the execution of the job
+
+            Returns
+            -------
+            int
+                The exit code of the jobs
+
+            Raises
+            ------
+            InterruptedError
+                The InterruptedError passed to the function
+            """
+            eprint("--- d. Cleaning up output/error files and getting exit code ---")
+            time.sleep(
+                1
+            )  # Wait a bit for the output/error to be received when streaming
+            with self._connect(ignore_interrupted_error=True) as connection:
+                with connection.cd(job.remote_output):
+                    if not stream_oe:
+                        eprint()  # Separate with blank line
+                        for filename, stream in zip(
+                            output_error_files, (sys.stdout, sys.stderr)
+                        ):
+                            expect_ok(
+                                self._run(
+                                    connection,
+                                    f"cat {filename} && rm {filename}",
+                                    out_stream=stream,
+                                ).exited
+                            )
+                    expect_ok(
+                        self._run(
+                            connection, f"rm -f {' '.join(output_error_files)}"
+                        ).exited
+                    )
+            sys.stdout.flush()
+            sys.stderr.flush()
+            if interrupted_error is not None:
+                raise interrupted_error
+            with self._connect(ignore_interrupted_error=True) as connection:
+                exit_code = self._get_job_exit_code(connection, local_job_id)
+            if exit_code is None:
+                exit_code = -1
+            return exit_code
+
+        interrupted_error: Optional[InterruptedError] = None
+        was_job_started = False
+        try:
+            await_job_start()
+            was_job_started = True
+            await_job_completion()
+        except InterruptedError as e:
+            interrupted_error = e
+            if was_job_started:
+                callbacks.on_end()
+            with self._connect(ignore_interrupted_error=True) as connection:
+                self._cancel_job(connection, local_job_id)
+        finally:
+            return clean_up_and_get_job_status(interrupted_error)
