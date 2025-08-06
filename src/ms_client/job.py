@@ -231,6 +231,11 @@ class Status(abc.ABC):
 
         pass
 
+    class Completing(_Enum):
+        """Class representing a job that has successfully finished executing with some pending operations (e.g. downloading results)."""
+
+        pass
+
     class Pending(_Enum):
         """Class representing a job that has been submitted but not yet assigned to a target."""
 

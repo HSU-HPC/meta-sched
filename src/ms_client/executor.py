@@ -253,7 +253,7 @@ class Executor:
             """
             if timestamp is None:
                 timestamp = int(time.time())
-            self.__job.set_status(job.Status.Completed())
+            self.__job.set_status(job.Status.Completing())
             try:
                 self.__scheduler.update_job_ended(self.__job_key, timestamp)
             except Exception as e:
