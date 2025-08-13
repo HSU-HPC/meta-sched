@@ -6,7 +6,7 @@ import sys
 from io import TextIOWrapper
 from os import PathLike
 from pathlib import Path
-from typing import Any, Optional, Self, Set, Type, TypeVar
+from typing import Any, Optional, Set, Type, TypeVar, Union
 
 E = TypeVar("E", bound=BaseException)
 
@@ -57,13 +57,15 @@ class SuppressStderr:
     NOTE: This is NOT thread safe.
     """
 
-    def __enter__(self: Self) -> Self:
+    def __enter__(self: "SuppressStderr") -> "SuppressStderr":
         self._stderr = sys.stderr
         self._devnull = open(os.devnull, "w")
         sys.stderr = self._devnull
         return self
 
-    def __exit__(self: Self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
+    def __exit__(
+        self: "SuppressStderr", exc_type: Any, exc_value: Any, traceback: Any
+    ) -> None:
         sys.stderr = self._stderr
         self._devnull.close()
 
@@ -72,18 +74,18 @@ class RedirectOutputToFile:
     """Context manager for redirecting sys.stdout/sys.stderr (e.g. the output of all calls to print) to a file."""
 
     def __init__(
-        self: Self,
-        stdout: Optional[str | PathLike[Any]] = None,
-        stderr: Optional[str | PathLike[Any]] = None,
+        self: "RedirectOutputToFile",
+        stdout: Optional[Union[str, PathLike[Any]]] = None,
+        stderr: Optional[Union[str, PathLike[Any]]] = None,
     ) -> None:
         """
         Create a new instance to redirect stdout/stderr.
 
         Parameters
         ----------
-        stdout : Optional[str | PathLike[Any]]
+        stdout : Optional[Union[str, PathLike[Any]]]
             Path to redirect sys.stdout to (default None does not redirect output)
-        stderr : Optional[str | PathLike[Any]]
+        stderr : Optional[Union[str, PathLike[Any]]]
             Path to redirect sys.stderr to (default None does not redirect output)
         """
         self.__stdout_redirect = stdout
@@ -91,14 +93,16 @@ class RedirectOutputToFile:
         self.__stdout = sys.stdout
         self.__stderr = sys.stderr
 
-    def __enter__(self: Self) -> Self:
+    def __enter__(self: "RedirectOutputToFile") -> "RedirectOutputToFile":
         if self.__stdout_redirect:
             sys.stdout = open(self.__stdout_redirect, "a")
         if self.__stderr_redirect:
             sys.stderr = open(self.__stderr_redirect, "a")
         return self
 
-    def __exit__(self: Self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
+    def __exit__(
+        self: "RedirectOutputToFile", exc_type: Any, exc_value: Any, traceback: Any
+    ) -> None:
         if self.__stdout_redirect:
             sys.stdout.flush()
             sys.stdout.close()
@@ -127,7 +131,7 @@ class LockFile:
         """
         return Path("/tmp")
 
-    def __init__(self: Self, name: str) -> None:
+    def __init__(self: "LockFile", name: str) -> None:
         """
         Create a new instance to guard a critical section.
 
@@ -141,14 +145,16 @@ class LockFile:
         self.__path.touch()
         self.__file: Optional[TextIOWrapper[Any]] = None
 
-    def __enter__(self: Self) -> Self:
+    def __enter__(self: "LockFile") -> "LockFile":
         if self.__file:
             raise RuntimeError("Re-entry not allowed")
         self.__file = open(self.__path)
         fcntl.flock(self.__file.fileno(), fcntl.LOCK_EX)
         return self
 
-    def __exit__(self: Self, exc_type: Any, exc_value: Any, traceback: Any) -> None:
+    def __exit__(
+        self: "LockFile", exc_type: Any, exc_value: Any, traceback: Any
+    ) -> None:
         if self.__file:
             fcntl.flock(self.__file.fileno(), fcntl.LOCK_UN)
             self.__file.close()
@@ -159,7 +165,7 @@ class ExponentialBackoff:
     """(Clamped) exponential backoff function."""
 
     def __init__(
-        self: Self,
+        self: "ExponentialBackoff",
         offset: float = 0,
         factor: float = 1,
         base: float = 2,
@@ -186,7 +192,7 @@ class ExponentialBackoff:
         self.base = base
         self.maximum = maximum
 
-    def __call__(self: Self) -> float:
+    def __call__(self: "ExponentialBackoff") -> float:
         """Get the current backoff function value.
 
         Returns
@@ -199,7 +205,7 @@ class ExponentialBackoff:
             delay = min(delay, self.maximum)
         return delay
 
-    def __iadd__(self: Self, other: int) -> Self:
+    def __iadd__(self: "ExponentialBackoff", other: int) -> "ExponentialBackoff":
         """Increment the internal counter (e.g., backoff += 1).
 
         Parameters
@@ -214,7 +220,7 @@ class ExponentialBackoff:
         self.count += other
         return self
 
-    def reset(self: Self) -> None:
+    def reset(self: "ExponentialBackoff") -> None:
         """Reset the backoff function."""
         self.count = 0
 

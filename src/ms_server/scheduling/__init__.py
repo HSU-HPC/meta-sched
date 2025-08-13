@@ -1,6 +1,6 @@
 """Module containing the base class for implementing scheduling policies."""
 
-from typing import Awaitable, Callable, List, Self
+from typing import Awaitable, Callable, List
 
 from ms_common.schemas import JobKey, SchedulingDecisionType
 
@@ -14,7 +14,7 @@ class Policy:
     Base class for scheduling policies.
     """
 
-    def __init__(self: Self, on_schedule_job: ScheduleJobCallback):
+    def __init__(self: "Policy", on_schedule_job: ScheduleJobCallback):
         """
         Create a new instance of the scheduling policy
 
@@ -28,7 +28,7 @@ class Policy:
         self.on_schedule_job = on_schedule_job
 
     async def update(
-        self: Self,
+        self: "Policy",
         pending_jobs: List[Job],
         decided_jobs: List[Job],
         targets_status: TargetsStatus,
@@ -58,7 +58,7 @@ class GreedyPolicy(Policy):
     """
 
     async def schedule_job(
-        self: Self,
+        self: "GreedyPolicy",
         job: Job,
         decided_jobs: List[Job],
         targets_status: TargetsStatus,
@@ -83,7 +83,7 @@ class GreedyPolicy(Policy):
         raise NotImplementedError()
 
     async def update(
-        self: Self,
+        self: "GreedyPolicy",
         pending_jobs: List[Job],
         decided_jobs: List[Job],
         targets_status: TargetsStatus,

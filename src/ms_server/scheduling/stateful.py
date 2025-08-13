@@ -2,7 +2,7 @@
 Module containing stateful scheduling policies which update and use information across scheduling requests.
 """
 
-from typing import Dict, List, Self
+from typing import Dict, List
 
 from ms_common.schemas import Assigned
 
@@ -16,7 +16,7 @@ class LeastUsed(GreedyPolicy):
     (Note that this may result in a non-uniform distribution across all targets depending on the available ones.)
     """
 
-    def __init__(self: Self, on_schedule_job: ScheduleJobCallback) -> None:
+    def __init__(self: "LeastUsed", on_schedule_job: ScheduleJobCallback) -> None:
         """
         Create a new instance of the scheduling policy
 
@@ -29,7 +29,7 @@ class LeastUsed(GreedyPolicy):
         self.__job_count: Dict[str, int] = dict()
 
     async def schedule_job(
-        self: Self,
+        self: "LeastUsed",
         job: Job,
         decided_jobs: List[Job],
         targets_status: TargetsStatus,

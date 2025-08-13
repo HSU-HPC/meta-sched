@@ -1,7 +1,7 @@
 """Module containing the model for the Meta Scheduler server component."""
 
 import abc
-from typing import Any, Dict, List, Optional, Self, Set
+from typing import Any, Dict, List, Optional, Set
 
 from ms_common.schemas import JobKey, SchedulingDecisionType
 from ms_common.schemas import Spec as JobSpec
@@ -46,7 +46,7 @@ class Job(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     @property
-    def key(self: Self) -> JobKey:
+    def key(self: "Job") -> JobKey:
         """
         Get the key of the job.
 
@@ -67,7 +67,7 @@ class Model(abc.ABC):
     """
 
     async def create_job_array(
-        self: Self, spec: JobSpec, available_targets: Set[str], token: str
+        self: "Model", spec: JobSpec, available_targets: Set[str], token: str
     ) -> int:
         """
         Create a new array of jobs for scheduling.
@@ -88,7 +88,7 @@ class Model(abc.ABC):
         """
         raise NotImplementedError()
 
-    async def get_pending_jobs(self: Self) -> List[Job]:
+    async def get_pending_jobs(self: "Model") -> List[Job]:
         """
         Get a list of jobs which are pending scheduling.
 
@@ -104,7 +104,7 @@ class Model(abc.ABC):
         """
         raise NotImplementedError()
 
-    async def get_decided_jobs(self: Self) -> List[Job]:
+    async def get_decided_jobs(self: "Model") -> List[Job]:
         """
         Get a list of jobs for which a scheduling decision has been made.
 
@@ -120,7 +120,7 @@ class Model(abc.ABC):
         """
         raise NotImplementedError()
 
-    async def update_job(self: Self, job_key: JobKey, data: Dict[str, Any]) -> None:
+    async def update_job(self: "Model", job_key: JobKey, data: Dict[str, Any]) -> None:
         """
         Update an existing job.
 
@@ -140,7 +140,7 @@ class Model(abc.ABC):
         """
         raise NotImplementedError()
 
-    async def remove_job(self: Self, job_key: JobKey) -> None:
+    async def remove_job(self: "Model", job_key: JobKey) -> None:
         """
         Remove a job.
 
@@ -159,7 +159,7 @@ class Model(abc.ABC):
         raise NotImplementedError()
 
     async def await_scheduling_decision(
-        self: Self, job_key: JobKey
+        self: "Model", job_key: JobKey
     ) -> SchedulingDecisionType:
         """
         Await a scheduling decision for a specific job.
@@ -179,7 +179,7 @@ class Model(abc.ABC):
         raise NotImplementedError()
 
     async def update_targets_status(
-        self: Self, target_id: str, status: TargetStatus
+        self: "Model", target_id: str, status: TargetStatus
     ) -> None:
         """
         Update the status of a target.
@@ -199,7 +199,7 @@ class Model(abc.ABC):
         raise NotImplementedError()
 
     async def get_targets_status(
-        self: Self,
+        self: "Model",
     ) -> TargetsStatus:
         """
         Get all targets and their last known status.

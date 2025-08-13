@@ -3,7 +3,7 @@
 import asyncio
 import secrets
 from typing import (Any, AsyncGenerator, Awaitable, Coroutine, List, Optional,
-                    Self, Set, Tuple, TypeVar)
+                    Set, Tuple, TypeVar)
 
 import ms_common
 import pandas as pd  # noqa: F401
@@ -23,7 +23,7 @@ class API(FastAPI):
     """
 
     def __init__(
-        self: Self,
+        self: "API",
         host: str,
         port: int,
         targets: List[Target],
@@ -58,7 +58,7 @@ class API(FastAPI):
         super().__init__(**kwargs)
         self.set_up_endpoints()
 
-    def set_up_endpoints(self: Self) -> None:
+    def set_up_endpoints(self: "API") -> None:
         """Set up the HTTP API endpoints."""
 
         @self.get("/version", response_model=str)
@@ -425,7 +425,7 @@ class API(FastAPI):
 
         # endregion job control
 
-    def serve(self: Self) -> Tuple[uvicorn.Server, Coroutine[Any, Any, None]]:
+    def serve(self: "API") -> Tuple[uvicorn.Server, Coroutine[Any, Any, None]]:
         """Start the HTTP API  (non-blocking).
 
         Returns

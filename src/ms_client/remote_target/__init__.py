@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, Self, TextIO, Tuple
+from typing import Any, Dict, List, TextIO, Tuple, Union
 
 import invoke
 from fabric import Connection  # type: ignore[attr-defined]
@@ -51,7 +51,7 @@ class RemoteTarget:
         self._target = target
 
     def _connect(
-        self: Self,
+        self: "RemoteTarget",
         retry: int = 5,
         backoff: ExponentialBackoff = ExponentialBackoff(factor=10),
         timeout: float = 30,
@@ -146,9 +146,9 @@ class RemoteTarget:
         DOWNLOAD = 1
 
     def transfer(
-        self: Self,
-        src: str | PathLike[Any],
-        dst: str | PathLike[Any],
+        self: "RemoteTarget",
+        src: Union[str, PathLike[Any]],
+        dst: Union[str, PathLike[Any]],
         mode: TransferMode,
     ) -> None:
         """
@@ -156,23 +156,22 @@ class RemoteTarget:
 
         Parameters
         ----------
-        src : str | PathLike[Any]
+        src : Union[str, PathLike[Any]]
             Source directory
-        std : str | PathLike[Any]
+        std : Union[str, PathLike[Any]]
             Destination directory
         mode : TransferMode
             Direction in which data is transferred between submit host and target
         """
-        match mode:
-            case self.TransferMode.UPLOAD:
-                with self._connect() as connection:
-                    expect_ok(
-                        self._run(connection, f"mkdir -p $(dirname {dst})").exited
-                    )
-                dst = f"{str(self._target.id)}:{dst}"
-            case self.TransferMode.DOWNLOAD:
-                Path(dst).parent.mkdir(parents=True, exist_ok=True)
-                src = f"{str(self._target.id)}:{src}"
+        if mode == self.TransferMode.UPLOAD:
+            with self._connect() as connection:
+                expect_ok(self._run(connection, f"mkdir -p $(dirname {dst})").exited)
+            dst = f"{str(self._target.id)}:{dst}"
+        elif mode == self.TransferMode.DOWNLOAD:
+            Path(dst).parent.mkdir(parents=True, exist_ok=True)
+            src = f"{str(self._target.id)}:{src}"
+        else:
+            raise NotImplementedError()
         ssh_options = ["StrictHostKeyChecking=no"]
         ssh_options_str = " ".join(f"-o {o}" for o in ssh_options)
         rsync_flags = [
@@ -207,7 +206,7 @@ class RemoteTarget:
         status = -1 if result is None else result.exited
         expect_ok(status)
 
-    def clean_up(self: Self, job: Job) -> None:
+    def clean_up(self: "RemoteTarget", job: Job) -> None:
         """
         Clean up job related files on the target.
 
@@ -220,7 +219,7 @@ class RemoteTarget:
             expect_ok(self._run(connection, f"rm -rf {job.remote_output}").exited)
 
     def _create_oe_files(
-        self: Self, connection: Connection, stream_contents: bool
+        self: "RemoteTarget", connection: Connection, stream_contents: bool
     ) -> Tuple[str, str]:
         """
         Create job output and error files and optionally stream their contents as they are appended.
@@ -254,14 +253,14 @@ class RemoteTarget:
         return oe
 
     def _run(
-        self: Self,
+        self: "RemoteTarget",
         connection: Connection,
         cmd: str,
         warn: bool = True,
         hide: bool = False,
         asynchronous: bool = False,
         env: Dict[str, Any] = {},
-        out_stream: TextIO | Any = sys.stdout,
+        out_stream: Union[TextIO, Any] = sys.stdout,
         modules: List[str] = [],
     ) -> Result:
         """
@@ -281,7 +280,7 @@ class RemoteTarget:
             If true, run the command in the background without blocking and return a Promise instead of a Result (Defaults to False)
         env : Dict[str, Any]
             Shell environment used for command execution
-        out_stream : TextIO | Any
+        out_stream : Union[TextIO, Any]
             The target where the standard output of the command should be sent (Defaults to sys.stdout)
         modules : List[str]
             Optional environment modules to be loaded before executing the command
@@ -332,7 +331,7 @@ class RemoteTarget:
         )
         return env
 
-    def setup(self: Self, job: Job) -> None:
+    def setup(self: "RemoteTarget", job: Job) -> None:
         """
         Run the set up command of the job files on the target.
 
@@ -371,7 +370,9 @@ class RemoteTarget:
         on_end: Any = lambda *args, **kwargs: None
 
     def execute(
-        self: Self, job: Job, callbacks: JobExecutionCallbacks = JobExecutionCallbacks()
+        self: "RemoteTarget",
+        job: Job,
+        callbacks: JobExecutionCallbacks = JobExecutionCallbacks(),
     ) -> int:
         """
         Execute the job on the target.
@@ -394,7 +395,7 @@ class RemoteTarget:
 
     @abc.abstractmethod
     def _execute(
-        self: Self,
+        self: "RemoteTarget",
         job: Job,
         callbacks: JobExecutionCallbacks,
         env: Dict[str, Any] = {},
@@ -423,7 +424,7 @@ class RemoteTarget:
         """
         raise NotImplementedError()
 
-    def get_status(self: Self) -> TargetStatus:
+    def get_status(self: "RemoteTarget") -> TargetStatus:
         """
         Get the status of the remote target.
 

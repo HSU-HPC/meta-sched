@@ -3,7 +3,7 @@
 import http
 import http.client
 import json
-from typing import Dict, List, Self, Set
+from typing import Dict, List, Set
 
 import ms_common
 import requests
@@ -18,7 +18,7 @@ from ms_client.scheduler_interface import SchedulerClientInterface
 class Client(SchedulerClientInterface):
     """Client for the meta-scheduler HTTP API."""
 
-    def __init__(self: Self, config: Config):
+    def __init__(self: "Client", config: Config):
         """
         Create a client for the HTTP server of the API.
 
@@ -29,7 +29,7 @@ class Client(SchedulerClientInterface):
         """
         self.__endpoint = config.endpoint
 
-    def check_version_ok(self: Self) -> None:
+    def check_version_ok(self: "Client") -> None:
         """
         Check if the server is running and if its version matches that of the client.
 
@@ -56,7 +56,7 @@ class Client(SchedulerClientInterface):
             )
 
     def update_target_status(
-        self: Self, target_id: str, target_status: TargetStatus, api_key: str
+        self: "Client", target_id: str, target_status: TargetStatus, api_key: str
     ) -> None:
         """
         Update the status of a remote target at the Meta Scheduler server.
@@ -80,7 +80,7 @@ class Client(SchedulerClientInterface):
             raise http.client.error(response.status_code, response.text)
 
     @property
-    def targets(self: Self) -> List[Target]:
+    def targets(self: "Client") -> List[Target]:
         """
         Get all targets which jobs may be assigned to.
 
@@ -96,7 +96,7 @@ class Client(SchedulerClientInterface):
         return [Target.model_validate(o) for o in content]
 
     def submit_job_array(
-        self: Self, job_spec: Spec, available_targets: Set[str]
+        self: "Client", job_spec: Spec, available_targets: Set[str]
     ) -> ScheduleResponse:
         """
         Create a new unique identifier for a new job array and schedule the corresponding jobs.
@@ -124,7 +124,7 @@ class Client(SchedulerClientInterface):
         content = response.json()
         return ScheduleResponse.model_validate(content)
 
-    def __get_job_request_headers(self: Self, job_token: str) -> Dict[str, str]:
+    def __get_job_request_headers(self: "Client", job_token: str) -> Dict[str, str]:
         """
         Create the HTTP headers for requests pertaining to a single job.
 
@@ -141,7 +141,7 @@ class Client(SchedulerClientInterface):
         return {"X-Job-Token": job_token}
 
     def poll_scheduling_decision(
-        self: Self,
+        self: "Client",
         job_key: JobKey,
     ) -> SchedulingDecisionType:
         """
@@ -179,7 +179,7 @@ class Client(SchedulerClientInterface):
             content = json.loads(last_line)
             return SchedulingDecision.parse(content)
 
-    def cancel_job(self: Self, job_key: JobKey) -> None:
+    def cancel_job(self: "Client", job_key: JobKey) -> None:
         """
         Cancel a job.
 
@@ -196,7 +196,7 @@ class Client(SchedulerClientInterface):
         if response.status_code not in [http.HTTPStatus.OK, http.HTTPStatus.NO_CONTENT]:
             raise http.client.error(response)
 
-    def update_job_started(self: Self, job_key: JobKey, timestamp: int) -> None:
+    def update_job_started(self: "Client", job_key: JobKey, timestamp: int) -> None:
         """
         Set the timestamp when a job was started.
 
@@ -215,7 +215,7 @@ class Client(SchedulerClientInterface):
         if response.status_code not in [http.HTTPStatus.OK, http.HTTPStatus.NO_CONTENT]:
             raise http.client.error(response)
 
-    def update_job_ended(self: Self, job_key: JobKey, timestamp: int) -> None:
+    def update_job_ended(self: "Client", job_key: JobKey, timestamp: int) -> None:
         """
         Set the timestamp when a job was ended.
 
@@ -235,7 +235,7 @@ class Client(SchedulerClientInterface):
             raise http.client.error(response)
 
     def reschedule_job(
-        self: Self,
+        self: "Client",
         job_key: JobKey,
         available_targets: Set[str],
     ) -> None:

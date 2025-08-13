@@ -11,7 +11,7 @@ import signal
 import sys
 import time
 from pathlib import Path
-from typing import Any, Dict, Self
+from typing import Any, Dict
 
 import pandas as pd
 from ms_common.utils import eprint
@@ -31,7 +31,7 @@ class CLI:
     Meta Scheduler command line application for creating job specifications and for job control.
     """
 
-    def __init__(self: Self, client: Client) -> None:
+    def __init__(self: "CLI", client: Client) -> None:
         """
         Create a new instance of the CLI.
 
@@ -42,7 +42,7 @@ class CLI:
         """
         self.__client = client
 
-    def require_can_use_client(self: Self) -> None:
+    def require_can_use_client(self: "CLI") -> None:
         """Check if the client has the correct version or exit the process with the corresponding error."""
         try:
             self.__client.check_version_ok()
@@ -53,7 +53,7 @@ class CLI:
             eprint(e)
             sys.exit(os.EX_UNAVAILABLE)
 
-    def ssh_config(self: Self) -> int:
+    def ssh_config(self: "CLI") -> int:
         """
         Update SSH configuration.
         (Fetches targets from scheduler first.)
@@ -76,7 +76,7 @@ class CLI:
         )
         return os.EX_OK
 
-    def create(self: Self, template: str, name: str) -> int:
+    def create(self: "CLI", template: str, name: str) -> int:
         """
         Create a new job spec
 
@@ -111,7 +111,7 @@ class CLI:
             return os.EX_CANTCREAT
         return os.EX_OK
 
-    def validate(self: Self, job_spec: str) -> int:
+    def validate(self: "CLI", job_spec: str) -> int:
         """
         Validate a job spec
 
@@ -142,7 +142,7 @@ class CLI:
             return os.EX_NOINPUT
         return os.EX_OK
 
-    def submit(self: Self, job_spec: str) -> int:
+    def submit(self: "CLI", job_spec: str) -> int:
         """
         Submit a job array for an existing job spec
 
@@ -169,7 +169,7 @@ class CLI:
         return os.EX_OK
 
     def status(
-        self: Self,
+        self: "CLI",
         count: int = 10,
         completed: bool = False,
         failed: bool = False,
@@ -218,15 +218,15 @@ class CLI:
             """
             if all:
                 return True
-            match status.lower().split()[0]:
-                case "completed":
-                    return completed
-                case "failed":
-                    return failed
-                case "canceled":
-                    return canceled
-                case _:
-                    return pending_scheduled_running
+            status_prefix = status.lower().split()[0]
+            if status_prefix == "completed":
+                return completed
+            elif status_prefix == "failed":
+                return failed
+            elif status_prefix == "canceled":
+                return canceled
+            else:
+                return pending_scheduled_running
 
         df["status"] = df["status"].apply(lambda x: x if filter_status(x) else None)
         df = df[~df["status"].isnull()]
@@ -237,7 +237,7 @@ class CLI:
         print(df.to_string(index=False))
         return os.EX_OK
 
-    def cancel(self: Self, array_or_job: str, no_confirm: bool = False) -> int:
+    def cancel(self: "CLI", array_or_job: str, no_confirm: bool = False) -> int:
         """
         Cancel submitted jobs
 
@@ -320,7 +320,7 @@ class CLI:
             pass
         return os.EX_OK
 
-    def run(self: Self) -> int:
+    def run(self: "CLI") -> int:
         """
         Execute the CLI in the current process (blocking).
 
@@ -359,7 +359,7 @@ class CLI:
                     dest = f"--{dest}"
                 if arg in annotations:
                     arg_type = annotations[arg]
-                    if arg_type == Self:
+                    if isinstance(arg_type, type(self)):
                         continue
                     if arg_type is bool and default is not None:
                         kwargs["action"] = "store_false" if default else "store_true"

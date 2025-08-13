@@ -24,12 +24,11 @@ def remote_target_from_target(target: Target) -> RemoteTarget:
         An instance of the child class matching the batch system of the target
     """
     sentinel = RemoteTarget._FactoryAccessToken()
-    match target.batch_system:
-        case "slurm":
-            return SlurmRemoteTarget(sentinel, target)
-        case "pbs":
-            return PBSRemoteTarget(sentinel, target)
-        case "none":
-            return DirectExecutionRemoteTarget(sentinel, target)
-        case _:
-            raise ValueError(f'Unknown batch system "{target.batch_system}"')
+    if target.batch_system == "slurm":
+        return SlurmRemoteTarget(sentinel, target)
+    elif target.batch_system == "pbs":
+        return PBSRemoteTarget(sentinel, target)
+    elif target.batch_system == "none":
+        return DirectExecutionRemoteTarget(sentinel, target)
+    else:
+        raise ValueError(f'Unknown batch system "{target.batch_system}"')

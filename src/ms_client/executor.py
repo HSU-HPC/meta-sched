@@ -5,10 +5,9 @@ import signal
 import time
 import traceback
 from types import FrameType
-from typing import List, Optional, Self, Set, Tuple
+from typing import List, Optional, Set, Tuple
 
 import ms_common.schemas
-from ms_common import schemas
 from ms_common.schemas import JobKey
 from ms_common.schemas import Spec as JobSpec
 from ms_common.schemas import Target
@@ -30,7 +29,7 @@ class Executor:
     """
 
     def __init__(
-        self: Self,
+        self: "Executor",
         job: Job,
         job_token: str,
         scheduler: SchedulerClientInterface,
@@ -57,7 +56,7 @@ class Executor:
         self.__redirect_output = redirect_output
 
     def __signal_handler(
-        self: Self, signal_number: int, frame: Optional[FrameType]
+        self: "Executor", signal_number: int, frame: Optional[FrameType]
     ) -> None:
         """
         Handle a signal sent to the process.
@@ -174,7 +173,7 @@ class Executor:
                 available_targets.add(t.id)
         return available_targets
 
-    def __run(self: Self) -> None:
+    def __run(self: "Executor") -> None:
         """
         Execute the job (blocking the calling thread).
         """
@@ -194,23 +193,20 @@ class Executor:
             raise StatusException(
                 os.EX_UNAVAILABLE, "Could not get scheduling decision"
             )
-        match decision:
-            case ms_common.schemas.Impossible():
-                raise Exception(
-                    f"Can't schedule job spec {self.__job.spec.name} anywhere."
-                )
-            case schemas.Assigned():
-                target = [
-                    t for t in self.__scheduler.targets if t.id == decision.target_id
-                ][0]
-                wait_seconds = max(0, decision.timestamp_start - int(time.time()))
-                eprint(
-                    f"Scheduler assigned {target.id} ({target.host}) in T minus {wait_seconds} seconds (at {decision.timestamp_start})"
-                )
-                self.__job.set_status(job.Status.Scheduled(target.id))
-                time.sleep(wait_seconds)
-            case _:
-                raise NotImplementedError("Unknown scheduling decision type")
+        if isinstance(decision, ms_common.schemas.Impossible):
+            raise Exception(f"Can't schedule job spec {self.__job.spec.name} anywhere.")
+        elif isinstance(decision, ms_common.schemas.Assigned):
+            target = [
+                t for t in self.__scheduler.targets if t.id == decision.target_id
+            ][0]
+            wait_seconds = max(0, decision.timestamp_start - int(time.time()))
+            eprint(
+                f"Scheduler assigned {target.id} ({target.host}) in T minus {wait_seconds} seconds (at {decision.timestamp_start})"
+            )
+            self.__job.set_status(job.Status.Scheduled(target.id))
+            time.sleep(wait_seconds)
+        else:
+            raise NotImplementedError("Unknown scheduling decision type")
         remote_target = remote_target_from_target(target)
         eprint(
             f"=== 2. Copying input files to target {target.id} and run optional setup step ==="
@@ -275,7 +271,7 @@ class Executor:
         expect_ok(job_exit_code, "Non-zero job exit code")
         eprint("=== All done ===")
 
-    def run(self: Self) -> None:
+    def run(self: "Executor") -> None:
         """
         Execute the job (blocking the calling thread) and manage output files.
         """

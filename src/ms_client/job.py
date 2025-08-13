@@ -1,12 +1,12 @@
 """Module containing functions and classes related to the jobs executed by the Meta Scheduler client component."""
 
 import abc
-import tomllib
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Optional, Self
+from typing import Any, List, Optional
 
 import pandas as pd
+import tomli
 from ms_common.schemas import Spec
 from ms_common.utils import eprint
 
@@ -53,13 +53,13 @@ def load_job_spec(name: str) -> Spec:
 
     Returns
     -------
-    Self
+    Spec
         The loaded job specification
     """
     path = get_jobs_dir() / name
     if not path.is_dir():
         raise ValueError("Job spec path must be a directory")
-    kwargs = tomllib.loads((path / "spec.toml").read_text())
+    kwargs = tomli.loads((path / "spec.toml").read_text())
     return Spec(name=name, **kwargs)
 
 
@@ -180,7 +180,7 @@ class Status(abc.ABC):
     class _Enum:
         """The base class for the status of a job."""
 
-        def __init__(self: Self) -> None:
+        def __init__(self: "Status._Enum") -> None:
             """
             Create a new instance of a job status.
 
@@ -193,7 +193,7 @@ class Status(abc.ABC):
                 raise NotImplementedError()
             self._data: Any = []
 
-        def __str__(self: Self) -> str:
+        def __str__(self: "Status._Enum") -> str:
             return " ".join(
                 [self.__class__.__name__.lower()] + [str(x) for x in self._data]
             )
@@ -201,7 +201,7 @@ class Status(abc.ABC):
     class Scheduled(_Enum):
         """State representing a job that has been assigned to a target but is not yet running."""
 
-        def __init__(self: Self, target_id: str) -> None:
+        def __init__(self: "Status._Enum", target_id: str) -> None:
             """
             Create a new instance of a state representing a scheduled job.
 
@@ -215,7 +215,7 @@ class Status(abc.ABC):
     class Running(_Enum):
         """Class representing a job that is currently running on a target."""
 
-        def __init__(self: Self, target_id: str) -> None:
+        def __init__(self: "Status._Enum", target_id: str) -> None:
             """
             Create a new instance of a state representing a running job.
 
@@ -244,7 +244,7 @@ class Status(abc.ABC):
     class Failed(_Enum):
         """Class representing a job that was started on a target but has exited unsuccessfully."""
 
-        def __init__(self: Self, status: int) -> None:
+        def __init__(self: "Status._Enum", status: int) -> None:
             """
             Create a new instance of a state representing a failed job.
 
@@ -270,7 +270,7 @@ class Instance:
     array_idx: int
 
     @property
-    def local_output(self: Self) -> Path:
+    def local_output(self: "Instance") -> Path:
         """
         Get the relative path to the output files of the job on the submit host.
 
@@ -284,7 +284,7 @@ class Instance:
         )
 
     @property
-    def local_input(self: Self) -> Path:
+    def local_input(self: "Instance") -> Path:
         """
         Get the relative path to the input files of the job on the submit host.
 
@@ -296,7 +296,7 @@ class Instance:
         return get_jobs_dir(hidden=False) / self.spec.name / "input"
 
     @property
-    def remote_output(self: Self) -> Path:
+    def remote_output(self: "Instance") -> Path:
         """
         Get the relative path to the output files of the job on the target.
 
@@ -310,7 +310,7 @@ class Instance:
         )
 
     @property
-    def remote_input(self: Self) -> Path:
+    def remote_input(self: "Instance") -> Path:
         """
         Get the relative path to the input files of the job on the target.
 
@@ -321,7 +321,7 @@ class Instance:
         """
         return get_jobs_dir(hidden=True) / self.spec.name / "input"
 
-    def set_status(self: Self, status: Status._Enum) -> None:
+    def set_status(self: "Instance", status: Status._Enum) -> None:
         """
         Update the status of the job on the submit host.
 

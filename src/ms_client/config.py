@@ -1,9 +1,9 @@
 """Module containing the configuration for the Meta Scheduler client."""
 
-import tomllib
 from pathlib import Path
-from typing import Any, List, Self, Tuple
+from typing import Any, List, Tuple
 
+import tomli
 from pydantic import BaseModel, Field, model_validator
 
 import ms_client.data as data
@@ -68,7 +68,7 @@ class Config(BaseModel):
         return config
 
     @property
-    def endpoint(self: Self) -> str:
+    def endpoint(self: "Config") -> str:
         """
         Get the full endpoint URL of the Meta Scheduler server.
 
@@ -80,7 +80,7 @@ class Config(BaseModel):
         return f"{self.protocol}://{self.host}:{self.port}"
 
     @classmethod
-    def load(cls, raise_on_missing: bool = False) -> Self:
+    def load(cls, raise_on_missing: bool = False) -> "Config":
         """
         Load and validate the client configuration.
 
@@ -91,7 +91,7 @@ class Config(BaseModel):
 
         Returns
         -------
-        Self
+        Config
             The loaded configuration
         """
         config_path = Path.home() / ".config" / "meta-sched.toml"
@@ -102,6 +102,6 @@ class Config(BaseModel):
                 raise FileNotFoundError(
                     f'No config file found. (Default was created at "{config_path}", please repeat!)'
                 )
-        values = tomllib.loads(config_path.read_text())
+        values = tomli.loads(config_path.read_text())
         config = cls.model_validate(values)
         return config

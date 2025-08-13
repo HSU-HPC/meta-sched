@@ -2,7 +2,7 @@
 
 import time
 from types import MappingProxyType
-from typing import Any, Dict, List, Literal, NamedTuple, Optional, Self, Tuple, Union
+from typing import Any, Dict, List, Literal, NamedTuple, Optional, Tuple, Union
 
 from frozendict import frozendict
 from pydantic import BaseModel, TypeAdapter, field_validator, model_validator
@@ -288,7 +288,7 @@ class JobKey(NamedTuple):
     array_id: int
     array_idx: int
 
-    def __str__(self: Self) -> str:
+    def __str__(self: "JobKey") -> str:
         return f"{self.token}_{self.array_id}_{self.array_idx}"
 
 class Impossible(BaseModel):
@@ -329,7 +329,7 @@ SchedulingDecisionType = Union[Impossible, Assigned]
 class SchedulingDecision:
     """Utility class for scheduling decisions."""
 
-    def __init__(self: Self) -> None:
+    def __init__(self: "SchedulingDecision") -> None:
         """SchedulingDecision is not meant to be instantiated."""
         raise NotImplementedError("SchedulingDecision is a type alias, not a class.")
 

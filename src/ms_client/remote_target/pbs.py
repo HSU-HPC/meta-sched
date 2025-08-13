@@ -2,7 +2,7 @@
 
 import sys
 import time
-from typing import Any, Dict, List, Optional, Self, Tuple
+from typing import Any, Dict, List, Optional, Tuple
 
 import pandas as pd
 from fabric import Connection  # type: ignore[attr-defined]
@@ -19,7 +19,7 @@ class PBSRemoteTarget(BatchSystemTarget):
     """RemoteTarget implementation for a PBS Pro/OpenPBS system."""
 
     def _submit_job(
-        self: Self,
+        self: "PBSRemoteTarget",
         connection: Connection,
         job: Job,
         oe: Tuple[str, str],
@@ -81,7 +81,9 @@ class PBSRemoteTarget(BatchSystemTarget):
         pbs_job_id = result.stdout.strip()
         return str(pbs_job_id)
 
-    def _has_job_started(self: Self, connection: Connection, local_job_id: str) -> bool:
+    def _has_job_started(
+        self: "PBSRemoteTarget", connection: Connection, local_job_id: str
+    ) -> bool:
         """
         Check if the job has started being executed by the batch system.
 
@@ -105,7 +107,7 @@ class PBSRemoteTarget(BatchSystemTarget):
         )
 
     def _get_job_start_time(
-        self: Self, connection: Connection, local_job_id: str
+        self: "PBSRemoteTarget", connection: Connection, local_job_id: str
     ) -> Optional[int]:
         """
         Get the timestamp of when the job started executing.
@@ -132,7 +134,9 @@ class PBSRemoteTarget(BatchSystemTarget):
             pass
         return timestamp_start
 
-    def _has_job_ended(self: Self, connection: Connection, local_job_id: str) -> bool:
+    def _has_job_ended(
+        self: "PBSRemoteTarget", connection: Connection, local_job_id: str
+    ) -> bool:
         """
         Check if the job has stopped being executed by the batch system.
 
@@ -153,7 +157,7 @@ class PBSRemoteTarget(BatchSystemTarget):
         return len(result.stdout.strip()) == 0
 
     def _get_job_end_time(
-        self: Self, connection: Connection, local_job_id: str
+        self: "PBSRemoteTarget", connection: Connection, local_job_id: str
     ) -> Optional[int]:
         """
         Get the timestamp of when the job stopped executing.
@@ -188,7 +192,9 @@ class PBSRemoteTarget(BatchSystemTarget):
             pass
         return timestamp_end
 
-    def _cancel_job(self: Self, connection: Connection, local_job_id: str) -> None:
+    def _cancel_job(
+        self: "PBSRemoteTarget", connection: Connection, local_job_id: str
+    ) -> None:
         """
         Cancel the job submitted to the batch system.
 
@@ -202,7 +208,7 @@ class PBSRemoteTarget(BatchSystemTarget):
         expect_ok(self._run(connection, f"qdel {local_job_id}").exited)
 
     def _get_job_exit_code(
-        self: Self, connection: Connection, local_job_id: str
+        self: "PBSRemoteTarget", connection: Connection, local_job_id: str
     ) -> Optional[int]:
         """
         Check if the job has started being executed by the batch system.
@@ -240,7 +246,7 @@ class PBSRemoteTarget(BatchSystemTarget):
             eprint(f"Job completed, but could not determine exit code using {cmd}:")
         return exit_code
 
-    def get_status(self: Self) -> TargetStatus:
+    def get_status(self: "PBSRemoteTarget") -> TargetStatus:
         """
         Get the status of the remote PBS target.
 

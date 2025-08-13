@@ -3,7 +3,7 @@
 import abc
 import sys
 import time
-from typing import Any, Dict, Optional, Self, Tuple
+from typing import Any, Dict, Optional, Tuple
 
 from fabric import Connection  # type: ignore[attr-defined]
 from ms_common.utils import eprint
@@ -20,7 +20,7 @@ class BatchSystemTarget(RemoteTarget):
 
     @abc.abstractmethod
     def _submit_job(
-        self: Self,
+        self: "BatchSystemTarget",
         connection: Connection,
         job: Job,
         oe: Tuple[str, str],
@@ -53,7 +53,9 @@ class BatchSystemTarget(RemoteTarget):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def _has_job_started(self: Self, connection: Connection, local_job_id: str) -> bool:
+    def _has_job_started(
+        self: "BatchSystemTarget", connection: Connection, local_job_id: str
+    ) -> bool:
         """
         Check if the job has started being executed by the batch system.
 
@@ -78,7 +80,7 @@ class BatchSystemTarget(RemoteTarget):
 
     @abc.abstractmethod
     def _get_job_start_time(
-        self: Self, connection: Connection, local_job_id: str
+        self: "BatchSystemTarget", connection: Connection, local_job_id: str
     ) -> Optional[int]:
         """
         Get the timestamp of when the job started executing.
@@ -103,7 +105,9 @@ class BatchSystemTarget(RemoteTarget):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def _has_job_ended(self: Self, connection: Connection, local_job_id: str) -> bool:
+    def _has_job_ended(
+        self: "BatchSystemTarget", connection: Connection, local_job_id: str
+    ) -> bool:
         """
         Check if the job has stopped being executed by the batch system.
 
@@ -128,7 +132,7 @@ class BatchSystemTarget(RemoteTarget):
 
     @abc.abstractmethod
     def _get_job_end_time(
-        self: Self, connection: Connection, local_job_id: str
+        self: "BatchSystemTarget", connection: Connection, local_job_id: str
     ) -> Optional[int]:
         """
         Get the timestamp of when the job stopped executing.
@@ -153,7 +157,9 @@ class BatchSystemTarget(RemoteTarget):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def _cancel_job(self: Self, connection: Connection, local_job_id: str) -> None:
+    def _cancel_job(
+        self: "BatchSystemTarget", connection: Connection, local_job_id: str
+    ) -> None:
         """
         Cancel the job submitted to the batch system.
 
@@ -173,7 +179,7 @@ class BatchSystemTarget(RemoteTarget):
 
     @abc.abstractmethod
     def _get_job_exit_code(
-        self: Self, connection: Connection, local_job_id: str
+        self: "BatchSystemTarget", connection: Connection, local_job_id: str
     ) -> Optional[int]:
         """
         Check if the job has started being executed by the batch system.
@@ -198,7 +204,7 @@ class BatchSystemTarget(RemoteTarget):
         raise NotImplementedError()
 
     def _execute(
-        self: Self,
+        self: "BatchSystemTarget",
         job: Job,
         callbacks: RemoteTarget.JobExecutionCallbacks,
         env: Dict[str, Any] = {},

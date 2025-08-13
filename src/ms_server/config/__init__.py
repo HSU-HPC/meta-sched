@@ -2,11 +2,11 @@
 
 import importlib
 import importlib.util
-import tomllib
 from os import PathLike
 from pathlib import Path
-from typing import Any, List, Optional, Self, Type
+from typing import Any, List, Optional, Type, Union
 
+import tomli
 from ms_common.schemas import Target
 from pydantic import BaseModel, model_validator
 
@@ -66,7 +66,7 @@ class Config(BaseModel):
         return (Path(__file__).parent / "example.toml").absolute()
 
     @property
-    def scheduler_class(self: Self) -> Type[Policy]:
+    def scheduler_class(self: "Config") -> Type[Policy]:
         """
         Get the scheduling policy to be applied.
 
@@ -79,21 +79,21 @@ class Config(BaseModel):
         return self._scheduler_class
 
     @classmethod
-    def load(cls, path: str | PathLike[Any]) -> Self:
+    def load(cls, path: Union[str, PathLike[Any]]) -> "Config":
         """
         Load a configuration from a file.
 
         Parameters
         ----------
-        path : str | PathLike[Any]
+        path : Union[str, PathLike[Any]]
             The path to the file containing the configuration
 
         Returns
         -------
-        Self
+        Config
             The loaded configuration
         """
-        values = tomllib.loads(Path(path).read_text())
+        values = tomli.loads(Path(path).read_text())
         return cls.model_validate(values)
 
     @model_validator(mode="after")

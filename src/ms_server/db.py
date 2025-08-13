@@ -1,6 +1,6 @@
 """Module containing database specific code for the Meta Scheduler server component."""
 
-from typing import Any, Dict, List, Optional, Self, Set
+from typing import Any, Dict, List, Optional, Set
 
 import zmq
 from ms_common.schemas import JobKey, SchedulingDecisionType
@@ -109,7 +109,7 @@ class DataBase(Model):
     Database class containing the state of the Meta Scheduler server component which implements the model interface.
     """
 
-    def __init__(self: Self, db_url: str, targets: List[Target]) -> None:
+    def __init__(self: "DataBase", db_url: str, targets: List[Target]) -> None:
         """
         Connect to a database to use as the Meta Scheduler server model.
 
@@ -124,13 +124,12 @@ class DataBase(Model):
             The targets available to the Meta Scheduler
         """
         prefix, suffix = db_url.split("://")
-        match prefix:
-            case "sqlite":
-                prefix += "+aiosqlite"
-            case "postgresql":
-                prefix += "+asyncpg"
-            case _:
-                raise ValueError("Invalid db_url prefix", prefix)
+        if prefix == "sqlite":
+            prefix += "+aiosqlite"
+        elif prefix == "postgresql":
+            prefix += "+asyncpg"
+        else:
+            raise ValueError("Invalid db_url prefix", prefix)
         db_url = f"{prefix}://{suffix}"
         connect_args = dict(
             check_same_thread=False
@@ -149,7 +148,7 @@ class DataBase(Model):
 
         self.__targets = {t.id: t for t in targets}
 
-    async def init_models(self: Self) -> None:
+    async def init_models(self: "DataBase") -> None:
         """Create the tables for the model."""
         async with self.__engine.begin() as connection:
             await connection.run_sync(_Base.metadata.create_all)
@@ -162,12 +161,12 @@ class DataBase(Model):
                     [TargetStatus(target_id=t, status=None) for t in self.__targets]
                 )
 
-    async def dispose(self: Self) -> None:
+    async def dispose(self: "DataBase") -> None:
         """Disconnect cleanly from the database."""
         await self.__engine.dispose()
 
     async def create_job_array(
-        self: Self, spec: JobSpec, available_targets: Set[str], token: str
+        self: "DataBase", spec: JobSpec, available_targets: Set[str], token: str
     ) -> int:
         """
         Create a new array of jobs for scheduling.
@@ -199,7 +198,7 @@ class DataBase(Model):
                 await session.refresh(job_array)
             return int(job_array.id)  # pyright: ignore[reportArgumentType]
 
-    async def get_pending_jobs(self: Self) -> List[JobSchema]:
+    async def get_pending_jobs(self: "DataBase") -> List[JobSchema]:
         """
         Get a list of jobs which are pending scheduling.
 
@@ -214,7 +213,7 @@ class DataBase(Model):
             )
             return [JobSchema.model_validate(s) for s in result.scalars().all()]
 
-    async def get_decided_jobs(self: Self) -> List[JobSchema]:
+    async def get_decided_jobs(self: "DataBase") -> List[JobSchema]:
         """
         Get a list of jobs for which a scheduling decision has been made.
 
@@ -233,7 +232,7 @@ class DataBase(Model):
             return [JobSchema.model_validate(s) for s in result.scalars().all()]
 
     async def __get_job(
-        self: Self, job_key: JobKey, session: Optional[AsyncSession] = None
+        self: "DataBase", job_key: JobKey, session: Optional[AsyncSession] = None
     ) -> Job:
         """
         Get a job from the database by key.
@@ -274,7 +273,9 @@ class DataBase(Model):
             if should_close_session:
                 await session.close()
 
-    async def update_job(self: Self, job_key: JobKey, data: Dict[str, Any]) -> None:
+    async def update_job(
+        self: "DataBase", job_key: JobKey, data: Dict[str, Any]
+    ) -> None:
         """
         Update an existing job.
 
@@ -302,7 +303,7 @@ class DataBase(Model):
             job_json = JobSchema.model_validate(job).model_dump_json()
         self.__pub_socket.send_string(f"job:{job_key} {job_json}")
 
-    async def remove_job(self: Self, job_key: JobKey) -> None:
+    async def remove_job(self: "DataBase", job_key: JobKey) -> None:
         """
         Remove a job.
 
@@ -323,7 +324,7 @@ class DataBase(Model):
         self.__pub_socket.send_string(f"job:{job_key} null")
 
     async def await_scheduling_decision(
-        self: Self, job_key: JobKey
+        self: "DataBase", job_key: JobKey
     ) -> SchedulingDecisionType:
         """
         Await a scheduling decision for a specific job.
@@ -355,7 +356,7 @@ class DataBase(Model):
             return decision
 
     async def update_targets_status(
-        self: Self, target_id: str, status: TargetStatusSchema
+        self: "DataBase", target_id: str, status: TargetStatusSchema
     ) -> None:
         """
         Update the status of a target.
@@ -378,7 +379,7 @@ class DataBase(Model):
                 )
 
     async def get_targets_status(
-        self: Self,
+        self: "DataBase",
     ) -> TargetsStatus:
         """
         Get all targets and their last known status.

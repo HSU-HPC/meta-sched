@@ -1,6 +1,6 @@
 """Module containing class for remote target without a batch system."""
 
-from typing import Any, Dict, Self
+from typing import Any, Dict
 
 from ms_client.job import Instance as Job
 from ms_client.remote_target import RemoteTarget
@@ -11,7 +11,7 @@ class DirectExecutionRemoteTarget(RemoteTarget):
     """RemoteTarget implementation a target without any batch system."""
 
     def _execute(
-        self: Self,
+        self: "DirectExecutionRemoteTarget",
         job: Job,
         callbacks: RemoteTarget.JobExecutionCallbacks,
         env: Dict[str, Any] = {},

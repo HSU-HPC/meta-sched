@@ -1,7 +1,7 @@
 """Module containing the interface for the scheduling policy."""
 
 import abc
-from typing import List, Self, Set
+from typing import List, Set
 
 from ms_common.schemas import (JobKey, ScheduleResponse,
                                SchedulingDecisionType, Spec, Target)
@@ -12,7 +12,7 @@ class SchedulerClientInterface(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def targets(self: Self) -> List[Target]:
+    def targets(self: "SchedulerClientInterface") -> List[Target]:
         """
         Get all targets which jobs may be assigned to.
 
@@ -30,7 +30,7 @@ class SchedulerClientInterface(abc.ABC):
 
     @abc.abstractmethod
     def submit_job_array(
-        self: Self, job_spec: Spec, available_targets: Set[str]
+        self: "SchedulerClientInterface", job_spec: Spec, available_targets: Set[str]
     ) -> ScheduleResponse:
         """
         Create a new unique identifier for a new job array and schedule the corresponding jobs.
@@ -56,7 +56,7 @@ class SchedulerClientInterface(abc.ABC):
 
     @abc.abstractmethod
     def poll_scheduling_decision(
-        self: Self,
+        self: "SchedulerClientInterface",
         job_key: JobKey,
     ) -> SchedulingDecisionType:
         """
@@ -80,7 +80,7 @@ class SchedulerClientInterface(abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def cancel_job(self: Self, job_key: JobKey) -> None:
+    def cancel_job(self: "SchedulerClientInterface", job_key: JobKey) -> None:
         """
         Cancel a job.
 
@@ -97,7 +97,9 @@ class SchedulerClientInterface(abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def update_job_started(self: Self, job_key: JobKey, timestamp: int) -> None:
+    def update_job_started(
+        self: "SchedulerClientInterface", job_key: JobKey, timestamp: int
+    ) -> None:
         """
         Set the timestamp when a job was started.
 
@@ -116,7 +118,9 @@ class SchedulerClientInterface(abc.ABC):
         raise NotImplementedError()
 
     @abc.abstractmethod
-    def update_job_ended(self: Self, job_key: JobKey, timestamp: int) -> None:
+    def update_job_ended(
+        self: "SchedulerClientInterface", job_key: JobKey, timestamp: int
+    ) -> None:
         """
         Set the timestamp when a job was ended.
 
