@@ -352,6 +352,8 @@ class CLI:
             defaults = [] if full_arg_spec.defaults is None else full_arg_spec.defaults
             for i, arg in enumerate(args):
                 dest = arg.replace("_", "-")
+                if dest == "self":
+                    continue
                 kwargs: Dict[str, Any] = dict()
                 default = None
                 if i >= len(args) - len(defaults):
@@ -359,8 +361,6 @@ class CLI:
                     dest = f"--{dest}"
                 if arg in annotations:
                     arg_type = annotations[arg]
-                    if isinstance(arg_type, type(self)):
-                        continue
                     if arg_type is bool and default is not None:
                         kwargs["action"] = "store_false" if default else "store_true"
                     else:

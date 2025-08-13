@@ -97,6 +97,7 @@ class Config(BaseModel):
         config_path = Path.home() / ".config" / "meta-sched.toml"
         if not config_path.is_file():
             # Write default config to path
+            config_path.parent.mkdir(exist_ok=True, parents=True)
             config_path.write_text(data.get_default_config_path().read_text())
             if raise_on_missing:
                 raise FileNotFoundError(
