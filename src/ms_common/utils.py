@@ -4,7 +4,7 @@ import functools
 import os
 import shlex
 import sys
-from typing import Any, Callable, Optional, TypeVar, cast
+from typing import Any, Callable, Optional, TypeVar, Union, cast
 import warnings
 
 # See https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html
@@ -96,14 +96,14 @@ def try_become_root(required: bool = False) -> None:
             sys.exit(os.EX_NOPERM)
 
 
-def time_to_seconds(time: str | int) -> int:
+def time_to_seconds(time: Union[str, int]) -> int:
     """
     Compute duration in seconds from string in the format "d-hh:MM:ss".
     (Components are parsed from right to left and left-incomplete strings are allowed.)
 
     Parameters
     ----------
-    time : str | int
+    time : Union[str, int]
         Formatted time duration or seconds (no parsing needed)
 
 
