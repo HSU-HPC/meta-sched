@@ -36,7 +36,7 @@ where = ["../../src"]
 include = ["ms_server", "ms_server.config", "ms_server.scheduling", "ms_common"]
 
 [tool.setuptools.package-data]
-"server" = ["config/example.toml"]
+"ms_server.config" = ["example.toml"]
 
 [tool.setuptools.dynamic]
 version = {attr = "ms_common.__version__"}

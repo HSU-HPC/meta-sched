@@ -20,7 +20,7 @@ elif [[ "$COMPONENT" != "client" && "$COMPONENT" != "server" ]]; then
     exit 1
 fi
 
-PYTHON_VERSION=3.12.11 # Must be exact Python version (MAJOR.MINOR.PATCH)
+PYTHON_VERSION=3.9.21 # Must be exact Python version (MAJOR.MINOR.PATCH)
 PROFILE="$HOME/.bashrc"
 
 echo "=== Set up environment ==="
