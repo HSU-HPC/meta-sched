@@ -45,7 +45,7 @@ class Client(SchedulerClientInterface):
             response = requests.get(f"{self.__endpoint}/version")
         except Exception:
             raise RuntimeError(
-                f"Could check server version at {self.__endpoint}. (Is it running?)"
+                f"Could not check server version at {self.__endpoint}. (Is it running?)"
             )
         if http.HTTPStatus.OK != response.status_code:
             raise http.client.error(response.status_code, response.text)

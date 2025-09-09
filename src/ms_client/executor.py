@@ -124,7 +124,7 @@ class Executor:
             if t not in tags:
                 return False, f'Required tag "{t}" missing'
         for m in job_spec.required_modules:
-            if m not in target.module_map:
+            if m not in target.module_map:  # type: ignore[operator]
                 return False, f'Required module "{m}" missing'
         return True, "OK"
 

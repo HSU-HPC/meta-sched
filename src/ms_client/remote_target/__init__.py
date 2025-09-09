@@ -291,7 +291,7 @@ class RemoteTarget:
             The result of the command
         """
         # Prefix command with source scripts and modules before execution
-        specific_modules = [self._target.module_map[m] for m in modules]
+        specific_modules = [self._target.module_map[m] for m in modules]  # type: ignore[index]
         cmd = " && ".join(
             [f". {script}" for script in self._target.source_scripts]
             + [f"module load {module}" for module in specific_modules]

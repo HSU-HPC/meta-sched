@@ -5,7 +5,7 @@ from types import MappingProxyType
 from typing import Any, Dict, List, Literal, NamedTuple, Optional, Tuple, Union
 
 from frozendict import frozendict
-from pydantic import BaseModel, TypeAdapter, field_validator, model_validator
+from pydantic import BaseModel, TypeAdapter, field_validator, model_validator, computed_field
 from ms_common import utils
 from ms_common.utils import eprint, time_to_seconds
 
@@ -94,7 +94,20 @@ class Target(BaseModel):
     max_time: Optional[str] = None
     max_nodes: Optional[int] = None
     source_scripts: Tuple[str, ...] = ()
-    module_map: frozendict[str, str] = frozendict[str, str]()
+    _module_map: frozendict[str, str] = frozendict[str, str]()
+
+    @computed_field(return_type=Dict[str, str])
+    def module_map(self) -> Dict[str, str]:
+        """
+        Target module mapping (e.g. MPI -> OpenMPI).
+        
+        Returns
+        -------
+        Dict[str, str]
+            The mapping from abstract to concrete environment modules provided by the target
+        """
+        return dict(self._module_map)
+
     tags: Tuple[str, ...] = ()
 
     model_config = dict(frozen=True, arbitrary_types_allowed=True)
@@ -125,6 +138,19 @@ class Target(BaseModel):
         if not is_valid:
             raise TypeError("\"module_map\" must be a dict or frozendict with keys and values only of type str")
         return frozendict(v)
+
+    def __init__(self: "Target", **data: Any) -> None:
+        """Create a new instance of the target objects.
+        
+        Parameters
+        ----------
+        data : Any
+            Fields of the object to be created (Must contain "module_map")
+        """
+        # Convert module_map to frozendict during initialization
+        module_map = data.pop('module_map', {})
+        super().__init__(**data)
+        object.__setattr__(self, '_module_map', frozendict(module_map))
 
     @model_validator(mode="after")
     def validate_attributes(cls, target: Any) -> Any:

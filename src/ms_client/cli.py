@@ -74,7 +74,7 @@ class CLI:
         print(
             f"\n({targets_missing_user} incomplete target configs require credentials to be added.)"
         )
-        return os.EX_OK
+        return os.EX_OK if targets_missing_user == 0 else os.EX_TEMPFAIL
 
     def create(self: "CLI", template: str, name: str) -> int:
         """
