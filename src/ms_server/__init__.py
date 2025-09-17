@@ -10,8 +10,10 @@ import sys
 import time
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncGenerator
+from typing import Any, AsyncGenerator, Optional
 
+import ms_common
+import ms_common.schemas
 from ms_common.schemas import JobKey, SchedulingDecisionType
 from ms_common.utils import eprint, try_become_root
 from pydantic import ValidationError
@@ -48,7 +50,9 @@ async def scheduling_loop(
                 job
                 for job in decided_jobs
                 if job.timestamp_start is None
-                or job.timestamp_start + job.spec.seconds + scheduling_loop_interval
+                or job.timestamp_start
+                + job.requested_seconds
+                + scheduling_loop_interval
                 > int(time.time())
             ]
             targets_status = await model.get_targets_status()
@@ -145,6 +149,8 @@ def main() -> int:
             pass
         await model.dispose()
 
+    targets = {t.id: t for t in config.targets}
+
     async def on_schedule_job(
         job_key: JobKey, scheduling_decision: SchedulingDecisionType
     ) -> None:
@@ -158,7 +164,14 @@ def main() -> int:
         scheduling_decision : SchedulingDecisionType
             The scheduling decision that should be applied to the job
         """
-        await model.update_job(job_key, dict(scheduling_decision=scheduling_decision))
+        seconds: Optional[int] = None
+        if isinstance(scheduling_decision, ms_common.schemas.Assigned):
+            target = targets[scheduling_decision.target_id]
+            seconds = (await model.get_job(job_key)).spec.get_target_seconds(target)
+        await model.update_job(
+            job_key,
+            dict(scheduling_decision=scheduling_decision, requested_seconds=seconds),
+        )
 
     scheduler: Policy = config.scheduler_class(on_schedule_job)
     if "MS_API_KEY" not in os.environ:

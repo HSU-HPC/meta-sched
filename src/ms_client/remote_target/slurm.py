@@ -52,9 +52,14 @@ class SlurmRemoteTarget(BatchSystemTarget):
         if job.spec.exclusive:
             argv.append("--exclusive")
         argv.append(f"--nodes={job.spec.nodes}")
-        argv.append(f"--ntasks-per-node={job.spec.ranks_per_node}")
+        ranks_per_node = job.spec.ranks_per_node
+        if ranks_per_node is None:
+            ranks_per_node = self._target.cores_per_node // job.spec.cores_per_rank
+        argv.append(f"--ntasks-per-node={ranks_per_node}")
         argv.append(f"--cpus-per-task={job.spec.cores_per_rank}")
-        argv.append(f"--time={seconds_to_time(job.spec.seconds)}")
+        argv.append(
+            f"--time={seconds_to_time(job.spec.get_target_seconds(self._target))}"
+        )
         argv.append(f"--output={oe[0]}")
         argv.append(f"--error={oe[1]}")
         argv.append(f"--wrap='{job.spec.cmd_main}'")

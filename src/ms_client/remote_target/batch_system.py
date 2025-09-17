@@ -231,6 +231,8 @@ class BatchSystemTarget(RemoteTarget):
         stream_oe = False  # Must be false if not using long living connection
 
         eprint("--- a. Submitting job ---")
+        requested_seconds = job.spec.get_target_seconds(self._target)
+        eprint(f"SECONDS_REQUESTED={requested_seconds}")
         with self._connect() as connection:
             with connection.cd(job.remote_output):
                 output_error_files = self._create_oe_files(connection, stream_oe)
@@ -260,7 +262,7 @@ class BatchSystemTarget(RemoteTarget):
             """
             eprint("--- c. Awaiting job completion ---")
             # Do not wait requested time in case job completes earlier
-            # time.sleep(job.spec.seconds)
+            # time.sleep(requested_seconds)
             backoff = ExponentialBackoff()
             while True:
                 with self._connect() as connection:

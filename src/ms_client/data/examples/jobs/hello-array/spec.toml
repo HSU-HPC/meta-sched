@@ -1,3 +1,4 @@
 cmd_main = "python3 $MS_INPUT/caesar_cipher.py $MS_INPUT/lorem_ipsum.txt $(($MS_ARRAY_IDX + 1))"
 array_size = 3
-time       = "0-00:00:10" # d-hh:MM:ss
+# time       = "0-00:00:10" # d-hh:MM:ss
+time       = "=10 * p" # Just for demonstration: Request 10 x #cores

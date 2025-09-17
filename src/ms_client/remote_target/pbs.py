@@ -49,12 +49,18 @@ class PBSRemoteTarget(BatchSystemTarget):
             argv += ["-q", self._target.queue]
         if job.spec.exclusive:
             argv += ["-l", "place=excl"]
-        cores_per_node = job.spec.cores_per_rank * job.spec.ranks_per_node
+        ranks_per_node = job.spec.ranks_per_node
+        if ranks_per_node is None:
+            ranks_per_node = self._target.cores_per_node // job.spec.cores_per_rank
+        cores_per_node = job.spec.cores_per_rank * ranks_per_node
         argv += [
             "-l",
-            f"select={job.spec.nodes}:ncpus={cores_per_node}:mpiprocs={job.spec.ranks_per_node}:ompthreads={job.spec.cores_per_rank}",
+            f"select={job.spec.nodes}:ncpus={cores_per_node}:mpiprocs={ranks_per_node}:ompthreads={job.spec.cores_per_rank}",
         ]
-        argv += ["-l", f"walltime={seconds_to_time(job.spec.seconds, False)}"]
+        argv += [
+            "-l",
+            f"walltime={seconds_to_time(job.spec.get_target_seconds(self._target), False)}",
+        ]
         argv += ["-o", oe[0]]
         argv += ["-e", oe[1]]
         argv += ["-koed"]  # Stream output files from execution host

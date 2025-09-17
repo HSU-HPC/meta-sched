@@ -273,6 +273,29 @@ class DataBase(Model):
             if should_close_session:
                 await session.close()
 
+    async def get_job(self: "DataBase", job_key: JobKey) -> JobSchema:
+        """
+        Get an existing job.
+
+        Parameters
+        ----------
+        job_key : JobKey
+            The key of the job to be updated
+
+        Raises
+        ------
+        KeyError
+            If the job with the corresponding key does not exist
+
+        Returns
+        -------
+        Job
+            The job
+        """
+        async with self.__make_async_session() as session:
+            job = await self.__get_job(job_key, session)
+            return JobSchema.model_validate(job)
+
     async def update_job(
         self: "DataBase", job_key: JobKey, data: Dict[str, Any]
     ) -> None:

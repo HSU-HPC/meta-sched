@@ -1,7 +1,6 @@
 cmd_setup = "mpicxx $MS_INPUT/count.cpp -o count"
 cmd_main = "mpiexec ./count"
-array_size = 1
 nodes = 2
 ranks_per_node = 1
 required_modules = ["MPI"]
-time       = "0-00:05:00" # d-hh:MM:ss
+time       = "=p+10" # Takes one second per MPI rank (+10 buffer)

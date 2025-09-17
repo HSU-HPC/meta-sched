@@ -27,6 +27,8 @@ class Job(BaseModel):
         The set of target IDs which this job may be assigned to
     scheduling_decision : Optional[SchedulingDecisionType]
         The decision by the scheduling policy regarding this job or None, if the job has not yet been scheduled
+    requested_seconds : int
+        The number of seconds that will be requested on the concrete target that this job is assigned to (0 while not assigned)
     timestamp_start : Optional[int]
         The unix timestamp (seconds since epoch) of the job start or None, if the job has not yet started
     timestamp_end : Optional[int]
@@ -39,6 +41,7 @@ class Job(BaseModel):
     spec: JobSpec
     available_targets: List[str]
     scheduling_decision: Optional[SchedulingDecisionType]
+    requested_seconds: int = 0
     timestamp_start: Optional[int] = None
     timestamp_end: Optional[int] = None
 
@@ -117,6 +120,29 @@ class Model(abc.ABC):
         ------
         NotImplementedError
             Must be implemented by the concrete model
+        """
+        raise NotImplementedError()
+
+    async def get_job(self: "Model", job_key: JobKey) -> Job:
+        """
+        Get an existing job.
+
+        Parameters
+        ----------
+        job_key : JobKey
+            The key of the job to be updated
+
+        Raises
+        ------
+        KeyError
+            If the job with the corresponding key does not exist
+        NotImplementedError
+            Must be implemented by the concrete model
+
+        Returns
+        -------
+        Job
+            The job
         """
         raise NotImplementedError()
 

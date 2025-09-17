@@ -157,21 +157,33 @@ An example is given below:
 # (Here the binary will be included in the results downloaded from the target unless deleted.)
 # Note: The setup step is only executed after the job has been scheduled on a target.
 cmd_setup        = "mpicxx $MS_INPUT/example.cpp -o example"
-# Run the example three times on two nodes through the batch system
+# Run the example three times on two nodes through the batch system.
 # (Each job in the array may run on a different target.)
 cmd_main         = "mpiexec ./example --seed $MS_ARRAY_IDX"
 array_size       = 3
 nodes            = 2
 ranks_per_node   = 1
-# Optionally, supply number of cores (OpenMP) or node exclusivity
+# Optionally, supply number of cores (OpenMP) or request the full node (exclusive).
 # cores_per_rank   = 12
 # exclusive        = False
-# Only use targets providing an MPI implementation module like OpenMPI or MPICH (will be loaded)
+# Only use targets providing an MPI implementation module like OpenMPI or MPICH. (Will be loaded.)
 required_modules = ["MPI"]
-# Provide required wall time in the format d-hh:MM:ss or as "seconds = <seconds>"
+# Provide required wall time in the format d-hh:MM:ss or as 'seconds = <seconds>'.
+# To determine the number of seconds dynamically with SymPy, use 'time = "= <expression>" where p is the total number of cores available.
 time             = "0-00:05:00" 
-# Only consider a subset of targets (e.g. using renewable energy)
+# Only consider a subset of targets (e.g. using renewable energy).
 required_tags    = ["green"]
 ```
 
 The job spec can be validated with `mscli validate <job spec>`.
+
+### Toubleshooting
+
+If you encounter `No targets available to run job spec: <job spec>`, turn on debugging to investigate:
+
+```shell
+$ MS_DEBUG_FILTER_TARGETS=1 mscli-dev submit <job spec>
+[DEBUG]: Can the job run on hsuper-small: No (Required tag "green" missing)
+[DEBUG]: Can the job run on windhpc-wwit: No (Too many cores required)
+# ...
+```

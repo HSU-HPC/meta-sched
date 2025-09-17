@@ -172,3 +172,20 @@ def seconds_to_time(seconds: int, include_days: bool = True) -> str:
         return f"{days}-{hours:02d}:{minutes:02d}:{seconds:02d}"
     else:
         return f"{24 * days + hours:02d}:{minutes:02d}:{seconds:02d}"
+    
+def is_env_flag_set(key: str) -> bool:
+    """
+    Check if a flag is set as an environment variable is set (and not empty, 0, false, no).
+
+    Parameter
+    ---------
+    key : str
+        The name of the environment variable
+
+    Returns
+    -------
+    bool
+        The status of the flag from the environment variable
+    """
+    val = os.getenv(key, "").strip()
+    return len(val) > 0 and val != "0" and val.lower() != "false" and val.lower() != "no"

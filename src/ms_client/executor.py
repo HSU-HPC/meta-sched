@@ -11,7 +11,7 @@ import ms_common.schemas
 from ms_common.schemas import JobKey
 from ms_common.schemas import Spec as JobSpec
 from ms_common.schemas import Target
-from ms_common.utils import eprint, time_to_seconds
+from ms_common.utils import eprint, is_env_flag_set, time_to_seconds
 
 from ms_client import job, ssh
 from ms_client.config import TargetAdditionalConfigs
@@ -105,16 +105,20 @@ class Executor:
 
         if not ssh.has_ssh_config_entry(target.id):
             return False, "Credentials missing"
-        if target.max_time is not None and job_spec.seconds > time_to_seconds(
-            target.max_time
-        ):
+        if target.max_time is not None and job_spec.get_target_seconds(
+            target
+        ) > time_to_seconds(target.max_time):
             return False, "Too much time required"
         max_nodes = (
             min(target.nodes, target.max_nodes) if target.max_nodes else target.nodes
         )
         if job_spec.nodes > max_nodes:
             return False, "Too many nodes required"
-        cores_per_node = job_spec.ranks_per_node * job_spec.cores_per_rank
+        cores_per_node = (
+            target.cores_per_node
+            if job_spec.ranks_per_node is None
+            else (job_spec.ranks_per_node * job_spec.cores_per_rank)
+        )
         if cores_per_node > target.cores_per_node:
             return False, "Too many cores required"
         tags = target.tags
@@ -167,8 +171,10 @@ class Executor:
             is_suitable, reason = Executor.is_target_suitable(
                 t, job_spec, additional_configs
             )
-            # Uncomment for debugging:
-            # eprint(f'Job may run on {t.id}: {"Yes" if is_suitable else "No"} ({reason})')
+            if is_env_flag_set("MS_DEBUG_FILTER_TARGETS"):
+                eprint(
+                    f"[DEBUG]: Can the job run on {t.id}: {'Yes' if is_suitable else 'No'} ({reason})"
+                )
             if is_suitable:
                 available_targets.add(t.id)
         return available_targets

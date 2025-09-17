@@ -1,8 +1,13 @@
 """Module containing schemas shared by the Meta Scheduler client and server components."""
 
 import time
-from types import MappingProxyType
 from typing import Any, Dict, List, Literal, NamedTuple, Optional, Tuple, Union
+
+from dataclasses import dataclass
+import sympy
+from sympy import Float
+from sympy import Integer
+from sympy.parsing import sympy_parser
 
 from frozendict import frozendict
 from pydantic import BaseModel, TypeAdapter, field_validator, model_validator, computed_field
@@ -198,7 +203,8 @@ class Spec(BaseModel):
     cmd_main : str
         The main shell command to be executed as the jobs on the batch system of the target
     time : str
-        The maximum runtime as a formatted duration ("d-hh:MM:SS") of a job in the array or unrestricted if None (default)
+        The maximum runtime of a job in the array or unrestricted if None (default)
+        May be given as formatted duration ("d-hh:MM:SS") or SymPy expression for seconds starting with "=" where p is the total number of cores
     seconds : Optional[int]
         The amount of time in seconds that the job may run for (Alternative to parameter "time")
     cmd_setup : Optional[str] = None
@@ -226,11 +232,41 @@ class Spec(BaseModel):
     cmd_setup: Optional[str] = None
     array_size: int = 1
     nodes: int = 1
-    ranks_per_node: int = 1
+    ranks_per_node: Optional[int] = None
     cores_per_rank: int = 1
     required_modules: List[str] = []
     required_tags: List[str] = []
     exclusive: bool = False
+
+    
+    def get_target_seconds(self: "Spec", target: Target) -> int:
+        """
+        Get the requested seconds based on a concrete target. 
+        (Evaluates expression if applicable.)
+
+        Parameters
+        ----------
+        target : Target
+            The target for which the seconds of the job should be returned
+
+        Returns
+        -------
+        int
+            The duration in seconds
+        """
+        if self.seconds > 0:
+            return self.seconds # Fixed value
+        else:
+            # Expression based value
+            assert self.time is not None
+            total_cores = sympy.symbols("p")
+            substitutions = {
+                total_cores: self.nodes * (self.ranks_per_node if self.ranks_per_node else target.cores_per_node)
+            }
+            expression = sympy_parser.parse_expr(self.time[1:].strip()).subs(substitutions)
+            assert type(expression) in [Integer, Float], "Time expression must evaluate to a number"
+            seconds = int(round(expression.evalf()))
+            return seconds
 
     @model_validator(mode="after")
     def validate_attributes(cls, spec: Any) -> Any:
@@ -255,11 +291,28 @@ class Spec(BaseModel):
             spec.time is not None and spec.seconds != 0
         ):
             raise ValueError('Either "time" or "seconds" must be provided')
-        if spec.time is not None:
+        if spec.time is not None and not spec.time.startswith("="):
             spec.seconds = time_to_seconds(spec.time)
-        spec.time = None
-        if spec.seconds <= 0:
+            spec.time = None
+        if spec.seconds < 0:
             raise ValueError('Duration ("time" or "seconds") must be a positive value')
+        @dataclass
+        class MockTarget:
+            """
+            Stand in for target objects used to resolve the job seconds to request.
+            (Only used here for validation.)
+            """
+            nodes=1
+            cores_per_node=1
+        spec.get_target_seconds(MockTarget)
+        for k,v in {
+            spec.array_size: "Array size",
+            spec.nodes: "Node count",
+            spec.ranks_per_node: "Ranks per node",
+            spec.cores_per_rank: "Cores per rank",
+        }.items():
+            if k is not None and k < 1:
+                raise ValueError(f"{v} must be positive")
         return spec
 
 

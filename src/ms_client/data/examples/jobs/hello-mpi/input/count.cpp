@@ -9,7 +9,6 @@ int main(int argc, char **argv)
     int rank, size;
     char cpu_name[MPI_MAX_PROCESSOR_NAME];
     int cpu_name_len;
-    const int max_count = 20;
     MPI_Init(&argc, &argv);
     MPI_Comm_rank(MPI_COMM_WORLD, &rank);
     MPI_Comm_size(MPI_COMM_WORLD, &size);
@@ -34,7 +33,7 @@ int main(int argc, char **argv)
             break;
         std::this_thread::sleep_for(std::chrono::seconds(1));
         std::cout << "Rank #" << rank << " received: " << counter << std::endl;
-        if (counter < max_count)
+        if (counter < size) // Count the number of ranks
         {
             counter++;
             MPI_Send(&counter, /* count */ 1, MPI_INT, (rank + 1) % size, /* tag */ 0, MPI_COMM_WORLD);
