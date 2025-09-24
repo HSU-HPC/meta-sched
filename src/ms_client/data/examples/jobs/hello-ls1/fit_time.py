@@ -97,15 +97,15 @@ def make_constraint(xi, yi, zi):  # type: ignore[no-untyped-def]
 
 X = df["film_width"]
 Y = df["cores"]
-Z = df["seconds"]
+Z_sample = df["seconds"]
 # Initial guess for parameters
-init_params = curve_fit(surface, (X, Y), Z)[0]
+init_params = curve_fit(surface, (X, Y), Z_sample)[0]
 constraints = [
     {"type": "ineq", "fun": make_constraint(xi, yi, zi)}  # type: ignore[no-untyped-call]
-    for xi, yi, zi in zip(X, Y, Z)
+    for xi, yi, zi in zip(X, Y, Z_sample)
 ]
 result = minimize(
-    optmization_objective, init_params, args=((X, Y), Z), constraints=constraints
+    optmization_objective, init_params, args=((X, Y), Z_sample), constraints=constraints
 )
 if not result.success:
     print(f"Optimization failed: {result.message}")
@@ -144,13 +144,19 @@ def eval_expression_z(xy):  # type: ignore[no-untyped-def]
 
 x_range = np.linspace(np.min(X), np.max(X), 10)
 y_range = np.linspace(np.min(Y), np.max(Y), 10)
-X, Y = np.meshgrid(x_range, y_range)
-Z_fit = surface((X, Y), *surface_coefficients)  # type: ignore[no-untyped-call]
-Z_expr = eval_expression_z((X, Y)) / scale_up_factor  # type: ignore[no-untyped-call]
+X_surface, Y_surface = np.meshgrid(x_range, y_range)
+Z_fit = surface((X_surface, Y_surface), *surface_coefficients)  # type: ignore[no-untyped-call]
+Z_expr = eval_expression_z((X_surface, Y_surface)) / scale_up_factor  # type: ignore[no-untyped-call]
 assert (Z_fit <= Z_expr).all(), "Expression must not lie below the fitted surface!"
+Z_sample = df["seconds"]
+residuals = Z_sample - (eval_expression_z((X, Y)) / scale_up_factor)
+root_mean_square_error = (np.sum(residuals) ** 2 / len(Z_sample)) ** 0.5
+print(
+    f"RMSE: {int(np.ceil(root_mean_square_error))} sec ({root_mean_square_error / 60:.2f} min)"
+)
 n_cores = 48
-t_min = int(np.ceil(eval_expression_z((np.min(X), n_cores))))  # type: ignore[no-untyped-call]
-t_max = int(np.ceil(eval_expression_z((np.max(X), n_cores))))  # type: ignore[no-untyped-call]
+t_min = int(np.ceil(eval_expression_z((np.min(X_surface), n_cores))))  # type: ignore[no-untyped-call]
+t_max = int(np.ceil(eval_expression_z((np.max(X_surface), n_cores))))  # type: ignore[no-untyped-call]
 print(
     f"Estimated wall time range with {n_cores} cores: {t_min} sec ({t_min / 3600:.2f} h) - {t_max} sec ({t_max / 3600:.2f} h)"
 )
@@ -161,10 +167,7 @@ print(f'time = "={expression_z}"\n')
 
 # region visualization
 fig = go.Figure()
-X_sample = df["film_width"]
-Y_sample = df["cores"]
-Z_sample = df["seconds"]
-above = Z > surface((X_sample, Y_sample), *surface_coefficients)  # type: ignore[no-untyped-call]
+above = Z_sample > surface((X, Y), *surface_coefficients)  # type: ignore[no-untyped-call]
 below = ~above
 for mask, label, color in [
     (above, "Experiments (underestimated)", "red"),
@@ -172,8 +175,8 @@ for mask, label, color in [
 ]:
     fig.add_trace(
         go.Scatter3d(
-            x=X_sample[mask],
-            y=Y_sample[mask],
+            x=X[mask],
+            y=Y[mask],
             z=Z_sample[mask],
             mode="markers",
             marker=dict(size=3, color=color, opacity=1),
@@ -183,8 +186,8 @@ for mask, label, color in [
     )
 fig.add_trace(
     go.Surface(
-        x=X,
-        y=Y,
+        x=X_surface,
+        y=Y_surface,
         z=Z_fit,
         colorscale="Blues",
         opacity=1,
@@ -195,8 +198,8 @@ fig.add_trace(
 )
 fig.add_trace(
     go.Surface(
-        x=X,
-        y=Y,
+        x=X_surface,
+        y=Y_surface,
         z=Z_expr,
         colorscale="Greens",
         opacity=1,
