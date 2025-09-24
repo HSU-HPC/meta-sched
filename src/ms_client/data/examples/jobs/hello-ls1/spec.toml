@@ -4,6 +4,6 @@ array_size = 10
 # Only use OpenMP:
 # required_modules = ["MPI"]
 # Expression generated using fit_time.py
-time = "=1.1*100.0*(311481.731+10887.258*(10+i*10)-311310.180*p**(1/9815.529)-10881.955*(10+i*10)*p**(1/9815.529))"
+time = "=1.1*100.0*(168030.37+5954.57*(10+i*10)-167859.69*p**(1/5308.07)-5949.23*(10+i*10)*p**(1/5308.07))"
 # Force using all cores of the node:
 exclusive  = true

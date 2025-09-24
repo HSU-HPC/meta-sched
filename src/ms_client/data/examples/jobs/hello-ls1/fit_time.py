@@ -49,7 +49,7 @@ molecules film_width seconds cores
 4687568   320        536.159 24
 # Quarter of all physical cores
 155864    10         104.093 12
-311664    20         132.72  12
+311664    20         132.059 12
 623832    40         185.308 12
 1246616   80         293.452 12
 2492536   160        500.408 12
@@ -118,7 +118,7 @@ surface_coefficients = result.x
 a, b, c, d, e = surface_coefficients
 expression_x = f"{MIN_FILM_WIDTH}+i*{FILM_WIDTH_STEP}"
 scale_up_factor = SIMULATION_STEPS / experiment_steps
-expression_z = f"{1 + SAFETY_FRACTION}*{scale_up_factor}*({a:.3f}+{b:.3f}*({expression_x})+{c:.3f}*p**(1/{e:.3f})+{d:.3f}*({expression_x})*p**(1/{e:.3f}))"
+expression_z = f"{1 + SAFETY_FRACTION}*{scale_up_factor}*({a:.2f}+{b:.2f}*({expression_x})+{c:.2f}*p**(1/{e:.2f})+{d:.2f}*({expression_x})*p**(1/{e:.2f}))"
 expression_z = expression_z.replace("+-", "-")
 
 
