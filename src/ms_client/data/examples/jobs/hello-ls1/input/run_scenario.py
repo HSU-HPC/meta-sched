@@ -14,6 +14,13 @@ arg_parser = argparse.ArgumentParser()
 arg_parser.add_argument("-w", "--width", type=float, required=True)
 args = arg_parser.parse_args()
 
+if "MS_INPUT" not in os.environ:
+    print(
+        "Environment variable MS_INPUT (pointing to folder containing MarDyn executable) was not set.",
+        file=sys.stderr,
+    )
+    sys.exit(1)
+
 # 2. Validate arguments
 if args.width < 1 or args.width > 10:
     print("Liquid film may only be between 1 and 10 nm thick.", file=sys.stderr)
@@ -24,7 +31,8 @@ scenario_path = Path("ExplodingLiquid")
 if not scenario_path.is_dir():
     shutil.copytree(Path(__file__).parent / scenario_path.name, scenario_path)
 
-y_lower = 290.946
+# Center liquid film along y
+y_lower = 290.946 - args.width / 2
 y_upper = y_lower + args.width
 
 substitutions = dict(
@@ -47,7 +55,7 @@ print("UNIX_STARTED", int(datetime.now(tz=timezone.utc).timestamp()))
 print(f"Running exploding liquid simulation with film width of {args.width} nm:")
 sys.stdout.flush()
 if os.system("which mpiexec &>/dev/null") == 0 and False:  # Never use MPI
-    os.system(f"mpiexec ./MarDyn {config_path}")
+    os.system(f"mpiexec $MS_INPUT/MarDyn {config_path}")
 else:
-    os.system(f"./MarDyn {config_path}")
+    os.system(f"$MS_INPUT/MarDyn {config_path}")
 print("UNIX_ENDED", int(datetime.now(tz=timezone.utc).timestamp()))

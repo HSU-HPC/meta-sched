@@ -231,7 +231,7 @@ class BatchSystemTarget(RemoteTarget):
         stream_oe = False  # Must be false if not using long living connection
 
         eprint("--- a. Submitting job ---")
-        requested_seconds = job.spec.get_target_seconds(self._target)
+        requested_seconds = job.spec.get_target_seconds(self._target, job.array_idx)
         eprint(f"SECONDS_REQUESTED={requested_seconds}")
         with self._connect() as connection:
             with connection.cd(job.remote_output):

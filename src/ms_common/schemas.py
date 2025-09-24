@@ -1,5 +1,6 @@
 """Module containing schemas shared by the Meta Scheduler client and server components."""
 
+import math
 import time
 from typing import Any, Dict, List, Literal, NamedTuple, Optional, Tuple, Union
 
@@ -239,7 +240,7 @@ class Spec(BaseModel):
     exclusive: bool = False
 
     
-    def get_target_seconds(self: "Spec", target: Target) -> int:
+    def get_target_seconds(self: "Spec", target: Target, array_idx: int) -> int:
         """
         Get the requested seconds based on a concrete target. 
         (Evaluates expression if applicable.)
@@ -248,6 +249,8 @@ class Spec(BaseModel):
         ----------
         target : Target
             The target for which the seconds of the job should be returned
+        array_idx : int
+            The index of the job in the corresponding job array
 
         Returns
         -------
@@ -259,13 +262,14 @@ class Spec(BaseModel):
         else:
             # Expression based value
             assert self.time is not None
-            total_cores = sympy.symbols("p")
+            total_cores, idx = sympy.symbols("p,i")
             substitutions = {
-                total_cores: self.nodes * (self.ranks_per_node if self.ranks_per_node else target.cores_per_node)
+                total_cores: self.nodes * (self.ranks_per_node if self.ranks_per_node else target.cores_per_node),
+                idx: array_idx,
             }
             expression = sympy_parser.parse_expr(self.time[1:].strip()).subs(substitutions)
             assert type(expression) in [Integer, Float], "Time expression must evaluate to a number"
-            seconds = int(round(expression.evalf()))
+            seconds = int(math.ceil(expression.evalf()))
             return seconds
 
     @model_validator(mode="after")
@@ -304,7 +308,8 @@ class Spec(BaseModel):
             """
             nodes=1
             cores_per_node=1
-        spec.get_target_seconds(MockTarget)
+        # Evaluate expression (force potential expression error)
+        spec.get_target_seconds(MockTarget, 0)
         for k,v in {
             spec.array_size: "Array size",
             spec.nodes: "Node count",

@@ -58,7 +58,7 @@ class SlurmRemoteTarget(BatchSystemTarget):
         argv.append(f"--ntasks-per-node={ranks_per_node}")
         argv.append(f"--cpus-per-task={job.spec.cores_per_rank}")
         argv.append(
-            f"--time={seconds_to_time(job.spec.get_target_seconds(self._target))}"
+            f"--time={seconds_to_time(job.spec.get_target_seconds(self._target, job.array_idx))}"
         )
         argv.append(f"--output={oe[0]}")
         argv.append(f"--error={oe[1]}")

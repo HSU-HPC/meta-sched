@@ -105,10 +105,14 @@ class Executor:
 
         if not ssh.has_ssh_config_entry(target.id):
             return False, "Credentials missing"
-        if target.max_time is not None and job_spec.get_target_seconds(
-            target
-        ) > time_to_seconds(target.max_time):
-            return False, "Too much time required"
+        # This categorically rules out targets for the whole array.
+        # (Maybe some jobs in it would have fit within the limit.)
+        # TODO Refactor to support per-index filtering
+        for i in range(job_spec.array_size):
+            if target.max_time is not None and job_spec.get_target_seconds(
+                target, i
+            ) > time_to_seconds(target.max_time):
+                return False, "Too much time required"
         max_nodes = (
             min(target.nodes, target.max_nodes) if target.max_nodes else target.nodes
         )

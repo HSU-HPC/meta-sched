@@ -4,7 +4,7 @@ import importlib
 import importlib.util
 from os import PathLike
 from pathlib import Path
-from typing import Any, List, Optional, Type, Union
+from typing import Any, Dict, List, Optional, Type, Union
 
 import tomli
 from ms_common.schemas import Target
@@ -38,6 +38,7 @@ class Config(BaseModel):
     db_url: str
     scheduler_class_name: str
     _scheduler_class: Optional[Type[Policy]] = None
+    scheduler_parameter_overrides: Dict[str, Any] = {}
     scheduling_loop_interval: float
     targets: List[Target]
 

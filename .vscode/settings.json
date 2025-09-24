@@ -11,5 +11,10 @@
     },
     "python.analysis.autoImportCompletions": true,
     "python.terminal.activateEnvInCurrentTerminal": false,
-    "python.terminal.activateEnvironment": false
+    "python.terminal.activateEnvironment": false,
+    "workbench.colorCustomizations": {
+        "activityBar.background": "#000000",
+        "titleBar.activeBackground": "#0000FF",
+        "titleBar.activeForeground": "#FFFFFF"
+    }
 }

@@ -1,37 +1,32 @@
 <?xml version='1.0' encoding='UTF-8'?>
-<mardyn version="20100525" >
 
-    <refunits type="SI" >
+<mardyn version="20100525">
+    <refunits type="SI">
         <length unit="nm">0.1</length>
         <mass unit="u">1</mass>
         <energy unit="K">1</energy>
     </refunits>
-
-    <simulation type="MD" >
-        <integrator type="Leapfrog" >
-            <timestep unit="reduced" >0.00182367</timestep>
+    <simulation type="MD">
+        <integrator type="Leapfrog">
+            <timestep unit="reduced">0.00182367</timestep>
         </integrator>
-
         <run>
-            <currenttime>0.0</currenttime> 
+            <currenttime>0.0</currenttime>
             <production>
-                <steps>100000</steps> <!-- <steps>100000</steps> -->
+                <steps>100000</steps>
             </production>
         </run>
-
         <ensemble type="NVT">
             <!-- Nparticles determined by the input file -->
-            <temperature unit="reduced" >1.80</temperature>
+            <temperature unit="reduced">1.80</temperature>
             <domain type="box">
                 <lx>132.6</lx>
                 <ly>591.891</ly>
                 <lz>132.6</lz>
             </domain>
-
             <components>
-                <include query="/components/moleculetype" >components.xml</include>
+                <include query="/components/moleculetype">components.xml</include>
             </components>
-
             <phasespacepoint>
                 <generator name="MultiObjectGenerator">
                     <objectgenerator>
@@ -43,33 +38,36 @@
                         </filler>
                         <object type="Cuboid">
                             <!-- vary the y-thickness for vastly different scenarios -->
-                            <lower> <x>0</x> <y>Y_LOWER</y> <z>0</z> </lower>
-                            <upper> <x>131.531</x> <y>Y_UPPER</y> <z>131.531</z> </upper>
+                            <lower>
+                                <x>0</x>
+                                <y>Y_LOWER</y>
+                                <z>0</z>
+                            </lower>
+                            <upper>
+                                <x>131.531</x>
+                                <y>Y_UPPER</y>
+                                <z>131.531</z>
+                            </upper>
                         </object>
                     </objectgenerator>
                 </generator>
                 <ignoreCheckpointTime>true</ignoreCheckpointTime>
             </phasespacepoint>
         </ensemble>
-
         <algorithm>
             <parallelisation type="GeneralDomainDecomposition">
                 <updateFrequency>5000</updateFrequency>
                 <timerForLoad>SIMULATION_FORCE_CALCULATION</timerForLoad>
                 <loadBalancer type="ALL"></loadBalancer>
             </parallelisation>
-
-
-            <datastructure type="LinkedCells"/>
-
-            <cutoffs type="CenterOfMass" >
-                <defaultCutoff unit="reduced" >2.5</defaultCutoff>
-                <radiusLJ unit="reduced" >2.5</radiusLJ>
+            <datastructure type="LinkedCells" />
+            <cutoffs type="CenterOfMass">
+                <defaultCutoff unit="reduced">2.5</defaultCutoff>
+                <radiusLJ unit="reduced">2.5</radiusLJ>
             </cutoffs>
-            <electrostatic type="ReactionField" >
+            <electrostatic type="ReactionField">
                 <epsilon>1.0e+10</epsilon>
             </electrostatic>
-
             <thermostats>
                 <thermostat type="TemperatureControl">
                     <control>
@@ -80,8 +78,12 @@
                     <regions>
                         <region>
                             <coords>
-                                <lcx>0.0</lcx> <lcy>0.0</lcy> <lcz>0.0</lcz>
-                                <ucx>16.4414</ucx> <ucy>16.4414</ucy> <ucz>16.4414</ucz>
+                                <lcx>0.0</lcx>
+                                <lcy>0.0</lcy>
+                                <lcz>0.0</lcz>
+                                <ucx>16.4414</ucx>
+                                <ucy>16.4414</ucy>
+                                <ucz>16.4414</ucz>
                             </coords>
                             <target>
                                 <temperature>1.80</temperature>
@@ -99,13 +101,17 @@
                 </thermostat>
             </thermostats>
         </algorithm>
-
         <output>
             <outputplugin name="XyzWriter">
-            <writefrequency>10000</writefrequency>
-            <outputprefix>molecules</outputprefix>
-            <incremental>true</incremental>
-            </outputplugin>            
-     </output>
- </simulation>
+                <writefrequency>10000</writefrequency>
+                <outputprefix>molecules</outputprefix>
+                <incremental>true</incremental>
+            </outputplugin>
+        </output>
+        <plugin name="EnergyRAPL">
+            <writefrequency>100</writefrequency>
+            <outputprefix>ls1_rapl</outputprefix>
+            <per-host>false</per-host> <!-- Only running on one node -->
+        </plugin>
+    </simulation>
 </mardyn>

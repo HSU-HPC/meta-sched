@@ -167,13 +167,16 @@ def main() -> int:
         seconds: Optional[int] = None
         if isinstance(scheduling_decision, ms_common.schemas.Assigned):
             target = targets[scheduling_decision.target_id]
-            seconds = (await model.get_job(job_key)).spec.get_target_seconds(target)
+            job = await model.get_job(job_key)
+            seconds = job.spec.get_target_seconds(target, job.array_idx)
         await model.update_job(
             job_key,
             dict(scheduling_decision=scheduling_decision, requested_seconds=seconds),
         )
 
     scheduler: Policy = config.scheduler_class(on_schedule_job)
+    for k, v in config.scheduler_parameter_overrides.items():
+        setattr(scheduler, k, v)
     if "MS_API_KEY" not in os.environ:
         characters = string.ascii_letters + string.digits  # A-Z, a-z, 0-9
         api_key = "".join(secrets.choice(characters) for _ in range(32))

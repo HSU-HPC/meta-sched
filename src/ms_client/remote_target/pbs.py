@@ -59,7 +59,7 @@ class PBSRemoteTarget(BatchSystemTarget):
         ]
         argv += [
             "-l",
-            f"walltime={seconds_to_time(job.spec.get_target_seconds(self._target), False)}",
+            f"walltime={seconds_to_time(job.spec.get_target_seconds(self._target, job.array_idx), False)}",
         ]
         argv += ["-o", oe[0]]
         argv += ["-e", oe[1]]

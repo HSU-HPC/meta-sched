@@ -48,10 +48,14 @@ port = 8001
 # Use ephemeral in-memory database or flat file (e.g. "sqlite:////var/opt/meta-sched.db")
 db_url = "sqlite://" 
 
-# Scheduling policy
-scheduler_class_name = "stochastic.py:WeightedByCores"
 # Time between invoking the scheduling policy
 scheduling_loop_interval = 10
+# Scheduling policy
+scheduler_class_name = "stochastic.py:WeightedByCoresAvailable"
+# Override default parameters of the scheduling policy
+[scheduler_parameter_overrides]
+epsilon = 1e-9
+unavailable_discount_factor = 0.1
 
 # List of targets available for scheduling
 [[targets]]

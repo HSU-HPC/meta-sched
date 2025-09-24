@@ -3,6 +3,7 @@ cmd_main  = "python3 $MS_INPUT/run_scenario.py --width $MS_ARRAY_IDX"
 array_size = 10
 # Only use OpenMP:
 # required_modules = ["MPI"]
-time       = "0-05:30:00" # d-hh:MM:ss
+# Expression generated using fit_time.py
+time = "=1.1*100.0*(1.0475016729284865*(10+i*10)+36.1452491974465)"
 # Force using all cores of the node:
 exclusive  = true
