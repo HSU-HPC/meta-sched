@@ -267,7 +267,10 @@ class Spec(BaseModel):
                 total_cores: self.nodes * (self.ranks_per_node if self.ranks_per_node else target.cores_per_node),
                 idx: array_idx,
             }
-            expression = sympy_parser.parse_expr(self.time[1:].strip()).subs(substitutions)
+            try:
+                expression = sympy_parser.parse_expr(self.time[1:].strip()).subs(substitutions)
+            except SyntaxError as e:
+                assert False, f"Could not parse expression: {e.msg} in \"{e.text}\" at {e.offset}"
             assert type(expression) in [Integer, Float], "Time expression must evaluate to a number"
             seconds = int(math.ceil(expression.evalf()))
             return seconds
