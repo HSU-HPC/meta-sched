@@ -70,7 +70,7 @@ class WeightedByCores(GreedyPolicy):
         await self.on_schedule_job(job.key, decision)
 
 
-class WeightedByCoresAvailable(GreedyPolicy):
+class WeightedByCoresAvailability(GreedyPolicy):
     """
     This scheduling policy assigns jobs randomly per scheduling request proportional to the amount of currently unused cores on each target.
     (Note that this may result in disproportionate distribution across all targets depending on the available ones.)
@@ -84,7 +84,7 @@ class WeightedByCoresAvailable(GreedyPolicy):
     """
 
     def __init__(
-        self: "WeightedByCoresAvailable", on_schedule_job: ScheduleJobCallback
+        self: "WeightedByCoresAvailability", on_schedule_job: ScheduleJobCallback
     ):
         """
         Create a new instance of the scheduling policy
@@ -94,12 +94,12 @@ class WeightedByCoresAvailable(GreedyPolicy):
         on_schedule_job : ScheduleJobCallback
             Callback to apply scheduling decision to a job
         """
-        super(WeightedByCoresAvailable, self).__init__(on_schedule_job)
+        super(WeightedByCoresAvailability, self).__init__(on_schedule_job)
         self.epsilon = 1e-9
         self.unavailable_discount_factor = 0.1
 
     async def schedule_job(
-        self: "WeightedByCoresAvailable",
+        self: "WeightedByCoresAvailability",
         job: Job,
         decided_jobs: List[Job],
         targets_status: TargetsStatus,

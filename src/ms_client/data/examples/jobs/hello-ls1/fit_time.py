@@ -23,7 +23,7 @@ from scipy.optimize import curve_fit, minimize  # type: ignore
 SIMULATION_STEPS = 100_000  # Number of simulation steps in ls1 mardyn
 MIN_FILM_WIDTH = 10  # [nm]
 FILM_WIDTH_STEP = 10  # [nm]
-SAFETY_FRACTION = 0.1  # e.g. 0.1 => 10% request longer wall time
+SAFETY_FRACTION = 0.01  # e.g. 0.01 => 1% request longer wall time
 ARRAY_SIZE = 10  # Should match spec.toml
 # endregion script parameters
 
@@ -34,29 +34,29 @@ ARRAY_SIZE = 10  # Should match spec.toml
 experiments_csv = """
 molecules film_width seconds cores
 # All physical cores
-155864    10         48.2166 48
-311664    20         57.8555 48
-623832    40         79.5075 48
-1246616   80         124.213 48
-2492536   160        207.794 48
-4687568   320        353.156 48
+155864    1          48.2166 48
+311664    2          57.8555 48
+623832    4          79.5075 48
+1246616   8          124.213 48
+2492536   16         207.794 48
+4687568   32         353.156 48
 # Half of all physical cores (one socket)
-155864    10         66.2023 24
-311664    20         82.1669 24
-623832    40         114.267 24
-1246616   80         173.255 24
-2492536   160        308.564 24
-4687568   320        536.159 24
+155864    1          66.2023 24
+311664    2          82.1669 24
+623832    4          114.267 24
+1246616   8          173.255 24
+2492536   16         308.564 24
+4687568   32         536.159 24
 # Quarter of all physical cores
-155864    10         104.093 12
-311664    20         132.059 12
-623832    40         185.308 12
-1246616   80         293.452 12
-2492536   160        500.408 12
-4687568   320        887.295 12
+155864    1          104.093 12
+311664    2          132.059 12
+623832    4          185.308 12
+1246616   8          293.452 12
+2492536   16         500.408 12
+4687568   32         887.295 12
 """
 experiment_steps = 1000
-df = pd.read_csv(StringIO(experiments_csv), sep="\s+", comment="#")
+df = pd.read_csv(StringIO(experiments_csv), sep=r"\s+", comment="#")
 # endregion experiment data
 
 
@@ -149,7 +149,7 @@ Z_fit = surface((X_surface, Y_surface), *surface_coefficients)  # type: ignore[n
 Z_expr = eval_expression_z((X_surface, Y_surface)) / scale_up_factor  # type: ignore[no-untyped-call]
 assert (Z_fit <= Z_expr).all(), "Expression must not lie below the fitted surface!"
 Z_sample = df["seconds"]
-residuals = Z_sample - (eval_expression_z((X, Y)) / scale_up_factor)
+residuals = Z_sample - (eval_expression_z((X, Y)) / scale_up_factor)  # type: ignore[no-untyped-call]
 root_mean_square_error = (np.sum(residuals) ** 2 / len(Z_sample)) ** 0.5
 print(
     f"RMSE: {int(np.ceil(root_mean_square_error))} sec ({root_mean_square_error / 60:.2f} min)"

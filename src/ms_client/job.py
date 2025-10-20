@@ -263,7 +263,18 @@ class Status(abc.ABC):
 
 @dataclass(frozen=True)
 class Instance:
-    """Class representing the instance of a single job within an array corresponding to a job specification."""
+    """
+    Class representing the instance of a single job within an array corresponding to a job specification.
+
+    Attributes
+    ----------
+    spec : Spec
+        The job spec
+    array_id : int
+        The id of the job array
+    array_idx : int
+        The index of the job within the array
+    """
 
     spec: Spec
     array_id: int

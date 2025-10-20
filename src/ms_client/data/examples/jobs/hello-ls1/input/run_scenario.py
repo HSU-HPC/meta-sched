@@ -22,8 +22,8 @@ if "MS_INPUT" not in os.environ:
     sys.exit(1)
 
 # 2. Validate arguments
-if args.width < 1 or args.width > 10:
-    print("Liquid film may only be between 1 and 10 nm thick.", file=sys.stderr)
+if args.width < 1 or args.width > 100:
+    print("Liquid film may only be between 1 and 100 nm thick.", file=sys.stderr)
     sys.exit(1)
 
 # 3. Copy scenario files including template config template
@@ -32,8 +32,8 @@ if not scenario_path.is_dir():
     shutil.copytree(Path(__file__).parent / scenario_path.name, scenario_path)
 
 # Center liquid film along y
-y_lower = 290.946 - args.width / 2
-y_upper = y_lower + args.width
+y_lower = 290.946 - 10 * (args.width / 2)
+y_upper = y_lower + 10 * args.width
 
 substitutions = dict(
     Y_LOWER=y_lower,

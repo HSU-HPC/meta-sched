@@ -3,7 +3,7 @@ port = 8001
 db_url = "sqlite:///:memory:" # Use an ephemeral in-memory database
 
 scheduling_loop_interval = 10
-scheduler_class_name = "stochastic.py:WeightedByCoresAvailable"
+scheduler_class_name = "stochastic.py:WeightedByCoresAvailability"
 [scheduler_parameter_overrides]
 epsilon = 1e-9
 unavailable_discount_factor = 0.1
@@ -15,7 +15,7 @@ id = "hsuper-small"
 host = "hsuper-login01.hsu-hh.de"
 batch_system = "slurm"
 queue = "small"
-nodes = 571
+nodes = 569
 cores_per_node = 72
 max_time = "72:00:00"
 max_nodes = 5
