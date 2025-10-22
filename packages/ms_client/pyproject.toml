@@ -34,7 +34,7 @@ include-package-data = true
 
 [tool.setuptools.packages.find]
 where = ["../../src"]
-include = ["ms_client", "ms_client.remote_target", "ms_client.data", "ms_common"]
+include = ["ms_client", "ms_client.remote_target", "ms_client.data", "ms_client.probe", "ms_common"]
 
 [tool.setuptools.package-data]
 "ms_client.data" = ["**/*"]
