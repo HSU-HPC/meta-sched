@@ -8,4 +8,4 @@ cd "$(dirname "$(dirname "$SCRIPT_PATH")")"
 (cd packages/ms_client && uv sync --quiet) # Ensure .venv is set up
 # shellcheck source=/dev/null
 source packages/ms_client/.venv/bin/activate
-msprobe "$@"
+uv run msprobe "$@"
