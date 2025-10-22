@@ -185,16 +185,18 @@ def main() -> int:
         if t.id in target_ids:
             if not has_ssh_config_entry(t.id):
                 raise RuntimeError(f"No SSH alias set up for target {t.id} ({t.host})")
-            datacenter_api_endpoint = targets_config[t.id].datacenter_api_endpoint
-            datacenter_api_tenant_id = targets_config[t.id].datacenter_api_tenant_id
-            datacenter_api_tenant = (
-                Tenant(
-                    datacenter_api_tenant_id,
-                    ApiArgs(datacenter_api_endpoint),
+            datacenter_api_tenant: Optional[Tenant] = None
+            if t.id in targets_config:
+                datacenter_api_endpoint = targets_config[t.id].datacenter_api_endpoint
+                datacenter_api_tenant_id = targets_config[t.id].datacenter_api_tenant_id
+                datacenter_api_tenant = (
+                    Tenant(
+                        datacenter_api_tenant_id,
+                        ApiArgs(datacenter_api_endpoint),
+                    )
+                    if datacenter_api_endpoint and datacenter_api_tenant_id is not None
+                    else None
                 )
-                if datacenter_api_endpoint and datacenter_api_tenant_id is not None
-                else None
-            )
             p = multiprocessing.Process(
                 target=_monitor_target,
                 args=(client, t, args.interval, datacenter_api_tenant, args.verbose),
