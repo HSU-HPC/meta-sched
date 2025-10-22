@@ -37,7 +37,7 @@ If the application is running under a non-root user and requires `sudo`, add the
 
 To persistently execute the server in the background after the system has booted, create a new [systemd unit](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html) or use a terminal multiplexer like [tmux](https://github.com/tmux/tmux/wiki) to manually run it in the background.
 
-The state of the Meta Scheduler can be updated with the state of the targets using `MS_API_KEY=someSecret msprobe -t [<target ID>,...] [-i <interval>]` from the client package.
+The state of the Meta Scheduler can be updated with the state of the targets using `MS_API_KEY=someSecret msprobe [-t <target ID>,...] [-i <interval>]` from the client package.
 This state can be used by the scheduling policy to optimize job distribution across targets.
 
 The structure of the configuration file is explained by example below:
@@ -133,6 +133,10 @@ For additional filtering of targets used for scheduling of a particular job, cus
 [[targets]]
 id   = "windhpc-hlrs"
 tags = ["test"]
+
+# Fields used by msprobe to gather additional data about the target
+datacenter_api_endpoint = "https://example.org/api"
+datacenter_api_tenant_id = 0
 ```
 
 First, run `mscli ssh-config` to create/update `~/.ssh/config.d/meta-sched` with the targets of the Meta Scheduler server.  
@@ -187,7 +191,7 @@ If you encounter `No targets available to run job spec: <job spec>`, turn on deb
 
 ```shell
 $ MS_DEBUG_FILTER_TARGETS=1 mscli-dev submit <job spec>
-[DEBUG]: Can the job run on hsuper-small: No (Required tag "green" missing)
-[DEBUG]: Can the job run on windhpc-wwit: No (Too many cores required)
+[DEBUG]: Can the job run on hsuper-small? No. (Required tag "green" missing.)
+[DEBUG]: Can the job run on windhpc-wwit? No. (Too many cores required.)
 # ...
 ```

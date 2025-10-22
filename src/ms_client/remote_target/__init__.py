@@ -261,6 +261,7 @@ class RemoteTarget:
         asynchronous: bool = False,
         env: Dict[str, Any] = {},
         out_stream: Union[TextIO, Any] = sys.stdout,
+        err_stream: Union[TextIO, Any] = sys.stderr,
         modules: List[str] = [],
     ) -> Result:
         """
@@ -282,6 +283,8 @@ class RemoteTarget:
             Shell environment used for command execution
         out_stream : Union[TextIO, Any]
             The target where the standard output of the command should be sent (Defaults to sys.stdout)
+        err_stream : Union[TextIO, Any]
+            The target where the standard error of the command should be sent (Defaults to sys.stderr)
         modules : List[str]
             Optional environment modules to be loaded before executing the command
 
@@ -304,6 +307,7 @@ class RemoteTarget:
             asynchronous=asynchronous,
             env=env,
             out_stream=out_stream,
+            err_stream=err_stream,
         )
         return result
 

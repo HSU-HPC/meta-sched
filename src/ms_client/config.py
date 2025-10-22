@@ -1,7 +1,7 @@
 """Module containing the configuration for the Meta Scheduler client."""
 
 from pathlib import Path
-from typing import Any, List, Tuple
+from typing import Any, List, Optional, Tuple
 
 import tomli
 from pydantic import BaseModel, Field, model_validator
@@ -19,10 +19,44 @@ class TargetAdditionalConfigs(BaseModel):
         The target ID
     tags : Tuple[str, ...]
         Additional user defined tags to filter this target by
+    datacenter_api_endpoint : Optional[str]
+        HTTP endpoint for the datacenter API of this target
+        (Used to fetch additional data about the state of the target)
+    datacenter_api_tenant_id : Optional[int]
+        The tenant ID to use at the datacenter API for this target
     """
 
     id: str
     tags: Tuple[str, ...] = ()
+    datacenter_api_endpoint: Optional[str] = None
+    datacenter_api_tenant_id: Optional[int] = None
+
+    @model_validator(mode="after")
+    def validate_attributes(cls, config: Any) -> Any:
+        """
+        Validates additional target config attributes.
+
+        Parameters
+        ----------
+        config : Any
+            The additional target config to validate
+
+        Returns
+        -------
+        Any
+            The validated additional target config
+        """
+        if (
+            config.datacenter_api_endpoint is None
+            and config.datacenter_api_tenant_id is not None
+        ) or (
+            config.datacenter_api_endpoint is not None
+            and config.datacenter_api_tenant_id is None
+        ):
+            raise ValueError(
+                'Either all or no fields with the prefix "data_center_api_" must be given. (Suffixes: endpoint, tenant_id)'
+            )
+        return config
 
 
 class Config(BaseModel):
@@ -49,7 +83,7 @@ class Config(BaseModel):
     @model_validator(mode="after")
     def validate_attributes(cls, config: Any) -> Any:
         """
-        Validates an adjusts (!) client config attributes. (Is idempotent.)
+        Validates and adjusts (!) client config attributes. (Is idempotent.)
 
         Parameters
         ----------

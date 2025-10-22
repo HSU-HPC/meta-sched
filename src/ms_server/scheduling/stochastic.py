@@ -1,6 +1,7 @@
 """Module containing scheduling policy implementations which use randomness."""
 
 import random
+import time
 from typing import List
 
 from ms_common.schemas import Assigned, Target
@@ -79,8 +80,12 @@ class WeightedByCoresAvailability(GreedyPolicy):
     -----------------
     epsilon : float = 1e-9
         The minimum weight for each target for sampling
-    unavailable_discount_factor : float = 0.1
-        The discount factor for unavailable cores (Used by other jobs/nodes under maintenance)
+    weight_unavailable : float = 0.1
+        The weighting factor for unavailable cores (Used by other jobs/nodes under maintenance)
+    amplification_renewable : float = 0.5
+        Additional weighting factor for renewable powered cores
+    threshold_reliability_renewable : float = 0.8
+        Threshold below which to disregard forecasts
     """
 
     def __init__(
@@ -96,7 +101,9 @@ class WeightedByCoresAvailability(GreedyPolicy):
         """
         super(WeightedByCoresAvailability, self).__init__(on_schedule_job)
         self.epsilon = 1e-9
-        self.unavailable_discount_factor = 0.1
+        self.weight_unavailable = 0.1
+        self.amplification_renewable = 0.5
+        self.threshold_reliability_renewable = 0.8
 
     async def schedule_job(
         self: "WeightedByCoresAvailability",
@@ -139,10 +146,28 @@ class WeightedByCoresAvailability(GreedyPolicy):
                 n_cores_avail = n_cores
             else:
                 n_cores_avail = status.nodes_available * t.cores_per_node
-            weight = (
-                n_cores_avail
-                + (n_cores - n_cores_avail) * self.unavailable_discount_factor
+            weight = n_cores_avail + (n_cores - n_cores_avail) * self.weight_unavailable
+            # Add amplification of renewable powered cores
+            # (Must be available continuously)
+            n_cores_avail_renewable: float = 0
+            timestamp_earliest_done = time.time() + job.spec.get_target_seconds(
+                t, job.array_idx
             )
+            for i, forecast in enumerate(status.power_forecasts if status else []):
+                if (
+                    forecast.timestamp > timestamp_earliest_done
+                    or forecast.reliability < self.threshold_reliability_renewable
+                ):
+                    break
+                n_cores_avail_renewable = (
+                    forecast.nodes_renewable_powered * t.cores_per_node
+                    if i == 0
+                    else min(
+                        n_cores_avail,
+                        forecast.nodes_renewable_powered * t.cores_per_node,
+                    )
+                )
+            weight += n_cores_avail_renewable * self.amplification_renewable
             # Ensure all weights are greater than zero
             return max(weight, self.epsilon)
 

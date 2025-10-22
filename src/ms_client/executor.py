@@ -177,7 +177,7 @@ class Executor:
             )
             if is_env_flag_set("MS_DEBUG_FILTER_TARGETS"):
                 eprint(
-                    f"[DEBUG]: Can the job run on {t.id}: {'Yes' if is_suitable else 'No'} ({reason})"
+                    f"[DEBUG]: Can the job run on {t.id}? {'Yes' if is_suitable else 'No'}. ({reason}.)"
                 )
             if is_suitable:
                 available_targets.add(t.id)

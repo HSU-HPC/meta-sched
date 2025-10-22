@@ -184,13 +184,13 @@ class CLI:
         count : int
             The maximum number of jobs to list
         completed : bool
-            If true, output jobs that have successfully completed
+            If True, output jobs that have successfully completed
         failed : bool
-            If true, output jobs that have failed
+            If True, output jobs that have failed
         canceled : bool
-            If true, output jobs that have been canceled
+            If True, output jobs that have been canceled
         all : bool
-            If true, output jobs with any state
+            If True, output jobs with any state
 
         Returns
         -------

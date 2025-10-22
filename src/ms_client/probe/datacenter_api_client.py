@@ -1,6 +1,6 @@
 #! /usr/bin/env python3
 
-"""Module containging the datacenter API client code."""
+"""Module containing the datacenter API client code."""
 
 import http
 import json
@@ -9,7 +9,7 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set, Tuple, Union
 
 import pandas as pd
 import requests
@@ -30,7 +30,10 @@ class ApiArgs:
     """
 
     endpoint: str
-    verify_cert: bool = True
+    verify_cert: bool = os.getenv(
+        "DATACENTER_API_VERIFY_CERT",
+        "false",  # TODO: API is currently using self-signed certificate
+    ).lower() in ["1", "true", "yes", "on"]
 
 
 class _ApiResource(object):
@@ -113,15 +116,15 @@ class Forecast:
     ----------
     timestamp : float
         Unix timestamp for the forecast
+    renewable_powered : float
+        Number of resources forecast to be powered by renewable energy at that timestamp
     reliability : float
         Forecast reliability as a fraction (0-1)
-    renewable_powered : int
-        Number of resources forecast to be powered by renewable energy
     """
 
     timestamp: float
+    renewable_powered: float
     reliability: float
-    renewable_powered: int
 
     @staticmethod
     def forecasts_to_dataframe(forecasts: List["Forecast"]) -> pd.DataFrame:
@@ -150,7 +153,9 @@ class Forecast:
         )
 
     @staticmethod
-    def plot_forecasts(forecasts: List["Forecast"]) -> None:
+    def plot_forecasts(
+        forecasts: List["Forecast"], title: Union[bool, Optional[str]] = True
+    ) -> None:
         """
         Plot and show a list of forecasts using Matplotlib.
 
@@ -158,6 +163,8 @@ class Forecast:
         ----------
         forecasts : List[Forecast]
             The list of forecasts to be plotted
+        title : Union[bool, Optional[str]]
+            Optional title of the figure or "Forecast" if True
         """
         try:
             import matplotlib.dates as mdates  # type: ignore[import-not-found]
@@ -181,7 +188,10 @@ class Forecast:
         plt.ylabel("Reliability", color="C1")
         plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%d.%m. %H:%M"))
         plt.gcf().autofmt_xdate()
-        plt.title("Forecasts")
+        if title == True:  # noqa: E712
+            plt.title("Forecast")
+        elif title:
+            plt.title(title)
         plt.tight_layout()
         plt.show()
 
@@ -380,28 +390,34 @@ def __main() -> None:
     if endpoint_env_key not in os.environ:
         print(f"Environment variable {endpoint_env_key} is not set!")
         sys.exit(1)
-    apiArgs = ApiArgs(
-        os.environ[endpoint_env_key],
-        os.getenv("DATACENTER_API_VERIFY_CERT", False),  # TODO: API is currently using self-signed certificate
-    )
+    apiArgs = ApiArgs(os.environ[endpoint_env_key])
     tenant = Tenant(tenant_id, apiArgs)
-    print(f"Fetching first contract associated with tenant {tenant.id}...")
-    contract: Contract
+    print(f"Fetching contracts associated with tenant {tenant.id}...")
+    contracts: List[Contract] = []
     try:
-        contract = list(tenant.get_contracts())[0]
+        contracts = list(tenant.get_contracts())
     except Exception:
         print(f"No contracts found for tenant {tenant.id}.")
         sys.exit(1)
-    print(f"Fetching first forecast source associated with contract {contract.id}...")
-    forecast_sources = list(contract.forecast_sources)
+    print(
+        f"Fetching forecast sources associated with contracts {[c.id for c in contracts]}..."
+    )
+    forecast_sources = [f for c in contracts for f in c.forecast_sources]
     if len(forecast_sources) == 0:
-        print(f"Contract {contract.id} has no forecast sources.")
+        print(f"No forecast sources found for contracts {[c.id for c in contracts]}.")
         sys.exit(1)
-    forecasts, determination_timestamp = forecast_sources[0].get_forecasts()
-    df = Forecast.forecasts_to_dataframe(forecasts)
-    print(f"Forecasts as of {determination_timestamp}", df, sep="\n")
-    print()
-    Forecast.plot_forecasts(forecasts)
+    dfs = []
+    determination_timestamp: float = -1
+    for forecast_source in forecast_sources:
+        forecasts, determination_timestamp = forecast_sources[0].get_forecasts()
+        Forecast.plot_forecasts(forecasts, f"Forecast (Source {forecast_source.id})")
+        df = Forecast.forecasts_to_dataframe(forecasts)
+        df["forecast_source"] = forecast_source.id
+        dfs.append(df)
+    df = pd.concat(dfs)
+    print(
+        f"\nForecasts as of {determination_timestamp} (Unix timestamp):", df, sep="\n"
+    )
 
 
 if __name__ == "__main__":

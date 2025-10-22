@@ -265,9 +265,13 @@ class PBSRemoteTarget(BatchSystemTarget):
             # Get the job states
             assert self._target.queue
             # Third column indicates the queue
-            cmd = "qstat -a | awk '$3 == \"QUEUE\" { print $1 }'".replace(
-                "QUEUE", self._target.queue
-            )
+            cmd: str
+            if self._target.queue:
+                cmd = "qstat -a | awk '$3 == \"QUEUE\" { print $1 }'".replace(
+                    "QUEUE", self._target.queue
+                )
+            else:
+                cmd = "qstat -a | awk '{ print $1 }'"
             output = self._run(connection, cmd, hide=True).stdout.strip()
             qstat_job_fields = dict(
                 nodes="Resource_List.nodect",

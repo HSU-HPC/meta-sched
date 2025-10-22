@@ -250,8 +250,10 @@ class SlurmRemoteTarget(BatchSystemTarget):
         with self._connect() as connection:
             # Get the job states
             squeue_format = "%D,%l,%T,%M"  # nodes, time limit, state, time
-            cmd = f"squeue --partition {self._target.queue} --format '{squeue_format}'"
-            output = self._run(connection, cmd, hide=True).stdout.strip()
+            cmd = f"squeue {'--partition ' + self._target.queue if self._target.queue else ''} --format '{squeue_format}'"
+            output = self._run(
+                connection, cmd, hide=True, out_stream=None
+            ).stdout.strip()
             df = pd.read_csv(io.StringIO(output.lower()))
             df["time_limit"] = df["time_limit"].apply(lambda s: time_to_seconds(s))
             df["time"] = df["time"].apply(lambda s: time_to_seconds(s))
@@ -271,9 +273,11 @@ class SlurmRemoteTarget(BatchSystemTarget):
                 ["nodes", "time_limit", "is_using_nodes", "time_remaining"]
             ].to_dict("records")  # pyright: ignore[reportCallIssue]
             # Get the node states
-            cmd = f"sinfo --partition {self._target.queue} -N --format '%t' --noheader"
+            cmd = f"sinfo {'--partition ' + self._target.queue if self._target.queue else ''} -N --format '%t' --noheader"
             nodes_state = (
-                self._run(connection, cmd, hide=True).stdout.strip().splitlines()
+                self._run(connection, cmd, hide=True, out_stream=None)
+                .stdout.strip()
+                .splitlines()
             )
             node_states = dict(
                 nodes_in_use=0,

@@ -15,6 +15,23 @@ from pydantic import BaseModel, TypeAdapter, field_validator, model_validator, c
 from ms_common import utils
 from ms_common.utils import eprint, time_to_seconds
 
+class PowerForecast(BaseModel):
+    """
+    Class representing a forecast of (renewable) power availability for a target.
+
+    Attributes
+    ----------
+    timestamp : float
+        Unix timestamp for the forecast
+    nodes_renewable_powered : float
+        Number of nodes forecast to be powered by renewable energy at that timestamp
+    reliability : float
+        Forecast reliability as a fraction (0-1)
+    """
+    timestamp: float
+    nodes_renewable_powered: float
+    reliability: float
+
 class JobStatus(BaseModel):
     """
     Class representing the status of a job on a target.
@@ -49,6 +66,8 @@ class TargetStatus(BaseModel):
         The number of nodes which are available for running jobs
     nodes_unavailable : int
         The number of nodes which are not in used but are not available for running jobs (e.g. due to maintenance)
+    power_forecasts: List[PowerForecast]
+        Information about the (renewable) power forecast to be available for the target
     jobs_status : List[JobStatus]
         Information about the jobs currently running or scheduled on the target's local batch system
     """
@@ -56,6 +75,7 @@ class TargetStatus(BaseModel):
     nodes_in_use: int
     nodes_available:int
     nodes_unavailable: int
+    power_forecasts: List[PowerForecast] = [] # Empty by default (Available from external data source)
     jobs_status: List[JobStatus]
 
 class Target(BaseModel):
