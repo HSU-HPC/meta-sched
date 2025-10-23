@@ -43,7 +43,8 @@ class DirectExecutionRemoteTarget(RemoteTarget):
         cmd = job.spec.cmd_main
         callbacks.on_start()
         try:
-            with self._connect() as connection:
+            # Use a fresh, ephemeral connection to ensure correct paths
+            with self._get_connection(fresh=True) as connection:
                 expect_ok(
                     self._run(
                         connection, f"mkdir -p {job.remote_output}", warn=True

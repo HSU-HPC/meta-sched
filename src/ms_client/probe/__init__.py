@@ -83,51 +83,51 @@ def _monitor_target(
     """
     api_key = os.environ["MS_API_KEY"]
     print(f"Started monitor for {target.id} ({target.host})")
-    remote_target = remote_target_from_target(target)
-    forecast_source = _get_forecast_source(datacenter_api_tenant)
-    while True:
-        start = time.perf_counter()
-        target_status: Optional[TargetStatus] = None
-        print(f"===== State at {datetime.now()} =====")
-        try:
-            target_status = remote_target.get_status()
-        except NotImplementedError:
-            eprint(
-                f'Getting the queue status is not implemented for target {target.id} with batch system "{target.batch_system}"'
-            )
-            break
-        assert target_status  # Should not be None
-        if verbose:
-            print("Target State:")
-            print("Nodes available:", target_status.nodes_available)
-            print("Nodes in use:", target_status.nodes_in_use)
-            print("Nodes unavailable:", target_status.nodes_unavailable)
-            print("Current job count:", len(target_status.jobs_status))
-        if forecast_source:
-            forecasts = forecast_source.get_forecasts()[0]
-            target_status.power_forecasts = [
-                PowerForecast(
-                    timestamp=f.timestamp,
-                    nodes_renewable_powered=f.renewable_powered,
-                    reliability=f.reliability,
+    with remote_target_from_target(target) as remote_target:
+        forecast_source = _get_forecast_source(datacenter_api_tenant)
+        while True:
+            start = time.perf_counter()
+            target_status: Optional[TargetStatus] = None
+            print(f"===== State at {datetime.now()} =====")
+            try:
+                target_status = remote_target.get_status()
+            except NotImplementedError:
+                eprint(
+                    f'Getting the queue status is not implemented for target {target.id} with batch system "{target.batch_system}"'
                 )
-                for f in forecasts
-            ]
-            df = Forecast.forecasts_to_dataframe(forecasts)
+                break
+            assert target_status  # Should not be None
             if verbose:
-                print("\nPower Forecast:")
-                print(df.head().to_string(index=False))
-                print()
-        try:
-            client.update_target_status(target.id, target_status, api_key)
-        except Exception as e:
-            eprint("Error sending target status to Meta Scheduler API:", e)
-            break
-        sleep_for = max(0, interval - (time.perf_counter() - start))
-        try:
-            time.sleep(sleep_for)
-        except KeyboardInterrupt:
-            break
+                print("Target State:")
+                print("Nodes available:", target_status.nodes_available)
+                print("Nodes in use:", target_status.nodes_in_use)
+                print("Nodes unavailable:", target_status.nodes_unavailable)
+                print("Current job count:", len(target_status.jobs_status))
+            if forecast_source:
+                forecasts = forecast_source.get_forecasts()[0]
+                target_status.power_forecasts = [
+                    PowerForecast(
+                        timestamp=f.timestamp,
+                        nodes_renewable_powered=f.renewable_powered,
+                        reliability=f.reliability,
+                    )
+                    for f in forecasts
+                ]
+                df = Forecast.forecasts_to_dataframe(forecasts)
+                if verbose:
+                    print("\nPower Forecast:")
+                    print(df.head().to_string(index=False))
+                    print()
+            try:
+                client.update_target_status(target.id, target_status, api_key)
+            except Exception as e:
+                eprint("Error sending target status to Meta Scheduler API:", e)
+                break
+            sleep_for = max(0, interval - (time.perf_counter() - start))
+            try:
+                time.sleep(sleep_for)
+            except KeyboardInterrupt:
+                break
 
 
 def main() -> int:

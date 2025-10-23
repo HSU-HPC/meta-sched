@@ -247,52 +247,51 @@ class SlurmRemoteTarget(BatchSystemTarget):
         TargetStatus
             The status of the remote target
         """
-        with self._connect() as connection:
-            # Get the job states
-            squeue_format = "%D,%l,%T,%M"  # nodes, time limit, state, time
-            cmd = f"squeue {'--partition ' + self._target.queue if self._target.queue else ''} --format '{squeue_format}'"
-            output = self._run(
-                connection, cmd, hide=True, out_stream=None
-            ).stdout.strip()
-            df = pd.read_csv(io.StringIO(output.lower()))
-            df["time_limit"] = df["time_limit"].apply(lambda s: time_to_seconds(s))
-            df["time"] = df["time"].apply(lambda s: time_to_seconds(s))
-            df["is_using_nodes"] = df["state"].apply(
-                lambda s: s
-                in [
-                    # https://slurm.schedmd.com/job_state_codes.html
-                    # "completing",
-                    "configuring",
-                    "power_up_nodes",
-                    # "signaling",
-                    "running",
-                ]
-            )
-            df["time_remaining"] = df["time_limit"] - df["time"]
-            records = df[
-                ["nodes", "time_limit", "is_using_nodes", "time_remaining"]
-            ].to_dict("records")  # pyright: ignore[reportCallIssue]
-            # Get the node states
-            cmd = f"sinfo {'--partition ' + self._target.queue if self._target.queue else ''} -N --format '%t' --noheader"
-            nodes_state = (
-                self._run(connection, cmd, hide=True, out_stream=None)
-                .stdout.strip()
-                .splitlines()
-            )
-            node_states = dict(
-                nodes_in_use=0,
-                nodes_unavailable=0,
-                nodes_available=0,
-            )
-            for node_state in nodes_state:
-                # https://slurm.schedmd.com/sinfo.html#SECTION_NODE-STATE-CODES
-                if node_state.startswith("alloc"):
-                    node_states["nodes_in_use"] += 1
-                elif node_state.startswith("idle"):
-                    node_states["nodes_available"] += 1
-                else:
-                    node_states["nodes_unavailable"] += 1
-            assert sum(node_states.values()) == len(nodes_state)
-            return TargetStatus.model_validate(
-                node_states | {"timestamp": int(time.time()), "jobs_status": records}
-            )
+        # Get the job states
+        squeue_format = "%D,%l,%T,%M"  # nodes, time limit, state, time
+        cmd = f"squeue {'--partition ' + self._target.queue if self._target.queue else ''} --format '{squeue_format}'"
+        output = self._run(
+            self._get_connection(), cmd, hide=True, out_stream=None
+        ).stdout.strip()
+        df = pd.read_csv(io.StringIO(output.lower()))
+        df["time_limit"] = df["time_limit"].apply(lambda s: time_to_seconds(s))
+        df["time"] = df["time"].apply(lambda s: time_to_seconds(s))
+        df["is_using_nodes"] = df["state"].apply(
+            lambda s: s
+            in [
+                # https://slurm.schedmd.com/job_state_codes.html
+                # "completing",
+                "configuring",
+                "power_up_nodes",
+                # "signaling",
+                "running",
+            ]
+        )
+        df["time_remaining"] = df["time_limit"] - df["time"]
+        records = df[
+            ["nodes", "time_limit", "is_using_nodes", "time_remaining"]
+        ].to_dict("records")  # pyright: ignore[reportCallIssue]
+        # Get the node states
+        cmd = f"sinfo {'--partition ' + self._target.queue if self._target.queue else ''} -N --format '%t' --noheader"
+        nodes_state = (
+            self._run(self._get_connection(), cmd, hide=True, out_stream=None)
+            .stdout.strip()
+            .splitlines()
+        )
+        node_states = dict(
+            nodes_in_use=0,
+            nodes_unavailable=0,
+            nodes_available=0,
+        )
+        for node_state in nodes_state:
+            # https://slurm.schedmd.com/sinfo.html#SECTION_NODE-STATE-CODES
+            if node_state.startswith("alloc"):
+                node_states["nodes_in_use"] += 1
+            elif node_state.startswith("idle"):
+                node_states["nodes_available"] += 1
+            else:
+                node_states["nodes_unavailable"] += 1
+        assert sum(node_states.values()) == len(nodes_state)
+        return TargetStatus.model_validate(
+            node_states | {"timestamp": int(time.time()), "jobs_status": records}
+        )

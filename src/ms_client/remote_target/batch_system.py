@@ -233,7 +233,8 @@ class BatchSystemTarget(RemoteTarget):
         eprint("--- a. Submitting job ---")
         requested_seconds = job.spec.get_target_seconds(self._target, job.array_idx)
         eprint(f"SECONDS_REQUESTED={requested_seconds}")
-        with self._connect() as connection:
+        # Use a fresh, ephemeral connection to ensure correct paths
+        with self._get_connection(fresh=True) as connection:
             with connection.cd(job.remote_output):
                 output_error_files = self._create_oe_files(connection, stream_oe)
                 local_job_id = self._submit_job(
@@ -248,13 +249,13 @@ class BatchSystemTarget(RemoteTarget):
             time.sleep(1)
             backoff = ExponentialBackoff()
             while True:
-                with self._connect() as connection:
-                    if self._has_job_started(connection, local_job_id):
-                        break
+                if self._has_job_started(self._get_connection(), local_job_id):
+                    break
                 time.sleep(backoff())
                 backoff += 1
-            with self._connect() as connection:
-                callbacks.on_start(self._get_job_start_time(connection, local_job_id))
+            callbacks.on_start(
+                self._get_job_start_time(self._get_connection(), local_job_id)
+            )
 
         def await_job_completion() -> None:
             """
@@ -263,15 +264,21 @@ class BatchSystemTarget(RemoteTarget):
             eprint("--- c. Awaiting job completion ---")
             # Do not wait requested time in case job completes earlier
             # time.sleep(requested_seconds)
-            backoff = ExponentialBackoff()
+            # Check repeatedly in intervals of 1-10% of the job time
+            wait_until = time.time() + requested_seconds
+            backoff = ExponentialBackoff(
+                offset=requested_seconds // 100, maximum=requested_seconds // 10
+            )
             while True:
-                with self._connect() as connection:
-                    if self._has_job_ended(connection, local_job_id):
-                        break
-                time.sleep(backoff())
+                if self._has_job_ended(self._get_connection(), local_job_id):
+                    break
+                # Do not oversleep (but sleep at least 1 second)
+                seconds = max(1, min(backoff(), wait_until - time.time()))
+                time.sleep(seconds)
                 backoff += 1
-            with self._connect() as connection:
-                callbacks.on_end(self._get_job_end_time(connection, local_job_id))
+            callbacks.on_end(
+                self._get_job_end_time(self._get_connection(), local_job_id)
+            )
 
         def clean_up_and_get_job_status(
             interrupted_error: Optional[InterruptedError],
@@ -298,7 +305,10 @@ class BatchSystemTarget(RemoteTarget):
             time.sleep(
                 1
             )  # Wait a bit for the output/error to be received when streaming
-            with self._connect(ignore_interrupted_error=True) as connection:
+            # Use a fresh, ephemeral connection to ensure correct paths
+            with self._get_connection(
+                fresh=True, ignore_interrupted_error=True
+            ) as connection:
                 with connection.cd(job.remote_output):
                     if not stream_oe:
                         eprint()  # Separate with blank line
@@ -321,7 +331,7 @@ class BatchSystemTarget(RemoteTarget):
             sys.stderr.flush()
             if interrupted_error is not None:
                 raise interrupted_error
-            with self._connect(ignore_interrupted_error=True) as connection:
+            with self._get_connection(ignore_interrupted_error=True) as connection:
                 exit_code = self._get_job_exit_code(connection, local_job_id)
             if exit_code is None:
                 exit_code = -1
@@ -337,7 +347,7 @@ class BatchSystemTarget(RemoteTarget):
             interrupted_error = e
             if was_job_started:
                 callbacks.on_end()
-            with self._connect(ignore_interrupted_error=True) as connection:
+            with self._get_connection(ignore_interrupted_error=True) as connection:
                 self._cancel_job(connection, local_job_id)
         finally:
             return clean_up_and_get_job_status(interrupted_error)

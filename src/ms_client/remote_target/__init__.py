@@ -8,7 +8,7 @@ import time
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, TextIO, Tuple, Union
+from typing import Any, Dict, List, Optional, TextIO, Tuple, Union
 
 import invoke
 from fabric import Connection  # type: ignore[attr-defined]
@@ -49,20 +49,22 @@ class RemoteTarget:
                 "A remote target instance cannot be created directly. (Use factory method RemoteTarget.from_target(target) instead!)"
             )
         self._target = target
+        self._connection: Optional[Connection] = None
 
-    def _connect(
+    def _get_connection(
         self: "RemoteTarget",
-        retry: int = 5,
+        retry_count: int = 5,
         backoff: ExponentialBackoff = ExponentialBackoff(factor=10),
-        timeout: float = 30,
+        timeout: float = 60,
         ignore_interrupted_error: bool = False,
+        fresh: bool = False,
     ) -> Connection:
         """
         Connect to the target over SSH.
 
         Parameters
         ----------
-        retry : int
+        retry_count : int
             The maximum number of connection attempts
         backoff : ExponentialBackoff
             Exponential backoff strategy to ensure connection is eventually established
@@ -70,6 +72,8 @@ class RemoteTarget:
             The connection timeout in seconds
         ignore_interrupted_error : bool
             If true, ignore InterruptedError (default is False)
+        fresh : bool
+            If true, do not re-use any open connection
 
         Returns
         -------
@@ -84,7 +88,11 @@ class RemoteTarget:
         # connect_kwargs are forwarded to
         # https://docs.paramiko.org/en/latest/api/client.html#paramiko.client.SSHClient.connect
         connect_kwargs = dict(
-            allow_agent=False, look_for_keys=False, banner_timeout=timeout
+            allow_agent=False,
+            look_for_keys=False,
+            banner_timeout=timeout,
+            auth_timeout=timeout,
+            channel_timeout=timeout,
         )
         ssh_config = ssh.get_config()
         target_ssh_config = ssh_config.lookup(self._target.id)
@@ -107,9 +115,17 @@ class RemoteTarget:
             )
         config = Config(ssh_config=ssh_config)  # type: ignore[no-untyped-call]
         attempt = 0
-        while attempt < retry:
+        if self._connection:
+            if self._connection.is_connected:
+                if fresh:
+                    self._connection.close()  # type: ignore[no-untyped-call]
+                    backoff.reset()
+                else:
+                    return self._connection
+        self._connection = None
+        while attempt < retry_count:
             try:
-                connection = Connection(  # type: ignore[no-untyped-call]
+                self._connection = Connection(  # type: ignore[no-untyped-call]
                     self._target.id,
                     config=config,
                     connect_kwargs=connect_kwargs,
@@ -117,8 +133,9 @@ class RemoteTarget:
                 )
                 with SuppressStderr():  # Paramiko dumps entire stack trace on stderr
                     #  Explicitly open the connection (eager instead of lazy)
-                    connection.open()  # type: ignore[no-untyped-call]
-                return connection  # Do not try to reconnect again
+                    self._connection.open()  # type: ignore[no-untyped-call]
+                assert self._connection
+                return self._connection  # Do not try to reconnect again
             except InterruptedError:  # If ignored, does not count toward attempts
                 if not ignore_interrupted_error:
                     raise
@@ -126,7 +143,7 @@ class RemoteTarget:
                 attempt += 1
                 eprint(f"Connection failed on attempt #{attempt}:")
                 eprint(e)
-                if attempt < retry:
+                if attempt < retry_count:
                     delay = backoff()
                     backoff += 1
                     eprint(f"(Will try again in {delay} seconds.)")
@@ -136,6 +153,17 @@ class RemoteTarget:
                         f"Failed to connect to {self._target.id} after {attempt} attempts."
                     ) from e
         raise RuntimeError("Unreachable code somehow reached")
+
+    def __enter__(self: "RemoteTarget") -> "RemoteTarget":
+        return self
+
+    def __exit__(
+        self: "RemoteTarget", exc_type: Any, exc_value: Any, traceback: Any
+    ) -> None:
+        # Clean up any open connection
+        if self._connection and self._connection.is_connected:
+            self._connection.close()  # type: ignore[no-untyped-call]
+        self._connection = None
 
     class TransferMode(enum.Enum):
         """
@@ -164,8 +192,9 @@ class RemoteTarget:
             Direction in which data is transferred between submit host and target
         """
         if mode == self.TransferMode.UPLOAD:
-            with self._connect() as connection:
-                expect_ok(self._run(connection, f"mkdir -p $(dirname {dst})").exited)
+            expect_ok(
+                self._run(self._get_connection(), f"mkdir -p $(dirname {dst})").exited
+            )
             dst = f"{str(self._target.id)}:{dst}"
         elif mode == self.TransferMode.DOWNLOAD:
             Path(dst).parent.mkdir(parents=True, exist_ok=True)
@@ -198,9 +227,10 @@ class RemoteTarget:
             # scp uses src = A:/path/to/dir/* dst = B:/path/to/dir so dir is in path/to/
             dst = Path(dst) / Path(src).name
             src = f"{str(src)}/*"
-            with self._connect() as connection:
-                remote_dst = str(dst).split(":")[-1]
-                expect_ok(self._run(connection, f"mkdir -p {remote_dst}").exited)
+            remote_dst = str(dst).split(":")[-1]
+            expect_ok(
+                self._run(self._get_connection(), f"mkdir -p {remote_dst}").exited
+            )
             cmd = f"scp {' '.join(scp_flags)} {src} {dst} 1>&2"
             result = invoke.run(cmd, warn=True, pty=False)
         status = -1 if result is None else result.exited
@@ -215,8 +245,9 @@ class RemoteTarget:
         job : Job
             The job of which related files should be deleted on the target
         """
-        with self._connect() as connection:
-            expect_ok(self._run(connection, f"rm -rf {job.remote_output}").exited)
+        expect_ok(
+            self._run(self._get_connection(), f"rm -rf {job.remote_output}").exited
+        )
 
     def _create_oe_files(
         self: "RemoteTarget", connection: Connection, stream_contents: bool
@@ -344,7 +375,8 @@ class RemoteTarget:
         job : Job
             The job which to set up on the target
         """
-        with self._connect() as connection:
+        # Use a fresh, ephemeral connection to ensure correct paths
+        with self._get_connection(fresh=True) as connection:
             expect_ok(self._run(connection, f"mkdir -p {job.remote_output}").exited)
             with connection.cd(job.remote_output):
                 if job.spec.cmd_setup:
@@ -394,7 +426,9 @@ class RemoteTarget:
         int
             The exit code of the job or -1 if it could not be determined
         """
-        with self._connect() as connection:
+        with self._get_connection() as connection:
+            # Create the job output folder (delete any existing one to avoid confusion)
+            expect_ok(self._run(connection, f"rm -rf {job.remote_output}").exited)
             expect_ok(self._run(connection, f"mkdir -p {job.remote_output}").exited)
         return self._execute(job, callbacks, RemoteTarget.__get_job_env(job))
 

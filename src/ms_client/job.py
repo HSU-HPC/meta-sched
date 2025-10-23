@@ -139,7 +139,7 @@ def get_job_outputs() -> pd.DataFrame:
         """
         status_file = job_output_path / ".status"
         if not status_file.exists():
-            return None
+            return "unknown"
         return status_file.read_text().strip()
 
     if get_jobs_dir().is_dir():
@@ -229,7 +229,19 @@ class Status(abc.ABC):
     class Completed(_Enum):
         """Class representing a job that has successfully exited."""
 
-        pass
+        def __init__(self: "Status._Enum", status: int = 0) -> None:
+            """
+            Create a new instance of a state representing a failed job.
+
+            Parameters
+            ----------
+            status : int
+                The exit code of the job
+            """
+            self._data = [status]
+
+        def __str__(self: "Status._Enum") -> str:
+            return f"completed ({'?' if self._data[0] == -1 else self._data[0]})"
 
     class Completing(_Enum):
         """Class representing a job that has successfully finished executing with some pending operations (e.g. downloading results)."""
@@ -254,6 +266,9 @@ class Status(abc.ABC):
                 The exit code of the job
             """
             self._data = [status]
+
+        def __str__(self: "Status._Enum") -> str:
+            return f"failed ({self._data[0]})"
 
     class Canceled(_Enum):
         """Class representing a job that was cancelled by the user."""

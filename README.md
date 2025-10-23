@@ -15,6 +15,7 @@ Please refer to the [administrator](./docs/README.md#administrators) and [user](
 
 ## To-Dos
 
-- [ ] (Green) scheduling algorithms
+- [ ] `mscli purge [-t <target> ...] -a` to delete `~/.meta-sched` from targets
+- [ ] (Advanced) scheduling algorithms
 - [ ] Energy reporting plugin
-- [ ] Client side re-scheduling
+- [ ] Client-side re-scheduling

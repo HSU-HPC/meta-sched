@@ -217,69 +217,69 @@ class Executor:
             time.sleep(wait_seconds)
         else:
             raise NotImplementedError("Unknown scheduling decision type")
-        remote_target = remote_target_from_target(target)
-        eprint(
-            f"=== 2. Copying input files to target {target.id} and run optional setup step ==="
-        )
-        # Try to avoid race conditions outside of the scope of a batch system
-        with LockFile(
-            f"meta-sched/{os.getuid()}/{target.id}:{self.__job.spec.name}.lock"
-        ):
-            src = self.__job.local_input
-            dst = self.__job.remote_input.parent
-            remote_target.transfer(src, dst, RemoteTarget.TransferMode.UPLOAD)
-            remote_target.setup(self.__job)
-        eprint(f"=== 3. Executing job on target {target.id} ===")
+        with remote_target_from_target(target) as remote_target:
+            eprint(
+                f"=== 2. Copying input files to target {target.id} and run optional setup step ==="
+            )
+            # Try to avoid race conditions outside of the scope of a batch system
+            with LockFile(
+                f"meta-sched/{os.getuid()}/{target.id}:{self.__job.spec.name}.lock"
+            ):
+                src = self.__job.local_input
+                dst = self.__job.remote_input.parent
+                remote_target.transfer(src, dst, RemoteTarget.TransferMode.UPLOAD)
+                remote_target.setup(self.__job)
+            eprint(f"=== 3. Executing job on target {target.id} ===")
 
-        def callback_job_started(timestamp: Optional[int] = None) -> None:
-            """
-            Callback to update the Meta Scheduler server that the job has started executing on the target.
+            def callback_job_started(timestamp: Optional[int] = None) -> None:
+                """
+                Callback to update the Meta Scheduler server that the job has started executing on the target.
 
-            Parameters
-            ----------
-            timestamp : Optional[int]
-                The timestamp of when the job was started (Defaults to current timestamp)
-            """
-            if timestamp is None:
-                timestamp = int(time.time())
-            self.__job.set_status(job.Status.Running(target.id))
-            try:
-                self.__scheduler.update_job_started(self.__job_key, timestamp)
-            except Exception as e:
-                eprint("Error updating job state:", e)
+                Parameters
+                ----------
+                timestamp : Optional[int]
+                    The timestamp of when the job was started (Defaults to current timestamp)
+                """
+                if timestamp is None:
+                    timestamp = int(time.time())
+                self.__job.set_status(job.Status.Running(target.id))
+                try:
+                    self.__scheduler.update_job_started(self.__job_key, timestamp)
+                except Exception as e:
+                    eprint("Error updating job state:", e)
 
-        def callback_job_ended(timestamp: Optional[int] = None) -> None:
-            """
-            Callback to update the Meta Scheduler server that the job has finished executing on the target.
+            def callback_job_ended(timestamp: Optional[int] = None) -> None:
+                """
+                Callback to update the Meta Scheduler server that the job has finished executing on the target.
 
-            Parameters
-            ----------
-            timestamp : Optional[int]
-                The timestamp of when the job has ended (Defaults to current timestamp)
-            """
-            if timestamp is None:
-                timestamp = int(time.time())
-            self.__job.set_status(job.Status.Completing())
-            try:
-                self.__scheduler.update_job_ended(self.__job_key, timestamp)
-            except Exception as e:
-                eprint("Error updating job state:", e)
+                Parameters
+                ----------
+                timestamp : Optional[int]
+                    The timestamp of when the job has ended (Defaults to current timestamp)
+                """
+                if timestamp is None:
+                    timestamp = int(time.time())
+                self.__job.set_status(job.Status.Completing())
+                try:
+                    self.__scheduler.update_job_ended(self.__job_key, timestamp)
+                except Exception as e:
+                    eprint("Error updating job state:", e)
 
-        callbacks = RemoteTarget.JobExecutionCallbacks(
-            on_start=callback_job_started,
-            on_end=callback_job_ended,
-        )
-        job_exit_code = remote_target.execute(self.__job, callbacks)
-        eprint(f"=== 4. Fetching results from target {target.id} ===")
-        src = self.__job.remote_output
-        dst = self.__job.local_output.parent
-        remote_target.transfer(src, dst, RemoteTarget.TransferMode.DOWNLOAD)
-        eprint(f"=== 5. Cleaning up files on target {target.id} ===")
-        # TODO: Consider always cleaning up (even if job failed/was canceled)
-        remote_target.clean_up(self.__job)
-        eprint("=== 6. Validating job exit code ===")
-        expect_ok(job_exit_code, "Non-zero job exit code")
-        eprint("=== All done ===")
+            callbacks = RemoteTarget.JobExecutionCallbacks(
+                on_start=callback_job_started,
+                on_end=callback_job_ended,
+            )
+            job_exit_code = remote_target.execute(self.__job, callbacks)
+            eprint(f"=== 4. Fetching results from target {target.id} ===")
+            src = self.__job.remote_output
+            dst = self.__job.local_output.parent
+            remote_target.transfer(src, dst, RemoteTarget.TransferMode.DOWNLOAD)
+            eprint(f"=== 5. Cleaning up files on target {target.id} ===")
+            # TODO: Consider always cleaning up (even if job failed/was canceled)
+            remote_target.clean_up(self.__job)
+            eprint("=== 6. Validating job exit code ===")
+            expect_ok(job_exit_code, "Non-zero job exit code")
+            eprint("=== All done ===")
 
     def run(self: "Executor") -> None:
         """
@@ -309,9 +309,10 @@ class Executor:
                 if isinstance(e, StatusException):
                     status = e.status
                     eprint(e)
+                    final_job_status = job.Status.Completed(-1)
                 else:
                     eprint(traceback.format_exc())
-                final_job_status = job.Status.Failed(status)
+                    final_job_status = job.Status.Failed(status)
             finally:
                 try:
                     self.__job.set_status(final_job_status)

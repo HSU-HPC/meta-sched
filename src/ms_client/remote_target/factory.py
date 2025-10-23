@@ -12,6 +12,7 @@ from ms_client.remote_target.slurm import SlurmRemoteTarget
 def remote_target_from_target(target: Target) -> RemoteTarget:
     """
     Create an instance of the corresponding child class for a given target.
+    NOTE: Remote targets are context managers. (Usage: `with remote_target_from_target(...) as remote_target:`)
 
     Parameters
     ----------
