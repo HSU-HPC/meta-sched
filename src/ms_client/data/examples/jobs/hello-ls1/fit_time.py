@@ -61,8 +61,12 @@ df = pd.read_csv(StringIO(experiments_csv), sep=r"\s+", comment="#")
 
 
 # region fitting/optimization
-def surface(xy, a, b, c, d, e):  # type: ignore[no-untyped-def]
-    """Function for a surface polynomial: f(x,y)=a+bx+cy+dxy^(1/e).
+surface_expr = "a + b * x**c * y**(-d)"
+print("Fitting:", surface_expr)
+
+
+def surface(xy, a, b, c, d):  # type: ignore[no-untyped-def]
+    f"""Function for a surface polynomial: f(x,y)={surface_expr}.
 
     Parameters
     ----------
@@ -76,7 +80,7 @@ def surface(xy, a, b, c, d, e):  # type: ignore[no-untyped-def]
     The value of the function evaluation
     """
     x, y = xy
-    return a + b * x + c * y ** (1 / e) + d * x * y ** (1 / e)
+    return eval(surface_expr)
 
 
 def optmization_objective(params, xy, z):  # type: ignore[no-untyped-def]
@@ -115,10 +119,18 @@ surface_coefficients = result.x
 # endregion fitting/optimization
 
 # region create expression
-a, b, c, d, e = surface_coefficients
-expression_x = f"{MIN_FILM_WIDTH}+i*{FILM_WIDTH_STEP}"
+expression_x = f"({MIN_FILM_WIDTH}+i*{FILM_WIDTH_STEP})"
 scale_up_factor = SIMULATION_STEPS / experiment_steps
-expression_z = f"{1 + SAFETY_FRACTION}*{scale_up_factor}*({a:.2f}+{b:.2f}*({expression_x})+{c:.2f}*p**(1/{e:.2f})+{d:.2f}*({expression_x})*p**(1/{e:.2f}))"
+expression_z = f"{1 + SAFETY_FRACTION}*{scale_up_factor}*({surface_expr})"
+expression_z = expression_z.replace("x", expression_x)
+expression_z = expression_z.replace("y", "p")
+print("Coefficients")
+for i, val in enumerate(surface_coefficients):
+    var = chr(ord("a") + i)
+    val_fmtd = f"{val:.3f}"
+    print(f" - {var} = {val_fmtd}")
+    expression_z = expression_z.replace(var, val_fmtd)
+expression_z = expression_z.replace(" ", "")
 expression_z = expression_z.replace("+-", "-")
 
 
