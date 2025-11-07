@@ -11,8 +11,11 @@
 
 """Script to determine the expression for the requested time of the job spec."""
 
-from io import StringIO
+import os
+import sys
+from contextlib import contextmanager
 from pathlib import Path
+from typing import Iterator
 
 import numpy as np
 import pandas as pd
@@ -21,42 +24,40 @@ from scipy.optimize import curve_fit, minimize  # type: ignore
 
 # region script parameters
 SIMULATION_STEPS = 100_000  # Number of simulation steps in ls1 mardyn
-MIN_FILM_WIDTH = 10  # [nm]
-FILM_WIDTH_STEP = 10  # [nm]
+MIN_FILM_WIDTH = 1  # [nm]
+FILM_WIDTH_STEP = 1  # [nm]
 SAFETY_FRACTION = 0.01  # e.g. 0.01 => 1% request longer wall time
 ARRAY_SIZE = 10  # Should match spec.toml
 # endregion script parameters
 
 # region experiment data
 # Experiment data from using WindHPC node running the
-# ls1 exploding liquid simulation for 1000 steps with OMP.
+# ls1 exploding liquid simulation for 1000 steps with MPI.
 # (NOTE: On less powerful systems this may take longer.)
-experiments_csv = """
-molecules film_width seconds cores
-# All physical cores
-155864    1          48.2166 48
-311664    2          57.8555 48
-623832    4          79.5075 48
-1246616   8          124.213 48
-2492536   16         207.794 48
-4687568   32         353.156 48
-# Half of all physical cores (one socket)
-155864    1          66.2023 24
-311664    2          82.1669 24
-623832    4          114.267 24
-1246616   8          173.255 24
-2492536   16         308.564 24
-4687568   32         536.159 24
-# Quarter of all physical cores
-155864    1          104.093 12
-311664    2          132.059 12
-623832    4          185.308 12
-1246616   8          293.452 12
-2492536   16         500.408 12
-4687568   32         887.295 12
-"""
-experiment_steps = 1000
-df = pd.read_csv(StringIO(experiments_csv), sep=r"\s+", comment="#")
+benchmark_path = Path(__file__).parent / "benchmarks_time.csv"
+if not benchmark_path.is_file():
+    print(f'File not found: {benchmark_path}\n(Run "{Path(__file__).parent/"create_benchmarks_time.py"} first!)', file=sys.stderr)
+    sys.exit(1)
+df = pd.read_csv(benchmark_path)
+assert len(df["steps"].unique()) == 1, "Some experiments ran for different lenghts."
+experiment_steps = df["steps"].values[0]
+df = df.groupby(["cores", "film_width"], as_index=False)["seconds"].mean()
+df.sort_values(["film_width", "cores"], inplace=True)  # ignore: type[reportCallIssue]
+print("Benchmarks Mean:")
+film_widths = df["film_width"].unique()  # ignore: type[reportAttributeAccessIssue]
+data = dict(
+    film_width=film_widths,
+)
+for cores in df["cores"].unique()[::-1]:  # ignore: type[reportAttributeAccessIssue]
+    mask_cores = df["cores"] == cores
+    column_seconds = []
+    for film_width in film_widths:
+        seconds = df[mask_cores & (df["film_width"] == film_width)][
+            "seconds"
+        ].values  # ignore: type[reportAttributeAccessIssue]
+        column_seconds.append(seconds[0] if len(seconds) == 1 else np.nan)
+    data[f"{cores} cores"] = column_seconds
+print(pd.DataFrame(data).to_string(index=False), end="\n\n")
 # endregion experiment data
 
 
@@ -65,8 +66,20 @@ surface_expr = "a + b * x**c * y**(-d)"
 print("Fitting:", surface_expr)
 
 
+@contextmanager
+def suppress_stderr() -> Iterator[None]:
+    """Context manager to temporarily hide output to sys.stderr."""
+    with open(os.devnull, "w") as fnull:
+        old_stderr = sys.stderr
+        sys.stderr = fnull
+        try:
+            yield
+        finally:
+            sys.stderr = old_stderr
+
+
 def surface(xy, a, b, c, d):  # type: ignore[no-untyped-def]
-    f"""Function for a surface polynomial: f(x,y)={surface_expr}.
+    """Function for a surface polynomial: f(x,y)=eval(surface_expr).
 
     Parameters
     ----------
@@ -80,7 +93,8 @@ def surface(xy, a, b, c, d):  # type: ignore[no-untyped-def]
     The value of the function evaluation
     """
     x, y = xy
-    return eval(surface_expr)
+    with suppress_stderr():
+        return eval(surface_expr)
 
 
 def optmization_objective(params, xy, z):  # type: ignore[no-untyped-def]
@@ -121,13 +135,17 @@ surface_coefficients = result.x
 # region create expression
 expression_x = f"({MIN_FILM_WIDTH}+i*{FILM_WIDTH_STEP})"
 scale_up_factor = SIMULATION_STEPS / experiment_steps
+# Remove trailing ".0"
+scale_up_factor = (
+    int(scale_up_factor) if int(scale_up_factor) == scale_up_factor else scale_up_factor
+)
 expression_z = f"{1 + SAFETY_FRACTION}*{scale_up_factor}*({surface_expr})"
 expression_z = expression_z.replace("x", expression_x)
 expression_z = expression_z.replace("y", "p")
 print("Coefficients")
 for i, val in enumerate(surface_coefficients):
     var = chr(ord("a") + i)
-    val_fmtd = f"{val:.3f}"
+    val_fmtd = f"{val:.2f}"
     print(f" - {var} = {val_fmtd}")
     expression_z = expression_z.replace(var, val_fmtd)
 expression_z = expression_z.replace(" ", "")
@@ -167,10 +185,11 @@ print(
     f"RMSE: {int(np.ceil(root_mean_square_error))} sec ({root_mean_square_error / 60:.2f} min)"
 )
 n_cores = 48
-t_min = int(np.ceil(eval_expression_z((np.min(X_surface), n_cores))))  # type: ignore[no-untyped-call]
-t_max = int(np.ceil(eval_expression_z((np.max(X_surface), n_cores))))  # type: ignore[no-untyped-call]
+t_min = int(np.ceil(eval_expression_z((x_range[0], n_cores))))  # type: ignore[no-untyped-call]
+t_max = int(np.ceil(eval_expression_z((x_range[-1], n_cores))))  # type: ignore[no-untyped-call]
 print(
-    f"Estimated wall time range with {n_cores} cores: {t_min} sec ({t_min / 3600:.2f} h) - {t_max} sec ({t_max / 3600:.2f} h)"
+    f"Estimated wall time range with {n_cores} cores for {x_range[0]} - {x_range[-1]} nm and {SIMULATION_STEPS} steps:",
+    f"{t_min} sec ({t_min / 3600:.2f} h) - {t_max} sec ({t_max / 3600:.2f} h)",
 )
 print("\nAdd this to your spec.toml:\n")
 print(f"# Expression generated using {Path(__file__).name}")

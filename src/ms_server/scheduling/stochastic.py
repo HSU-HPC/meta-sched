@@ -78,8 +78,7 @@ class WeightedByCoresAvailability(GreedyPolicy):
 
     Policy Parameters
     -----------------
-    epsilon : float = 1e-9
-        The minimum weight for each target for sampling
+        The minimum weight for each target for sampling (Should not be zero!)
     weight_unavailable : float = 0.1
         The weighting factor for unavailable cores (Used by other jobs/nodes under maintenance)
     amplification_renewable : float = 0.5
@@ -100,7 +99,6 @@ class WeightedByCoresAvailability(GreedyPolicy):
             Callback to apply scheduling decision to a job
         """
         super(WeightedByCoresAvailability, self).__init__(on_schedule_job)
-        self.epsilon = 1e-9
         self.weight_unavailable = 0.1
         self.amplification_renewable = 0.5
         self.threshold_reliability_renewable = 0.8
@@ -169,7 +167,7 @@ class WeightedByCoresAvailability(GreedyPolicy):
                 )
             weight += n_cores_avail_renewable * self.amplification_renewable
             # Ensure all weights are greater than zero
-            return max(weight, self.epsilon)
+            return weight
 
         targets_weights = {t.id: get_target_weights(t) for t in targets_status}
         weights = [targets_weights[t] for t in job.available_targets]

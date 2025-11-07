@@ -1,9 +1,10 @@
 cmd_setup = "$MS_INPUT/build_ls1.sh --find >&2" # Build or locate existing binary
-cmd_main  = "python3 $MS_INPUT/run_scenario.py --width $MS_ARRAY_IDX"
+cmd_main  = "python3 $MS_INPUT/run_scenario.py --width $(($MS_ARRAY_IDX+1))" # Index starts at 0
 array_size = 10
 # Only use OpenMP:
 # required_modules = ["MPI"]
 # Expression generated using fit_time.py
-time = "=1.01*100.0*(71.090+221.305*(10+i*10)**0.926*p**(-0.768))"
+time = "=1.01*100*(39.60+391.44*(1+i*1)**1.00*p**(-0.76))"
 # Force using all cores of the node:
 exclusive  = true
+

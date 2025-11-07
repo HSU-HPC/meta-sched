@@ -1,14 +1,24 @@
 #! /bin/bash
 
 # shellcheck disable=SC2089
-BUILD_ARGS_LS1="-DENABLE_ADIOS2=OFF -DENABLE_MPI=OFF -DOPENMP=ON -DENABLE_AUTOPAS=OFF -DENABLE_UNIT_TESTS=OFF -DENABLE_ALLLBL=OFF -DMAMICO_COUPLING=OFF"
+BUILD_ARGS_LS1="-DENABLE_ADIOS2=OFF -DENABLE_MPI=ON -DOPENMP=ON -DENABLE_AUTOPAS=OFF -DENABLE_UNIT_TESTS=OFF -DENABLE_ALLLBL=ON -DMAMICO_COUPLING=OFF"
 
 set -e
 
 clear || :
 
-# Try to load cmake module (required on some systems)
-ml cmake || :
+if ! command -v cmake >/dev/null 2>&1
+then
+    # Try to load cmake module (required on some systems)
+    ml cmake
+fi
+
+if ! command -v mpicxx >/dev/null 2>&1
+then
+    # Try to load MPI module (required on some systems)
+    ml mpi
+fi
+
 
 CWD=$(pwd)
 cd "$(dirname "$0")"
@@ -21,6 +31,8 @@ if [[ -z "$MARDYN_BIN_PATH" || ! " ${ARGS[*]} " =~ " --find " ]]; then
     cd "$ROOT"
     git clone --depth 1 https://github.com/ls1mardyn/ls1-mardyn.git || :
     cd ls1-mardyn
+    git reset --hard
+    git checkout master
     git pull
 
     echo "::: Building ls1 :::"

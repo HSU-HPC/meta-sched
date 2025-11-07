@@ -13,7 +13,7 @@
         <run>
             <currenttime>0.0</currenttime>
             <production>
-                <steps>100000</steps>
+                <steps>STEPS</steps>
             </production>
         </run>
         <ensemble type="NVT">
