@@ -18,6 +18,7 @@ from ms_client.client import Client
 from ms_client.config import Config
 from ms_client.probe.datacenter_api_client import (ApiArgs, Contract, Forecast,
                                                    ForecastSource, Tenant)
+from ms_client.remote_target import RemoteTarget
 from ms_client.remote_target.factory import remote_target_from_target
 from ms_client.ssh import has_ssh_config_entry
 
@@ -57,6 +58,61 @@ def _get_forecast_source(tenant: Optional[Tenant]) -> Optional[ForecastSource]:
     return forecast_sources[0]
 
 
+def _get_target_status(
+    target: Target,
+    remote_target: RemoteTarget,
+    forecast_source: Optional[ForecastSource],
+    verbose: bool = False,
+) -> TargetStatus:
+    """
+    Fetch the status of a remote target.
+
+    Parameters
+    ----------
+    target : Target
+        The target to monitor for updates
+    remote_target : RemoteTarget
+        An instance of the remote target to execute commands (fetch status)
+    forecast_source : Optional[ForecastSource]
+        ForecastSource for the datacenter API of this target
+        (Used to fetch additional data about the state of the target)
+    verbose : bool
+        Print some fetched information about the target (Defaults to False)
+    """
+    target_status: TargetStatus
+    print(f"===== Fetched state at {datetime.now()} =====")
+    try:
+        target_status = remote_target.get_status()
+    except NotImplementedError:
+        eprint(
+            f'Getting the queue status is not implemented for target {target.id} with batch system "{target.batch_system}"'
+        )
+        raise
+    assert target_status  # Should not be None
+    if verbose:
+        print("Target State:")
+        print("Nodes available:", target_status.nodes_available)
+        print("Nodes in use:", target_status.nodes_in_use)
+        print("Nodes unavailable:", target_status.nodes_unavailable)
+        print("Current job count:", len(target_status.jobs_status))
+    if forecast_source:
+        forecasts = forecast_source.get_forecasts()[0]
+        target_status.power_forecasts = [
+            PowerForecast(
+                timestamp=f.timestamp,
+                nodes_renewable_powered=f.renewable_powered,
+                reliability=f.reliability,
+            )
+            for f in forecasts
+        ]
+        df = Forecast.forecasts_to_dataframe(forecasts)
+        if verbose:
+            print("\nPower Forecast:")
+            print(df.head().to_string(index=False))
+            print()
+    return target_status
+
+
 def _monitor_target(
     client: Client,
     target: Target,
@@ -87,37 +143,14 @@ def _monitor_target(
         forecast_source = _get_forecast_source(datacenter_api_tenant)
         while True:
             start = time.perf_counter()
-            target_status: Optional[TargetStatus] = None
-            print(f"===== State at {datetime.now()} =====")
+            target_status: Optional[TargetStatus]
             try:
-                target_status = remote_target.get_status()
-            except NotImplementedError:
-                eprint(
-                    f'Getting the queue status is not implemented for target {target.id} with batch system "{target.batch_system}"'
+                target_status = _get_target_status(
+                    target, remote_target, forecast_source, verbose
                 )
+            except Exception as e:
+                eprint("Error fetching target status:", e)
                 break
-            assert target_status  # Should not be None
-            if verbose:
-                print("Target State:")
-                print("Nodes available:", target_status.nodes_available)
-                print("Nodes in use:", target_status.nodes_in_use)
-                print("Nodes unavailable:", target_status.nodes_unavailable)
-                print("Current job count:", len(target_status.jobs_status))
-            if forecast_source:
-                forecasts = forecast_source.get_forecasts()[0]
-                target_status.power_forecasts = [
-                    PowerForecast(
-                        timestamp=f.timestamp,
-                        nodes_renewable_powered=f.renewable_powered,
-                        reliability=f.reliability,
-                    )
-                    for f in forecasts
-                ]
-                df = Forecast.forecasts_to_dataframe(forecasts)
-                if verbose:
-                    print("\nPower Forecast:")
-                    print(df.head().to_string(index=False))
-                    print()
             try:
                 client.update_target_status(target.id, target_status, api_key)
             except Exception as e:

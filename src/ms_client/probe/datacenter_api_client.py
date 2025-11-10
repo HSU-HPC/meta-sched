@@ -74,7 +74,13 @@ class _ApiResource(object):
     def __repr__(self: "_ApiResource") -> str:
         return f"<{type(self).__name__} #{getattr(self, 'id')}>"
 
-    def _get(self: "_ApiResource", path: str, *args: Any, **kwargs: Any) -> Any:
+    def _get(
+        self: "_ApiResource",
+        path: str,
+        is_retry: bool = False,
+        *args: Any,
+        **kwargs: Any,
+    ) -> Any:
         """
         Request data (HTTP-GET) from the API.
 
@@ -82,6 +88,8 @@ class _ApiResource(object):
         ----------
         path : str
             The path (without the base path) of the API resource to request
+        is_retry : bool
+            Indicates that the request is being repeated after an initial (authentication) failure
         *args : Any
             Positional arguments to be forwarded to requests.get(...)
         **kwargs : Any
@@ -97,11 +105,38 @@ class _ApiResource(object):
         with urllib3.warnings.catch_warnings():  # type: ignore[attr-defined]
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
             assert self._apiArgs, "No API arguments provided. (Cannot fetch content.)"
+            username = os.getenv("DATACENTER_API_USER")
+            password = os.getenv("DATACENTER_API_PASS")
+            token_env_key = "DATACENTER_API_TOKEN"
+            token = os.getenv(token_env_key)
+            if username and password and not token:
+                response = requests.post(
+                    self._apiArgs.endpoint + "/login",
+                    headers={"Content-Type": "application/json"},
+                    data=json.dumps(dict(username=username, password=password)),
+                    verify=self._apiArgs.verify_cert,
+                )
+                response.raise_for_status()
+                token = response.json()["access_token"]
+                os.environ[token_env_key] = token
+            if "headers" not in kwargs:
+                kwargs["headers"] = {}
+            if token:
+                kwargs["headers"] |= {"Authorization": f"Bearer {token}"}
             response = requests.get(
                 self._apiArgs.endpoint + path,
                 *args,
                 **kwargs | dict(verify=self._apiArgs.verify_cert),
             )
+            if (
+                response.status_code == http.HTTPStatus.UNAUTHORIZED
+                and token
+                and not is_retry
+            ):
+                # Token may have expired (re-try)
+                del os.environ[token_env_key]
+                kwargs["is_retry"] = True
+                return self._get(path, *args, **kwargs)
             if response.status_code != http.HTTPStatus.OK:
                 raise http.client.error(response.status_code, response.text)  # pyright: ignore[reportAttributeAccessIssue]
             return json.loads(response.text)
@@ -178,11 +213,11 @@ class Forecast:
             return
 
         df = Forecast.forecasts_to_dataframe(forecasts)
-        plt.plot(df["timestamp"], df["renewable_powered"], "C0")
+        plt.step(df["timestamp"], df["renewable_powered"], "C0")
         plt.ylim(-0.5, df["renewable_powered"].max() + 0.5)
         plt.ylabel("Renewable Powered", color="C0")
         plt.twinx()
-        plt.plot(df["timestamp"], df["reliability"], "C1")
+        plt.step(df["timestamp"], df["reliability"], "C1")
         plt.ylim(-0.1, 1.1)
         plt.gca().yaxis.set_major_formatter(mtick.PercentFormatter(xmax=1))
         plt.ylabel("Reliability", color="C1")
@@ -219,8 +254,8 @@ class ForecastSource(_ApiResource):
             forecasts.append(
                 Forecast(
                     determination_timestamp + 3600 * forecast_raw["ahead_hour"],
-                    forecast_raw["reliability"] / 100,  # Convert percent to fraction
                     forecast_raw["renewable_powered"],
+                    forecast_raw["reliability"] / 100,  # Convert percent to fraction
                 )
             )
         # Ensure forecasts are sorted chronologically

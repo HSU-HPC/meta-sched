@@ -15,7 +15,7 @@ import os
 import sys
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Iterator
+from typing import Any, Dict, Iterator
 
 import numpy as np
 import pandas as pd
@@ -36,25 +36,26 @@ ARRAY_SIZE = 10  # Should match spec.toml
 # (NOTE: On less powerful systems this may take longer.)
 benchmark_path = Path(__file__).parent / "benchmarks_time.csv"
 if not benchmark_path.is_file():
-    print(f'File not found: {benchmark_path}\n(Run "{Path(__file__).parent/"create_benchmarks_time.py"} first!)', file=sys.stderr)
+    print(
+        f'File not found: {benchmark_path}\n(Run "{Path(__file__).parent / "create_benchmarks_time.py"} first!)',
+        file=sys.stderr,
+    )
     sys.exit(1)
 df = pd.read_csv(benchmark_path)
 assert len(df["steps"].unique()) == 1, "Some experiments ran for different lenghts."
 experiment_steps = df["steps"].values[0]
-df = df.groupby(["cores", "film_width"], as_index=False)["seconds"].mean()
-df.sort_values(["film_width", "cores"], inplace=True)  # ignore: type[reportCallIssue]
+df = pd.DataFrame(df.groupby(["cores", "film_width"], as_index=False)["seconds"].mean())
+df.sort_values(["film_width", "cores"], inplace=True)
 print("Benchmarks Mean:")
-film_widths = df["film_width"].unique()  # ignore: type[reportAttributeAccessIssue]
-data = dict(
+film_widths = df["film_width"].unique()
+data: Dict[str, Any] = dict(
     film_width=film_widths,
 )
-for cores in df["cores"].unique()[::-1]:  # ignore: type[reportAttributeAccessIssue]
+for cores in df["cores"].unique()[::-1]:
     mask_cores = df["cores"] == cores
     column_seconds = []
     for film_width in film_widths:
-        seconds = df[mask_cores & (df["film_width"] == film_width)][
-            "seconds"
-        ].values  # ignore: type[reportAttributeAccessIssue]
+        seconds = df[mask_cores & (df["film_width"] == film_width)]["seconds"].value
         column_seconds.append(seconds[0] if len(seconds) == 1 else np.nan)
     data[f"{cores} cores"] = column_seconds
 print(pd.DataFrame(data).to_string(index=False), end="\n\n")

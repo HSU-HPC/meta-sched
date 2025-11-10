@@ -159,7 +159,7 @@ def get_job_outputs() -> pd.DataFrame:
                 except ValueError:
                     continue
                 df.loc[len(df)] = [job_spec, array_id, array_idx]
-    df["path"] = df.apply(lambda r: _get_job_output(*r), axis=1)
+    df["path"] = df.apply(lambda r: _get_job_output(*r), axis=1)  # pyright: ignore[reportCallIssue,reportArgumentType]
     df["pid"] = df["path"].apply(get_pid).astype(float)
     df["status"] = df["path"].apply(get_status).astype(str)
     # Try to interpret array_id as int to allow for correct sorting

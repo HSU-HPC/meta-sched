@@ -37,7 +37,20 @@ If the application is running under a non-root user and requires `sudo`, add the
 
 To persistently execute the server in the background after the system has booted, create a new [systemd unit](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html) or use a terminal multiplexer like [tmux](https://github.com/tmux/tmux/wiki) to manually run it in the background.
 
-The state of the Meta Scheduler can be updated with the state of the targets using `MS_API_KEY=someSecret msprobe [-t <target ID>,...] [-i <interval>]` from the client package.
+The state of the Meta Scheduler can be updated with the state of the targets using
+
+```shell
+(
+  export MS_API_KEY=someSecret
+  # Optional:
+  export DATACENTER_API_USER=someUser
+  export DATACENTER_API_PASS=somePassword
+
+  msprobe [-t <target ID>,...] [-i <interval>]
+)
+```
+
+from the client package.
 This state can be used by the scheduling policy to optimize job distribution across targets.
 
 The structure of the configuration file is explained by example below:
