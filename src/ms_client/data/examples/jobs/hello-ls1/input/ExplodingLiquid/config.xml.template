@@ -111,7 +111,7 @@
         <plugin name="EnergyRAPL">
             <writefrequency>100</writefrequency>
             <outputprefix>ls1_rapl</outputprefix>
-            <per-host>false</per-host> <!-- Only running on one node -->
+            <per-host>false</per-host>
         </plugin>
     </simulation>
 </mardyn>

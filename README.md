@@ -15,6 +15,7 @@ Please refer to the [administrator](./docs/README.md#administrators) and [user](
 
 ## To-Dos
 
+- [ ] Node count as expression (`min:max`) with support for percentage of max/available
 - [ ] `mscli purge [-t <target> ...] -a` to delete `~/.meta-sched` from targets
 - [ ] (Advanced) scheduling algorithms
 - [ ] Energy reporting plugin

@@ -55,7 +55,7 @@ for cores in df["cores"].unique()[::-1]:
     mask_cores = df["cores"] == cores
     column_seconds = []
     for film_width in film_widths:
-        seconds = df[mask_cores & (df["film_width"] == film_width)]["seconds"].value
+        seconds = df[mask_cores & (df["film_width"] == film_width)]["seconds"].values
         column_seconds.append(seconds[0] if len(seconds) == 1 else np.nan)
     data[f"{cores} cores"] = column_seconds
 print(pd.DataFrame(data).to_string(index=False), end="\n\n")

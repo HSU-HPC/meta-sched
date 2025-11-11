@@ -1,4 +1,12 @@
-#! /usr/bin/env python3
+#!/usr/bin/env -S uv run --script
+# /// script
+# requires-python = ">=3.9"
+# dependencies = [
+#     "matplotlib>=3.9.4",
+#     "pandas>=2.3.2",
+#     "requests>=2.32.5",
+# ]
+# ///
 
 """Module containing the datacenter API client code."""
 
@@ -418,7 +426,9 @@ def __main() -> None:
             "Print/plot datacenter forecast using API.\n(Demo only!)",
             file=sys.stderr,
         )
-        print(f"\nUsage: {Path(sys.argv[0]).name} <tenant id>\n", file=sys.stderr)
+        print(
+            f"\nUsage: {Path(sys.argv[0]).name} <tenant id> [--plot]\n", file=sys.stderr
+        )
         sys.exit(1)
 
     endpoint_env_key = "DATACENTER_API_URL"
@@ -427,32 +437,47 @@ def __main() -> None:
         sys.exit(1)
     apiArgs = ApiArgs(os.environ[endpoint_env_key])
     tenant = Tenant(tenant_id, apiArgs)
-    print(f"Fetching contracts associated with tenant {tenant.id}...")
+    print(f"Fetching contracts associated with tenant {tenant.id}...", file=sys.stderr)
     contracts: List[Contract] = []
     try:
         contracts = list(tenant.get_contracts())
     except Exception:
-        print(f"No contracts found for tenant {tenant.id}.")
+        print(f"No contracts found for tenant {tenant.id}.", file=sys.stderr)
         sys.exit(1)
     print(
-        f"Fetching forecast sources associated with contracts {[c.id for c in contracts]}..."
+        f"Fetching forecast sources associated with contracts {[c.id for c in contracts]}...",
+        file=sys.stderr,
     )
     forecast_sources = [f for c in contracts for f in c.forecast_sources]
     if len(forecast_sources) == 0:
-        print(f"No forecast sources found for contracts {[c.id for c in contracts]}.")
+        print(
+            f"No forecast sources found for contracts {[c.id for c in contracts]}.",
+            file=sys.stderr,
+        )
         sys.exit(1)
     dfs = []
     determination_timestamp: float = -1
     for forecast_source in forecast_sources:
         forecasts, determination_timestamp = forecast_sources[0].get_forecasts()
-        Forecast.plot_forecasts(forecasts, f"Forecast (Source {forecast_source.id})")
+        if len(sys.argv) == 3 and sys.argv[2] == "--plot":
+            if "uv" in [p.name for p in Path(sys.executable).parents]:
+                print(
+                    "Plotting is not supported when running in uv script mode!",
+                    file=sys.stderr,
+                )
+            else:
+                Forecast.plot_forecasts(
+                    forecasts, f"Forecast (Source {forecast_source.id})"
+                )
         df = Forecast.forecasts_to_dataframe(forecasts)
         df["forecast_source"] = forecast_source.id
         dfs.append(df)
     df = pd.concat(dfs)
     print(
-        f"\nForecasts as of {determination_timestamp} (Unix timestamp):", df, sep="\n"
+        f"\nForecasts as of {determination_timestamp} (Unix timestamp):",
+        file=sys.stderr,
     )
+    print(df.to_string(index=False))
 
 
 if __name__ == "__main__":
