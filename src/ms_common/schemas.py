@@ -228,7 +228,9 @@ class Spec(BaseModel):
         May be given as formatted duration ("d-hh:MM:SS") or SymPy expression for seconds starting with "=" where p is the total number of cores
     seconds : Optional[int]
         The amount of time in seconds that the job may run for (Alternative to parameter "time")
-    cmd_setup : Optional[str] = None
+    cmd_setup_local : Optional[str] = None
+        The shell command to run on the submit host before the execution of any remote commands
+    cmd_setup_target : Optional[str] = None
         The shell command to run before the execution of the main command without using a batch system
     array_size : int
         The number of jobs in the array (defaults to 1)
@@ -250,7 +252,8 @@ class Spec(BaseModel):
     cmd_main: str
     time: Optional[str] = None
     seconds: int = 0
-    cmd_setup: Optional[str] = None
+    cmd_setup_local: Optional[str] = None
+    cmd_setup_target: Optional[str] = None
     array_size: int = 1
     nodes: int = 1
     ranks_per_node: Optional[int] = None

@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any, Dict
 
 import pandas as pd
+from ms_common.schemas import Target
 from ms_common.utils import eprint
 from pydantic import ValidationError
 
@@ -23,6 +24,7 @@ from ms_client.client import Client
 from ms_client.config import Config
 from ms_client.job import (get_job_outputs, get_jobs_dir, list_job_spec_names,
                            load_job_spec)
+from ms_client.remote_target.factory import remote_target_from_target
 from ms_client.run_job import NoTargetsAvailableError, launch_job_array
 
 
@@ -253,13 +255,13 @@ class CLI:
         int
             The exit status of the operation
         """
-        os.chdir(Path.home())
-        df: pd.DataFrame = get_job_outputs()
         if any(not (c.isalnum() or c in "_") for c in array_or_job):
             eprint(
-                "Bad job pattern. (Supports only valid job_id characters and wildcard *.)"
+                'Bad job pattern. (Supports only valid job_id characters (digits and "_").)'
             )
             return os.EX_USAGE
+        os.chdir(Path.home())
+        df: pd.DataFrame = get_job_outputs()
         if "_" not in array_or_job:
             array_or_job += "_.*"  # Any array_idx (since not given)
         if array_or_job.endswith("_"):
@@ -282,7 +284,7 @@ class CLI:
             except KeyboardInterrupt:
                 pass
         if not (no_confirm or was_confirmed):
-            print("Aborted.")
+            eprint("Aborted.")
             return os.EX_OK
         pids = df["pid"].astype(int).values
         for pid in pids:
@@ -320,6 +322,56 @@ class CLI:
             pass
         return os.EX_OK
 
+    def purge(self: "CLI", target_id: str, no_confirm: bool = False) -> int:
+        """
+        Delete all job files from a target.
+
+        Parameters
+        ----------
+        target_id : str
+            ID of the target on which all job files should be deleted
+        no_config : bool
+            If true, the target will be purged without prompting the user to confirm
+
+        Returns
+        -------
+        int
+            The exit status of the operation
+        """
+        self.require_can_use_client()
+        df: pd.DataFrame = get_job_outputs()
+        # Ignore finished jobs
+        df = df.dropna()
+        target: Target
+        try:
+            target = [t for t in self.__client.targets if t.id == target_id][0]
+        except Exception:
+            eprint("Could not find target with this ID:", target_id)
+            sys.exit(os.EX_USAGE)
+        jobs_using_target = df[df["status"].str.contains(target_id, na=False)][
+            "job_id"
+        ].values
+        if len(jobs_using_target) > 0:
+            eprint("Target is still being used by some jobs:", *jobs_using_target)
+            sys.exit(os.EX_TEMPFAIL)
+        was_confirmed = False
+        if not no_confirm:
+            print("Confirm purging all jobs from:", target_id)
+            try:
+                was_confirmed = input('\nType "yes": ').strip() == "yes"
+            except KeyboardInterrupt:
+                pass
+        if not (no_confirm or was_confirmed):
+            eprint("Aborted.")
+            return os.EX_OK
+        remote_target = remote_target_from_target(target)
+        try:
+            remote_target.purge()
+            return os.EX_OK
+        except Exception:
+            eprint("Failed.")
+            return os.EX_TEMPFAIL
+
     def run(self: "CLI") -> int:
         """
         Execute the CLI in the current process (blocking).
@@ -337,6 +389,7 @@ class CLI:
             self.validate,
             self.status,
             self.cancel,
+            self.purge,
             self.ssh_config,
         ]
         commands = {f.__name__.replace("_", "-"): f for f in command_functions}

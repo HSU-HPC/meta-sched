@@ -1,4 +1,4 @@
-# Meta-Scheduler Documentation
+# Meta Scheduler Documentation
 
 ## Table of Contents
 
@@ -173,11 +173,15 @@ The job spec in `$HOME/meta-sched/jobs/<job spec>/spec.toml` defines the require
 An example is given below:
 
 ```toml
+# Fetch source code in case target has no internet access.
+# The current working directory is $HOME/meta-sched/jobs/<job spec>.
+# Note: The local setup step is executed just after the job is submitted for scheduling.
+cmd_setup_local  = "git clone --depth 1 https://example.org/repo.git $MS_INPUT"
 # Compile source code copied from $HOME/meta-sched/jobs/<job spec>/input/
 # The current working directory is the job output folder ($MS_OUTPUT).
 # (Here the binary will be included in the results downloaded from the target unless deleted.)
-# Note: The setup step is only executed after the job has been scheduled on a target.
-cmd_setup        = "mpicxx $MS_INPUT/example.cpp -o example"
+# Note: The target setup step is only executed after the job has been scheduled on a target.
+cmd_setup_target = "mpicxx $MS_INPUT/example.cpp -o example"
 # Run the example three times on two nodes through the batch system.
 # (Each job in the array may run on a different target.)
 cmd_main         = "mpiexec ./example --seed $MS_ARRAY_IDX"

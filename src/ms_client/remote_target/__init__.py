@@ -20,6 +20,7 @@ from paramiko.ssh_exception import SSHException
 
 from ms_client import ssh
 from ms_client.job import Instance as Job
+from ms_client.job import get_jobs_dir
 from ms_client.utils import ExponentialBackoff, SuppressStderr, expect_ok
 
 
@@ -236,6 +237,16 @@ class RemoteTarget:
         status = -1 if result is None else result.exited
         expect_ok(status)
 
+    def purge(self: "RemoteTarget") -> None:
+        """
+        Delete all job files from the target.
+        """
+        expect_ok(
+            self._run(
+                self._get_connection(), f"rm -rf {get_jobs_dir(hidden=True)}"
+            ).exited
+        )
+
     def clean_up(self: "RemoteTarget", job: Job) -> None:
         """
         Clean up job related files on the target.
@@ -379,8 +390,8 @@ class RemoteTarget:
         with self._get_connection(fresh=True) as connection:
             expect_ok(self._run(connection, f"mkdir -p {job.remote_output}").exited)
             with connection.cd(job.remote_output):
-                if job.spec.cmd_setup:
-                    cmd = job.spec.cmd_setup
+                if job.spec.cmd_setup_target:
+                    cmd = job.spec.cmd_setup_target
                     result = self._run(
                         connection,
                         cmd,

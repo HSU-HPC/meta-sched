@@ -7,6 +7,7 @@ import traceback
 from types import FrameType
 from typing import List, Optional, Set, Tuple
 
+import invoke
 import ms_common.schemas
 from ms_common.schemas import JobKey
 from ms_common.schemas import Spec as JobSpec
@@ -183,6 +184,28 @@ class Executor:
                 available_targets.add(t.id)
         return available_targets
 
+    def __setup(self: "Executor") -> None:
+        """
+        Run the set up command of the job files on the submit host.
+        """
+        with LockFile(f"meta-sched/{os.getuid()}/locks/{self.__job.spec.name}.lock"):
+            if self.__job.spec.cmd_setup_local:
+                env = dict(
+                    MS_ARRAY_ID=self.__job.array_id,
+                    MS_ARRAY_IDX=self.__job.array_idx,
+                    MS_INPUT=self.__job.local_input,
+                    TERM="dumb",  # See man "term(7)"
+                )
+                cwd = os.getcwd()
+                try:
+                    os.chdir(self.__job.local_input.parent)
+                    cmd = self.__job.spec.cmd_setup_local
+                    result = invoke.run(cmd, env=env, warn=True)
+                    status = -1 if result is None else result.exited
+                    expect_ok(status)
+                finally:
+                    os.chdir(cwd)
+
     def __run(self: "Executor") -> None:
         """
         Execute the job (blocking the calling thread).
@@ -192,7 +215,8 @@ class Executor:
         eprint(f"MS_ARRAY_ID={self.__job.array_id}")
         eprint(f"MS_ARRAY_IDX={self.__job.array_idx}")
         eprint(f"MS_JOB_SPEC={self.__job.spec.name}")
-        eprint("=== 1. Awaiting scheduling of job ===")
+        eprint("=== 1. Run submit host setup step and awaiting scheduling of job ===")
+        self.__setup()
         target: Target
         try:
             decision = self.__scheduler.poll_scheduling_decision(self.__job_key)
@@ -219,11 +243,11 @@ class Executor:
             raise NotImplementedError("Unknown scheduling decision type")
         with remote_target_from_target(target) as remote_target:
             eprint(
-                f"=== 2. Copying input files to target {target.id} and run optional setup step ==="
+                f"=== 2. Copying input files to target {target.id} and run optional target setup step ==="
             )
             # Try to avoid race conditions outside of the scope of a batch system
             with LockFile(
-                f"meta-sched/{os.getuid()}/{target.id}:{self.__job.spec.name}.lock"
+                f"meta-sched/{os.getuid()}/locks/targets/{target.id}/{self.__job.spec.name}.lock"
             ):
                 src = self.__job.local_input
                 dst = self.__job.remote_input.parent
@@ -305,6 +329,7 @@ class Executor:
                 self.__scheduler.cancel_job(self.__job_key)
                 final_job_status = job.Status.Canceled()
             except Exception as e:
+                self.__scheduler.cancel_job(self.__job_key)
                 status = -1
                 if isinstance(e, StatusException):
                     status = e.status

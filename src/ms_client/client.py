@@ -240,6 +240,7 @@ class Client(SchedulerClientInterface):
         available_targets: Set[str],
     ) -> None:
         """
+        TODO: Currently unused
         Reschedule a job with the given array ID and index.
 
         Parameters

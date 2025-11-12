@@ -1,4 +1,4 @@
-cmd_setup = "mpicxx $MS_INPUT/count.cpp -o count"
+cmd_setup_target = "mpicxx $MS_INPUT/count.cpp -o count"
 cmd_main = "mpiexec ./count"
 nodes = 2
 ranks_per_node = 1

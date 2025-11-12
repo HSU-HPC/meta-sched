@@ -310,6 +310,18 @@ class Instance:
         )
 
     @property
+    def local_dir(self: "Instance") -> Path:
+        """
+        Get the relative path to the directory containing the files of the job on the submit host.
+
+        Returns
+        -------
+        Path
+            The path to the input files of the job on the submit host
+        """
+        return get_jobs_dir(hidden=False) / self.spec.name
+
+    @property
     def local_input(self: "Instance") -> Path:
         """
         Get the relative path to the input files of the job on the submit host.
@@ -319,7 +331,7 @@ class Instance:
         Path
             The path to the input files of the job on the submit host
         """
-        return get_jobs_dir(hidden=False) / self.spec.name / "input"
+        return self.local_dir / "input"
 
     @property
     def remote_output(self: "Instance") -> Path:

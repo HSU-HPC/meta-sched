@@ -1,4 +1,6 @@
-cmd_setup = "MPI_RANKS=32 $MS_INPUT/setup.sh >&2"
+# FIXME: Requires that the target can download MaMiCo/ls1 source from GitHub
+
+cmd_setup_target = "MPI_RANKS=32 $MS_INPUT/setup.sh >&2"
 cmd_main  = "MPI_RANKS=32 $MS_INPUT/main.sh"
 # MPI not required (falls back on sequential version)
 # required_modules = ["MPI"]
