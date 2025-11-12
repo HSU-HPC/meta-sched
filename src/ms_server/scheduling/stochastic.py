@@ -1,11 +1,14 @@
 """Module containing scheduling policy implementations which use randomness."""
 
+import json
+import os
 import random
 import time
 from typing import List
 
 from ms_common.schemas import Assigned, Target
 
+from ms_common.utils import eprint
 from ms_server.model import Job, TargetsStatus
 from ms_server.scheduling import GreedyPolicy, ScheduleJobCallback
 
@@ -169,8 +172,25 @@ class WeightedByCoresAvailability(GreedyPolicy):
             # Ensure all weights are greater than zero
             return weight
 
-        targets_weights = {t.id: get_target_weights(t) for t in targets_status}
+        targets_weights = {t.id: get_target_weights(t) for t in targets_status if t in set(job.available_targets)}
         weights = [targets_weights[t] for t in job.available_targets]
         target_id = random.choices(job.available_targets, weights, k=1)[0]
+
+        log_data = dict(
+            timestamp_ns=int(time.time_ns()),
+            job=dict(array_id=job.array_id, array_idx=job.array_idx),
+            targets_weights=targets_weights,
+            selected_target_id=target_id,
+        )
+        jsonl_line = json.dumps(log_data)
+        eprint(jsonl_line)
+
+        # e.g. /var/log/meta-sched-policy.log
+        filename = os.getenv("MS_POLICY_LOG")
+        if filename:
+            with open(filename, "a") as file:
+                file.write(jsonl_line)
+                file.write("\n")
+
         decision = Assigned(target_id=target_id)
         await self.on_schedule_job(job.key, decision)

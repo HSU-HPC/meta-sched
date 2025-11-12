@@ -129,7 +129,7 @@ class LockFile:
         Path
             The path of the base directory for lock files
         """
-        return Path("/tmp")
+        return Path("/tmp/meta-sched")
 
     def __init__(self: "LockFile", name: str) -> None:
         """

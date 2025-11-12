@@ -188,7 +188,7 @@ class Executor:
         """
         Run the set up command of the job files on the submit host.
         """
-        with LockFile(f"meta-sched/{os.getuid()}/locks/{self.__job.spec.name}.lock"):
+        with LockFile(f"{os.getuid()}/locks/{self.__job.spec.name}.lock"):
             if self.__job.spec.cmd_setup_local:
                 env = dict(
                     MS_ARRAY_ID=self.__job.array_id,
@@ -247,7 +247,7 @@ class Executor:
             )
             # Try to avoid race conditions outside of the scope of a batch system
             with LockFile(
-                f"meta-sched/{os.getuid()}/locks/targets/{target.id}/{self.__job.spec.name}.lock"
+                f"{os.getuid()}/locks/targets/{target.id}/{self.__job.spec.name}.lock"
             ):
                 src = self.__job.local_input
                 dst = self.__job.remote_input.parent

@@ -20,6 +20,8 @@ from ms_client.executor import Executor
 from ms_client.job import Instance as Job
 from ms_client.job import load_job_spec
 
+__token_env_key = "MS_JOB_TOKEN"
+
 
 def __get_config_or_exit() -> Config:
     """
@@ -59,8 +61,6 @@ def __start_process(job_spec: str, token: str, array_id: int, array_idx: int) ->
     args = [
         "-s",
         job_spec,
-        "-t",
-        token,
         "-a",
         str(array_id),
         "-i",
@@ -68,11 +68,14 @@ def __start_process(job_spec: str, token: str, array_id: int, array_idx: int) ->
         "-r",
         "--nohup",
     ]
+    env = os.environ.copy()
+    env[__token_env_key] = token
     p = subprocess.Popen(
         [sys.executable, __file__] + args,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
         preexec_fn=os.setpgrp,  # Do not receive signals from current process
+        env=env,
     )
     return p.pid
 
@@ -131,7 +134,6 @@ def launch_job_array(job_spec: str) -> str:
 if __name__ == "__main__":
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("-s", "--job-spec", type=str, required=True)
-    arg_parser.add_argument("-t", "--token", type=str, required=True)
     arg_parser.add_argument("-a", "--array-id", type=str, required=True)
     arg_parser.add_argument("-i", "--array-index", type=int, default=1)
     arg_parser.add_argument("-r", "--redirect-output", action="store_true")
@@ -159,9 +161,13 @@ if __name__ == "__main__":
     os.chdir(Path.home())
     job = Job(load_job_spec(args.job_spec), args.array_id, args.array_index)
     scheduler = Client(__get_config_or_exit())
+    token = os.getenv(__token_env_key)
+    if not token:
+        eprint("No job token provided through environment variable", __token_env_key)
+        sys.exit(os.EX_USAGE)
     Executor(
         job,
-        args.token,
+        token,
         scheduler,
         redirect_output=args.redirect_output,
     ).run()

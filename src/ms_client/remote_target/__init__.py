@@ -274,7 +274,7 @@ class RemoteTarget:
             If true, the contents of the files will be streamed to stdout/stderr as they are appended
         """
         # Use random filenames to avoid collisions
-        suffix = f"_{int(time.time() * 1000)}"
+        suffix = f"_{int(time.time_ns())}"
         output_files = {f"output{suffix}": sys.stdout, f"error{suffix}": sys.stderr}
         for k, v in output_files.items():
             expect_ok(
