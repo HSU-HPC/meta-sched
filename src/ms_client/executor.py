@@ -215,7 +215,7 @@ class Executor:
         eprint(f"MS_ARRAY_ID={self.__job.array_id}")
         eprint(f"MS_ARRAY_IDX={self.__job.array_idx}")
         eprint(f"MS_JOB_SPEC={self.__job.spec.name}")
-        eprint("=== 1. Run submit host setup step and awaiting scheduling of job ===")
+        eprint("=== 1. Run local setup step and awaiting scheduling of job ===")
         self.__setup()
         target: Target
         try:
