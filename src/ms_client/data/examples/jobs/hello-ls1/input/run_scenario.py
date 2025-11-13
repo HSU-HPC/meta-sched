@@ -93,8 +93,11 @@ status = 0
 if args.dry_run:
     print(cmd)
 else:
-    print("EPOCH_START", int(datetime.now(tz=timezone.utc).timestamp()))
-    print(f"Running exploding liquid simulation with film width of {args.width} nm:")
+    print("EPOCH_START", int(datetime.now(tz=timezone.utc).timestamp()), flush=True)
+    print(
+        f"Running exploding liquid simulation with film width of {args.width} nm:",
+        flush=True,
+    )
     status = os.system(cmd)
-    print("EPOCH_ENDED", int(datetime.now(tz=timezone.utc).timestamp()))
+    print("EPOCH_ENDED", int(datetime.now(tz=timezone.utc).timestamp()), flush=True)
 sys.exit(status)
