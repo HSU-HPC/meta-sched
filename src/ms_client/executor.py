@@ -2,6 +2,7 @@
 
 import os
 import signal
+import sys
 import time
 import traceback
 from types import FrameType
@@ -20,8 +21,13 @@ from ms_client.job import Instance as Job
 from ms_client.remote_target import RemoteTarget
 from ms_client.remote_target.factory import remote_target_from_target
 from ms_client.scheduler_interface import SchedulerClientInterface
-from ms_client.utils import (LockFile, RedirectOutputToFile, StatusException,
-                             expect_ok, unwrap_error)
+from ms_client.utils import (
+    LockFile,
+    RedirectOutputToFile,
+    StatusException,
+    expect_ok,
+    unwrap_error,
+)
 
 
 class Executor:
@@ -188,35 +194,48 @@ class Executor:
         """
         Run the set up command of the job files on the submit host.
         """
-        with LockFile(f"{os.getuid()}/locks/{self.__job.spec.name}.lock"):
-            if self.__job.spec.cmd_setup_local:
-                env = dict(
-                    MS_ARRAY_ID=self.__job.array_id,
-                    MS_ARRAY_IDX=self.__job.array_idx,
-                    MS_INPUT=self.__job.local_input,
-                    TERM="dumb",  # See man "term(7)"
-                )
-                cwd = os.getcwd()
-                try:
-                    os.chdir(self.__job.local_input.parent)
-                    cmd = self.__job.spec.cmd_setup_local
-                    result = invoke.run(cmd, env=env, warn=True)
-                    status = -1 if result is None else result.exited
-                    expect_ok(status)
-                finally:
-                    os.chdir(cwd)
+        cwd = os.getcwd()
+        setup_cwd = self.__job.local_dir.absolute()
+        env = {
+            k: str(v)
+            for k, v in dict(
+                MS_ARRAY_ID=self.__job.array_id,
+                MS_ARRAY_IDX=self.__job.array_idx,
+                MS_INPUT=self.__job.local_input.absolute().relative_to(setup_cwd),
+                TERM="dumb",  # See man "term(7)"
+            ).items()
+        }
+        if self.__job.spec.cmd_setup_local:
+            try:
+                os.chdir(setup_cwd)
+                cmd = self.__job.spec.cmd_setup_local
+                result = invoke.run(cmd, env=env, warn=True, out_stream=sys.stderr)
+                status = -1 if result is None else result.exited
+                expect_ok(status)
+            finally:
+                os.chdir(cwd)
 
-    def __run(self: "Executor") -> None:
+    def __run(self: "Executor") -> int:
         """
         Execute the job (blocking the calling thread).
+
+        Returns
+        -------
+        int
+            The exit code of the job
         """
         signal.signal(signal.SIGINT, self.__signal_handler)
         signal.signal(signal.SIGTERM, self.__signal_handler)
         eprint(f"MS_ARRAY_ID={self.__job.array_id}")
         eprint(f"MS_ARRAY_IDX={self.__job.array_idx}")
         eprint(f"MS_JOB_SPEC={self.__job.spec.name}")
-        eprint("=== 1. Run local setup step and awaiting scheduling of job ===")
-        self.__setup()
+        eprint(
+            "=== 1. Run optional local setup step and awaiting scheduling of job ==="
+        )
+        with LockFile(f"{os.getuid()}/locks/{self.__job.spec.name}.lock"):
+            eprint("--- a. Run optional local setup step ---")
+            self.__setup()
+        eprint("--- b. Awaiting scheduling of job ---")
         target: Target
         try:
             decision = self.__scheduler.poll_scheduling_decision(self.__job_key)
@@ -251,7 +270,9 @@ class Executor:
             ):
                 src = self.__job.local_input
                 dst = self.__job.remote_input.parent
+                eprint("--- a. Copying input files to the target ---")
                 remote_target.transfer(src, dst, RemoteTarget.TransferMode.UPLOAD)
+                eprint("--- b. Run run optional target setup step ---")
                 remote_target.setup(self.__job)
             eprint(f"=== 3. Executing job on target {target.id} ===")
 
@@ -302,8 +323,12 @@ class Executor:
             # TODO: Consider always cleaning up (even if job failed/was canceled)
             remote_target.clean_up(self.__job)
             eprint("=== 6. Validating job exit code ===")
-            expect_ok(job_exit_code, "Non-zero job exit code")
+            try:
+                expect_ok(job_exit_code, "Non-zero job exit code")
+            except StatusException as e:
+                eprint(e)
             eprint("=== All done ===")
+            return job_exit_code
 
     def run(self: "Executor") -> None:
         """
@@ -322,22 +347,18 @@ class Executor:
             else {}
         )
         with RedirectOutputToFile(**kwargs):
-            final_job_status: job.Status._Enum = job.Status.Completed()
+            final_job_status: job.Status._Enum
             try:
-                self.__run()
+                status = self.__run()
+                final_job_status = job.Status.Completed(status)
             except InterruptedError:
                 self.__scheduler.cancel_job(self.__job_key)
                 final_job_status = job.Status.Canceled()
-            except Exception as e:
+            except Exception:
                 self.__scheduler.cancel_job(self.__job_key)
                 status = -1
-                if isinstance(e, StatusException):
-                    status = e.status
-                    eprint(e)
-                    final_job_status = job.Status.Completed(-1)
-                else:
-                    eprint(traceback.format_exc())
-                    final_job_status = job.Status.Failed(status)
+                eprint(traceback.format_exc())
+                final_job_status = job.Status.Failed(status)
             finally:
                 try:
                     self.__job.set_status(final_job_status)

@@ -192,6 +192,13 @@ class RemoteTarget:
         mode : TransferMode
             Direction in which data is transferred between submit host and target
         """
+        eprint(
+            "Up" if mode == self.TransferMode.UPLOAD else "Down",
+            "loading",
+            sep="",
+            end=" ",
+        )
+        eprint(src, "to", dst)
         if mode == self.TransferMode.UPLOAD:
             expect_ok(
                 self._run(self._get_connection(), f"mkdir -p $(dirname {dst})").exited
@@ -206,8 +213,9 @@ class RemoteTarget:
         ssh_options_str = " ".join(f"-o {o}" for o in ssh_options)
         rsync_flags = [
             "--archive",
-            "--progress",
-            "--verbose",
+            # Limit output (uncomment for debugging)
+            # "--progress",
+            # "--verbose",
             f'-e "ssh -p {self._target.port} {ssh_options_str}"',
         ]
         cmd = f"rsync {' '.join(rsync_flags)} {src} {dst} 1>&2"
@@ -399,6 +407,8 @@ class RemoteTarget:
                         env=RemoteTarget.__get_job_env(job),
                         modules=job.spec.required_modules,
                     )
+                    eprint(result.stdout)
+                    eprint(result.stderr)
                     expect_ok(result.exited)
 
     @dataclass

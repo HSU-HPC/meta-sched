@@ -8,10 +8,13 @@ from ms_common.schemas import Spec as JobSpec
 from ms_common.schemas import Target
 from ms_common.schemas import TargetStatus as TargetStatusSchema
 from pydantic import BaseModel
-from sqlalchemy import (JSON, Column, ForeignKey, Integer, String, delete,
-                        select, update)
-from sqlalchemy.ext.asyncio import (AsyncAttrs, AsyncSession,
-                                    async_sessionmaker, create_async_engine)
+from sqlalchemy import JSON, Column, ForeignKey, Integer, String, delete, select, update
+from sqlalchemy.ext.asyncio import (
+    AsyncAttrs,
+    AsyncSession,
+    async_sessionmaker,
+    create_async_engine,
+)
 from sqlalchemy.orm import DeclarativeBase, relationship
 from zmq.asyncio import Context, Socket
 

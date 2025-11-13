@@ -7,8 +7,8 @@ import time
 from typing import List
 
 from ms_common.schemas import Assigned, Target
-
 from ms_common.utils import eprint
+
 from ms_server.model import Job, TargetsStatus
 from ms_server.scheduling import GreedyPolicy, ScheduleJobCallback
 
@@ -172,7 +172,11 @@ class WeightedByCoresAvailability(GreedyPolicy):
             # Ensure all weights are greater than zero
             return weight
 
-        targets_weights = {t.id: get_target_weights(t) for t in targets_status if t.id in set(job.available_targets)}
+        targets_weights = {
+            t.id: get_target_weights(t)
+            for t in targets_status
+            if t.id in set(job.available_targets)
+        }
         weights = [targets_weights[t] for t in job.available_targets]
         target_id = random.choices(job.available_targets, weights, k=1)[0]
 

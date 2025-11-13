@@ -3,8 +3,7 @@
 from ms_common.schemas import Target
 
 from ms_client.remote_target import RemoteTarget
-from ms_client.remote_target.direct_execution import \
-    DirectExecutionRemoteTarget
+from ms_client.remote_target.direct_execution import DirectExecutionRemoteTarget
 from ms_client.remote_target.pbs import PBSRemoteTarget
 from ms_client.remote_target.slurm import SlurmRemoteTarget
 

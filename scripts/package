@@ -32,7 +32,6 @@ cd "$BASE_DIR/src/$PACKAGE"
 echo "--- Apply formatting ---"
 uvx ruff check --fix
 uvx ruff format
-uvx isort .
 
 echo "--- Perform static type checking for modules ---"
 cd "$BASE_DIR/packages/$PACKAGE"

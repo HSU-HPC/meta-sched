@@ -2,17 +2,30 @@
 
 import asyncio
 import secrets
-from typing import (Any, AsyncGenerator, Awaitable, Coroutine, List, Optional,
-                    Set, Tuple, TypeVar)
+from typing import (
+    Any,
+    AsyncGenerator,
+    Awaitable,
+    Coroutine,
+    List,
+    Optional,
+    Set,
+    Tuple,
+    TypeVar,
+)
 
 import ms_common
 import pandas as pd  # noqa: F401
 import uvicorn
-from fastapi import (Depends, FastAPI, Header, HTTPException, Query, Request,
-                     status)
+from fastapi import Depends, FastAPI, Header, HTTPException, Query, Request, status
 from fastapi.responses import StreamingResponse
-from ms_common.schemas import (JobKey, ScheduleRequest, ScheduleResponse,
-                               Target, TargetStatus)
+from ms_common.schemas import (
+    JobKey,
+    ScheduleRequest,
+    ScheduleResponse,
+    Target,
+    TargetStatus,
+)
 
 from ms_server.model import Model
 

@@ -37,7 +37,7 @@ if "MS_INPUT" not in os.environ:
     )
     sys.exit(1)
 input_path = Path(os.environ["MS_INPUT"])
-mardyn_path = Path("MarDyn").absolute()
+mardyn_path = (input_path / "MarDyn").absolute()
 
 try:
     assert mardyn_path.exists()
@@ -93,8 +93,8 @@ status = 0
 if args.dry_run:
     print(cmd)
 else:
-    print("UNIX_STARTED", int(datetime.now(tz=timezone.utc).timestamp()))
+    print("EPOCH_START", int(datetime.now(tz=timezone.utc).timestamp()))
     print(f"Running exploding liquid simulation with film width of {args.width} nm:")
     status = os.system(cmd)
-    print("UNIX_ENDED", int(datetime.now(tz=timezone.utc).timestamp()))
+    print("EPOCH_ENDED", int(datetime.now(tz=timezone.utc).timestamp()))
 sys.exit(status)

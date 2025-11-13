@@ -16,8 +16,13 @@ from pydantic import ValidationError
 
 from ms_client.client import Client
 from ms_client.config import Config
-from ms_client.probe.datacenter_api_client import (ApiArgs, Contract, Forecast,
-                                                   ForecastSource, Tenant)
+from ms_client.probe.datacenter_api_client import (
+    ApiArgs,
+    Contract,
+    Forecast,
+    ForecastSource,
+    Tenant,
+)
 from ms_client.remote_target import RemoteTarget
 from ms_client.remote_target.factory import remote_target_from_target
 from ms_client.ssh import has_ssh_config_entry

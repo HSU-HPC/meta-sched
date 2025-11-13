@@ -22,8 +22,12 @@ import ms_client.data as data
 from ms_client import ssh
 from ms_client.client import Client
 from ms_client.config import Config
-from ms_client.job import (get_job_outputs, get_jobs_dir, list_job_spec_names,
-                           load_job_spec)
+from ms_client.job import (
+    get_job_outputs,
+    get_jobs_dir,
+    list_job_spec_names,
+    load_job_spec,
+)
 from ms_client.remote_target.factory import remote_target_from_target
 from ms_client.run_job import NoTargetsAvailableError, launch_job_array
 

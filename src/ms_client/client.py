@@ -7,9 +7,16 @@ from typing import Dict, List, Set
 
 import ms_common
 import requests
-from ms_common.schemas import (JobKey, ScheduleRequest, ScheduleResponse,
-                               SchedulingDecision, SchedulingDecisionType,
-                               Spec, Target, TargetStatus)
+from ms_common.schemas import (
+    JobKey,
+    ScheduleRequest,
+    ScheduleResponse,
+    SchedulingDecision,
+    SchedulingDecisionType,
+    Spec,
+    Target,
+    TargetStatus,
+)
 
 from ms_client.config import Config
 from ms_client.scheduler_interface import SchedulerClientInterface
