@@ -264,15 +264,16 @@ class Executor:
             eprint(
                 f"=== 2. Copying input files to target {target.id} and run optional target setup step ==="
             )
-            # Try to avoid race conditions outside of the scope of a batch system
-            with LockFile(
-                f"{os.getuid()}/locks/targets/{target.id}/{self.__job.spec.name}.lock"
-            ):
+            with LockFile(f"{os.getuid()}/locks/{self.__job.spec.name}.lock"):
                 src = self.__job.local_input
                 dst = self.__job.remote_input.parent
                 eprint("--- a. Copying input files to the target ---")
                 remote_target.transfer(src, dst, RemoteTarget.TransferMode.UPLOAD)
                 eprint("--- b. Run run optional target setup step ---")
+            # Try to avoid race conditions remotely outside of the scope of a batch system
+            with LockFile(
+                f"{os.getuid()}/locks/targets/{target.id}/{self.__job.spec.name}.lock"
+            ):
                 remote_target.setup(self.__job)
             eprint(f"=== 3. Executing job on target {target.id} ===")
 
