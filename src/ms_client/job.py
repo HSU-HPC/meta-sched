@@ -198,6 +198,11 @@ class Status(abc.ABC):
                 [self.__class__.__name__.lower()] + [str(x) for x in self._data]
             )
 
+    class Unknown(_Enum):
+        """Class representing a job that has an unknown state (which should only be temporary)."""
+
+        pass
+
     class Scheduled(_Enum):
         """State representing a job that has been assigned to a target but is not yet running."""
 

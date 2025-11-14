@@ -6,8 +6,8 @@ import argparse
 import os
 import shutil
 import sys
-from datetime import datetime, timezone
 from pathlib import Path
+import time
 
 # 1. Parse arguments
 arg_parser = argparse.ArgumentParser()
@@ -93,11 +93,12 @@ status = 0
 if args.dry_run:
     print(cmd)
 else:
-    print("EPOCH_START", int(datetime.now(tz=timezone.utc).timestamp()), flush=True)
+    print(f"EPOCH_START={int(time.time())}", flush=True)
+    print(f"SCENARIO_FILM_WIDTH_NM={args.width}", flush=True)
     print(
         f"Running exploding liquid simulation with film width of {args.width} nm:",
         flush=True,
     )
     status = os.system(cmd)
-    print("EPOCH_ENDED", int(datetime.now(tz=timezone.utc).timestamp()), flush=True)
+    print(f"EPOCH_END={int(time.time())}", flush=True)
 sys.exit(status)

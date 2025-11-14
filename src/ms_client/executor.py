@@ -226,6 +226,7 @@ class Executor:
         """
         signal.signal(signal.SIGINT, self.__signal_handler)
         signal.signal(signal.SIGTERM, self.__signal_handler)
+        eprint(f"MS_EPOCH_SUBMIT={int(time.time())}")
         eprint(f"MS_ARRAY_ID={self.__job.array_id}")
         eprint(f"MS_ARRAY_IDX={self.__job.array_idx}")
         eprint(f"MS_JOB_SPEC={self.__job.spec.name}")
@@ -257,9 +258,8 @@ class Executor:
                 f"Scheduler assigned {target.id} ({target.host}) in T minus {wait_seconds} seconds (at {decision.timestamp_start})"
             )
             self.__job.set_status(job.Status.Scheduled(target.id))
-            time.sleep(wait_seconds)
         else:
-            raise NotImplementedError("Unknown scheduling decision type")
+            raise ValueError("Unknown scheduling decision type")
         with remote_target_from_target(target) as remote_target:
             eprint(
                 f"=== 2. Copying input files to target {target.id} and run optional target setup step ==="
@@ -286,6 +286,7 @@ class Executor:
                     The timestamp of when the job was started (Defaults to current timestamp)
                 """
                 if timestamp is None:
+                    eprint(f"BATCH_EPOCH_START={timestamp}")
                     timestamp = int(time.time())
                 self.__job.set_status(job.Status.Running(target.id))
                 try:
@@ -304,6 +305,7 @@ class Executor:
                 """
                 if timestamp is None:
                     timestamp = int(time.time())
+                eprint(f"BATCH_EPOCH_END={timestamp}")
                 self.__job.set_status(job.Status.Completing())
                 try:
                     self.__scheduler.update_job_ended(self.__job_key, timestamp)
@@ -314,6 +316,10 @@ class Executor:
                 on_start=callback_job_started,
                 on_end=callback_job_ended,
             )
+            # Recompute time to wait
+            wait_seconds = max(0, decision.timestamp_start - int(time.time()))
+            time.sleep(wait_seconds)
+            eprint(f"BATCH_EPOCH_SUBMIT={int(time.time())}")
             job_exit_code = remote_target.execute(self.__job, callbacks)
             eprint(f"=== 4. Fetching results from target {target.id} ===")
             src = self.__job.remote_output
@@ -328,6 +334,7 @@ class Executor:
             except StatusException as e:
                 eprint(e)
             eprint("=== All done ===")
+            eprint(f"MS_EPOCH_DONE={int(time.time())}")
             return job_exit_code
 
     def run(self: "Executor") -> None:
@@ -347,7 +354,7 @@ class Executor:
             else {}
         )
         with RedirectOutputToFile(**kwargs):
-            final_job_status: job.Status._Enum
+            final_job_status: job.Status._Enum = job.Status.Unknown()
             try:
                 status = self.__run()
                 final_job_status = job.Status.Completed(status)
