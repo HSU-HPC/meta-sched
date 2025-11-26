@@ -257,6 +257,7 @@ class Executor:
             eprint(
                 f"Scheduler assigned {target.id} ({target.host}) in T minus {wait_seconds} seconds (at {decision.timestamp_start})"
             )
+            eprint(f"MS_TARGET={target.id}")
             self.__job.set_status(job.Status.Scheduled(target.id))
         else:
             raise ValueError("Unknown scheduling decision type")
