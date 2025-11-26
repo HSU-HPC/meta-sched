@@ -71,7 +71,56 @@ def deprecated(reason: str) -> Callable[[F], F]:
         return cast(F, wrapper)
     return decorator
 
-@deprecated(reason="Maybe not needed anymore")
+C = TypeVar("C", bound=type)
+
+def deprecated_class(reason: str) -> Callable[[C], C]:
+    """
+    Mark a class as deprecated.
+
+    Parameters
+    ----------
+    reason : str
+        The reason for deprecation
+
+    Returns
+    -------
+    Callable
+        The decorated class
+    """
+    def decorator(cls: C) -> C:
+        """
+        Deprecation decorator.
+
+        Parameters
+        ----------
+        cls : C
+            The class to be deprecated
+
+        Returns
+        -------
+        C
+            The deprecated class
+        """
+        original_init = cls.__init__ # type: ignore
+
+        @functools.wraps(original_init)
+        def new_init(self: C, *args: Any, **kwargs: Any) -> None:
+            """
+            Deprecation wrapper for the init function.
+            """
+            warnings.warn(
+                f"{cls.__name__} is deprecated: {reason}",
+                category=DeprecationWarning,
+                stacklevel=2
+            )
+            original_init(self, *args, **kwargs)
+
+        cls.__init__ = new_init # type: ignore
+        return cls
+
+    return decorator
+
+@deprecated(reason="Maybe not needed anymore.")
 def try_become_root(required: bool = False) -> None:
     """
     Try to restart the current application as the root user if not already and "--sudo" was given as a command line parameter.

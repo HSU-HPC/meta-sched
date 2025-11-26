@@ -180,11 +180,10 @@ Z_fit = surface((X_surface, Y_surface), *surface_coefficients)  # type: ignore[n
 Z_expr = eval_expression_z((X_surface, Y_surface)) / scale_up_factor  # type: ignore[no-untyped-call]
 assert (Z_fit <= Z_expr).all(), "Expression must not lie below the fitted surface!"
 Z_sample = df["seconds"]
-residuals = Z_sample - (eval_expression_z((X, Y)) / scale_up_factor)  # type: ignore[no-untyped-call]
-root_mean_square_error = (np.sum(residuals) ** 2 / len(Z_sample)) ** 0.5
-print(
-    f"RMSE: {int(np.ceil(root_mean_square_error))} sec ({root_mean_square_error / 60:.2f} min)"
-)
+Z_pred = eval_expression_z((X, Y)) / scale_up_factor  # type: ignore[no-untyped-call]
+mape = np.mean(np.abs(Z_sample - Z_pred) / Z_sample) * 100
+mae = np.mean(np.abs(Z_sample - Z_pred))
+print(f"MAPE: {int(np.ceil(mape))} % ({mae:.2f} sec)")
 n_cores = 48
 t_min = int(np.ceil(eval_expression_z((x_range[0], n_cores))))  # type: ignore[no-untyped-call]
 t_max = int(np.ceil(eval_expression_z((x_range[-1], n_cores))))  # type: ignore[no-untyped-call]

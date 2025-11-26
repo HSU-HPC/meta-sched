@@ -7,7 +7,7 @@ import time
 from typing import List
 
 from ms_common.schemas import Assigned, Target
-from ms_common.utils import eprint
+from ms_common.utils import deprecated_class, eprint
 
 from ms_server.model import Job, TargetsStatus
 from ms_server.scheduling import GreedyPolicy, ScheduleJobCallback
@@ -74,14 +74,16 @@ class WeightedByCores(GreedyPolicy):
         await self.on_schedule_job(job.key, decision)
 
 
-class WeightedByCoresAvailability(GreedyPolicy):
+@deprecated_class(
+    reason="Does not account for imbalance in core count between targets well."
+)
+class WeightedByCoresAvailabilityAbsolute(GreedyPolicy):
     """
     This scheduling policy assigns jobs randomly per scheduling request proportional to the amount of currently unused cores on each target.
     (Note that this may result in disproportionate distribution across all targets depending on the available ones.)
 
     Policy Parameters
     -----------------
-        The minimum weight for each target for sampling (Should not be zero!)
     weight_unavailable : float = 0.1
         The weighting factor for unavailable cores (Used by other jobs/nodes under maintenance)
     amplification_renewable : float = 0.5
@@ -91,7 +93,8 @@ class WeightedByCoresAvailability(GreedyPolicy):
     """
 
     def __init__(
-        self: "WeightedByCoresAvailability", on_schedule_job: ScheduleJobCallback
+        self: "WeightedByCoresAvailabilityAbsolute",
+        on_schedule_job: ScheduleJobCallback,
     ):
         """
         Create a new instance of the scheduling policy
@@ -101,13 +104,13 @@ class WeightedByCoresAvailability(GreedyPolicy):
         on_schedule_job : ScheduleJobCallback
             Callback to apply scheduling decision to a job
         """
-        super(WeightedByCoresAvailability, self).__init__(on_schedule_job)
+        super(WeightedByCoresAvailabilityAbsolute, self).__init__(on_schedule_job)
         self.weight_unavailable = 0.1
         self.amplification_renewable = 0.5
         self.threshold_reliability_renewable = 0.8
 
     async def schedule_job(
-        self: "WeightedByCoresAvailability",
+        self: "WeightedByCoresAvailabilityAbsolute",
         job: Job,
         decided_jobs: List[Job],
         targets_status: TargetsStatus,
@@ -169,8 +172,131 @@ class WeightedByCoresAvailability(GreedyPolicy):
                     )
                 )
             weight += n_cores_avail_renewable * self.amplification_renewable
-            # Ensure all weights are greater than zero
             return weight
+
+        targets_weights = {
+            t.id: get_target_weights(t)
+            for t in targets_status
+            if t.id in set(job.available_targets)
+        }
+        weights = [targets_weights[t] for t in job.available_targets]
+        target_id = random.choices(job.available_targets, weights, k=1)[0]
+
+        log_data = dict(
+            timestamp_ns=int(time.time_ns()),
+            job=dict(array_id=job.array_id, array_idx=job.array_idx),
+            targets_weights=targets_weights,
+            selected_target_id=target_id,
+        )
+        jsonl_line = json.dumps(log_data)
+        eprint(jsonl_line)
+
+        # e.g. /var/log/meta-sched-policy.log
+        filename = os.getenv("MS_POLICY_LOG")
+        if filename:
+            with open(filename, "a") as file:
+                file.write(jsonl_line)
+                file.write("\n")
+
+        decision = Assigned(target_id=target_id)
+        await self.on_schedule_job(job.key, decision)
+
+
+class WeightedByCoresAvailability(GreedyPolicy):
+    """
+    This scheduling policy assigns jobs randomly per scheduling request proportional to the target load.
+
+    Policy Parameters
+    -----------------
+    amplification_renewable : float = 0.1
+        Additional weighting factor for renewable powered cores
+    threshold_reliability_renewable : float = 0.8
+        Threshold below which to disregard forecasts
+    """
+
+    def __init__(
+        self: "WeightedByCoresAvailability", on_schedule_job: ScheduleJobCallback
+    ):
+        """
+        Create a new instance of the scheduling policy
+
+        Parameters
+        ----------
+        on_schedule_job : ScheduleJobCallback
+            Callback to apply scheduling decision to a job
+        """
+        super(WeightedByCoresAvailability, self).__init__(on_schedule_job)
+        self.amplification_renewable = 0.1
+        self.threshold_reliability_renewable = 0.8
+
+    async def schedule_job(
+        self: "WeightedByCoresAvailability",
+        job: Job,
+        decided_jobs: List[Job],
+        targets_status: TargetsStatus,
+    ) -> None:
+        """
+        Schedule a job by assigning it to a target using a weighted random selection based on core count and availability.
+
+        Parameters
+        ----------
+        job : Job
+            The job to be scheduled
+        decided_jobs : List[Job]
+            The jobs for which are scheduling decision has already been made
+        targets_status : TargetsStatus
+            A mapping from target IDs to the corresponding status if available
+        """
+
+        def get_target_weights(t: Target) -> float:
+            """
+            Compute weight of target for sampling.
+
+            Parameters
+            ----------
+            t : Target
+                The target
+
+            Returns
+            -------
+            float
+                The weight of the target
+            """
+            epsilon = 1e-9
+            n_cores = t.nodes * t.cores_per_node
+            status = targets_status[t]
+            load: float = 0
+            if status:
+                for job_status in status.jobs_status:
+                    load += (
+                        job_status.nodes
+                        * t.cores_per_node
+                        * job_status.time_remaining
+                        / job.spec.get_target_seconds(t, job.array_idx)
+                    )
+                load /= n_cores
+            # Add amplification of renewable powered cores
+            # (Must be available continuously)
+            n_cores_renewable: float = 0
+            timestamp_earliest_done = time.time() + job.spec.get_target_seconds(
+                t, job.array_idx
+            )
+            for i, forecast in enumerate(status.power_forecasts if status else []):
+                if (
+                    forecast.timestamp > timestamp_earliest_done
+                    or forecast.reliability < self.threshold_reliability_renewable
+                ):
+                    break
+                n_cores_renewable = (
+                    forecast.nodes_renewable_powered * t.cores_per_node
+                    if i == 0
+                    else min(
+                        n_cores,
+                        forecast.nodes_renewable_powered * t.cores_per_node,
+                    )
+                )
+            weight_green = self.amplification_renewable * n_cores_renewable
+            return 1 / (load + epsilon) + weight_green
 
         targets_weights = {
             t.id: get_target_weights(t)
