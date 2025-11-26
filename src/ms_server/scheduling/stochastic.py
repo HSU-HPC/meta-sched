@@ -295,7 +295,7 @@ class WeightedByCoresAvailability(GreedyPolicy):
                         forecast.nodes_renewable_powered * t.cores_per_node,
                     )
                 )
-            weight_green = self.amplification_renewable * n_cores_renewable
+            weight_green = self.amplification_renewable * n_cores_renewable / n_cores
             return 1 / (load + epsilon) + weight_green
 
         targets_weights = {
