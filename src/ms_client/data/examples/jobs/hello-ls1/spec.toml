@@ -7,6 +7,6 @@ required_modules = ["MPI"]
 nodes = 2
 # ^^^ Comment out to only use OpenMP
 # Expression generated using fit_time.py
-time = "=1.01*100*(39.60+391.44*(1+i*1)**1.00*p**(-0.76))"
+time = "=1.75*100*(39.60+391.44*(1+i*1)**1.00*p**(-0.76))"
 # Force using all cores of the node:
 exclusive  = true

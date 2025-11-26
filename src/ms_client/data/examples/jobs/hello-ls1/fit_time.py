@@ -26,7 +26,7 @@ from scipy.optimize import curve_fit, minimize  # type: ignore
 SIMULATION_STEPS = 100_000  # Number of simulation steps in ls1 mardyn
 MIN_FILM_WIDTH = 1  # [nm]
 FILM_WIDTH_STEP = 1  # [nm]
-SAFETY_FRACTION = 0.01  # e.g. 0.01 => 1% request longer wall time
+SAFETY_FRACTION = 0.75  # e.g. 0.01 => 1% request longer wall time
 ARRAY_SIZE = 10  # Should match spec.toml
 # endregion script parameters
 
