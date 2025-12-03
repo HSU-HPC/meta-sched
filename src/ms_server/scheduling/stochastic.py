@@ -208,6 +208,8 @@ class WeightedByCoresAvailability(GreedyPolicy):
 
     Policy Parameters
     -----------------
+    epsilon : float = 1e-9
+        Added to the divisor (scheduled core hours) to avoid division by zero
     amplification_renewable : float = 0.1
         Additional weighting factor for renewable powered cores
     threshold_reliability_renewable : float = 0.8
@@ -226,6 +228,7 @@ class WeightedByCoresAvailability(GreedyPolicy):
             Callback to apply scheduling decision to a job
         """
         super(WeightedByCoresAvailability, self).__init__(on_schedule_job)
+        self.epsilon = 1e-9
         self.amplification_renewable = 0.1
         self.threshold_reliability_renewable = 0.8
 
@@ -262,7 +265,6 @@ class WeightedByCoresAvailability(GreedyPolicy):
             float
                 The weight of the target
             """
-            epsilon = 1e-9
             n_cores = t.nodes * t.cores_per_node
             status = targets_status[t]
             load: float = 0
@@ -296,7 +298,7 @@ class WeightedByCoresAvailability(GreedyPolicy):
                     )
                 )
             weight_green = self.amplification_renewable * n_cores_renewable / n_cores
-            return 1 / (load + epsilon) + weight_green
+            return 1 / (load + self.epsilon) + weight_green
 
         targets_weights = {
             t.id: get_target_weights(t)

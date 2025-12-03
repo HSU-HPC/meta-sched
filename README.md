@@ -12,11 +12,3 @@ Besides Linux and Python version >= 3.9, the only[^1] requirement consists [rsyn
 [^1]: [Full list of required software on the remote targets](docs/README.md#required-software-on-the-targets)
 
 Please refer to the [administrator](./docs/README.md#administrators) and [user](./docs/README.md#users) documentation.
-
-## To-Dos
-
-- [ ] Node count as expression (`min:max`) with support for percentage of max/available
-- [ ] `mscli purge [-t <target> ...] -a` to delete `~/.meta-sched` from targets
-- [ ] (Advanced) scheduling algorithms
-- [ ] Energy reporting plugin
-- [ ] Client-side re-scheduling

@@ -64,11 +64,11 @@ db_url = "sqlite://"
 # Time between invoking the scheduling policy
 scheduling_loop_interval = 10
 # Scheduling policy
-scheduler_class_name = "stochastic.py:WeightedByCoresAvailable"
+scheduler_class_name = "stochastic.py:WeightedByCoresAvailability"
 # Override default parameters of the scheduling policy
 [scheduler_parameter_overrides]
 epsilon = 1e-9
-unavailable_discount_factor = 0.1
+threshold_reliability_renewable = 0.8
 
 # List of targets available for scheduling
 [[targets]]
