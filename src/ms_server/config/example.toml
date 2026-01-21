@@ -18,7 +18,7 @@ nodes = 569
 cores_per_node = 72
 max_time = "72:00:00"
 max_nodes = 5
-tags = ["x86"]
+tags = ["x86", "slurm"]
 [targets.module_map]
 MPI = "intel-oneapi-mpi"
 
@@ -32,7 +32,7 @@ nodes = 4
 cores_per_node = 48
 max_time = "7-00:00:00"
 source_scripts = ["/etc/profile"]
-tags = ["x86"]
+tags = ["x86", "windhpc", "slurm"]
 [targets.module_map]
 MPI = "mpi"
 
@@ -45,7 +45,7 @@ queue = "windhpc"
 nodes = 5
 cores_per_node = 48
 max_time = "24:00:00"
-tags = ["x86"]
+tags = ["x86", "windhpc", "pbs"]
 [targets.module_map]
 MPI = "mpi/openmpi"
 
@@ -57,6 +57,6 @@ batch_system = "slurm"
 nodes = 5
 cores_per_node = 48
 source_scripts = ["/etc/profile"]
-tags = ["x86", "green"]
+tags = ["x86", "green", "windhpc", "slurm"]
 [targets.module_map]
 MPI = "mpi/openmpi"

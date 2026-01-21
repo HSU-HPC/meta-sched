@@ -98,8 +98,7 @@ def get_job_outputs() -> pd.DataFrame:
         The table of jobs
     """
 
-    _columns = ["job_spec", "array_id", "array_idx"]
-    df = pd.DataFrame(columns=_columns)  # pyright: ignore[reportArgumentType]
+    rows = []
 
     def get_pid(job_output_path: Path) -> Optional[int]:
         """
@@ -158,9 +157,18 @@ def get_job_outputs() -> pd.DataFrame:
                     array_idx = int(job_output_dir.name.split("_")[-1])
                 except ValueError:
                     continue
-                df.loc[len(df)] = pd.Series([job_spec, array_id, array_idx])
+                rows.append(
+                    dict(
+                        job_spec=job_spec,
+                        array_id=array_id,
+                        array_idx=array_idx,
+                    )
+                )
 
-    def get_job_output(row: pd.Series[Any]) -> Path:
+    column_types = dict(job_spec=str, array_id=int, array_idx=int)
+    df = pd.DataFrame(rows).astype(column_types)
+
+    def get_job_output(row: pd.Series) -> Path:
         """Wrapper for _get_job_output(...) for use with df.apply"""
         return _get_job_output(*row)
 
