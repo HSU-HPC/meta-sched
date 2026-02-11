@@ -306,13 +306,15 @@ class PBSRemoteTarget(BatchSystemTarget):
         df["time"] = df["time"].apply(lambda s: time_to_seconds(s))
         df["nodes"] = df["nodes"].apply(lambda s: int(s))
         df["is_using_nodes"] = df["state"].apply(
-            lambda s: s
-            in [
-                # cf. https://docs.adaptivecomputing.com/torque/4-1-3/Content/topics/commands/qstat.htm
-                "R",  # Running
-                # "E", # Exiting
-                # "T", # Job is being moved
-            ]
+            lambda s: (
+                s
+                in [
+                    # cf. https://docs.adaptivecomputing.com/torque/4-1-3/Content/topics/commands/qstat.htm
+                    "R",  # Running
+                    # "E", # Exiting
+                    # "T", # Job is being moved
+                ]
+            )
         )
         df["time_remaining"] = df["time_limit"] - df["time"]
         records = df[

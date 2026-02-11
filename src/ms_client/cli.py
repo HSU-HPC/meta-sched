@@ -183,7 +183,7 @@ class CLI:
         all: bool = False,
     ) -> int:
         """
-        Get the status of submitted jobs"
+        Get the status of submitted jobs
 
         Parameters
         ----------

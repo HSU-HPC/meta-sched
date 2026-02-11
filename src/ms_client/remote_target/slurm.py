@@ -257,15 +257,17 @@ class SlurmRemoteTarget(BatchSystemTarget):
         df["time_limit"] = df["time_limit"].apply(lambda s: time_to_seconds(s))
         df["time"] = df["time"].apply(lambda s: time_to_seconds(s))
         df["is_using_nodes"] = df["state"].apply(
-            lambda s: s
-            in [
-                # https://slurm.schedmd.com/job_state_codes.html
-                # "completing",
-                "configuring",
-                "power_up_nodes",
-                # "signaling",
-                "running",
-            ]
+            lambda s: (
+                s
+                in [
+                    # https://slurm.schedmd.com/job_state_codes.html
+                    # "completing",
+                    "configuring",
+                    "power_up_nodes",
+                    # "signaling",
+                    "running",
+                ]
+            )
         )
         df["time_remaining"] = df["time_limit"] - df["time"]
         records = df[
