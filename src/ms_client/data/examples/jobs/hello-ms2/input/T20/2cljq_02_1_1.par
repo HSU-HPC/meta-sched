@@ -1,0 +1,184 @@
+WallTime     =       4320
+TimeLimit    =       40
+Units        =       Reduced
+LengthUnit   =       1.0
+EnergyUnit   =        1.0
+MassUnit     =        1.0
+Simulation   =       MD
+Integrator   =       Gear
+TimeStep     =       0.00091184
+Ensemble     =       NVT
+MCORSteps    =       50
+NVTSteps     =       100000
+NPTSteps     =       100000
+RunSteps     =       10000000
+ResultFreq   =       1000
+ErrorsFreq   =       5000
+VisualFreq   =       0
+CutoffMode    =       COM
+NEnsembles   =       6
+mpiEnsembleGroups = 1
+CorrfunMode   =       yes
+TransMethod   =       All
+
+# Ensemble  1
+
+Temperature  =       8.776
+Pressure     =       0.1
+Density      =       0.0466
+PistonMass   =       5.0e-4
+CommonEqui   =       No
+OptPressure  =       yes
+NParticles   =       1372
+NComponents  =       1
+StepsCorrfun =       10
+Corrlength   =       40000
+SpanCorrfun  =       200
+ViewCorrfun  =       1000
+ResultFreqCF =       1
+
+PotModel     =  2clj_02_1.pm
+MoleFract    =       1.0
+ChemPotMethod= Widom
+NTest   =       1372
+
+eta          = 1.0
+xi           = 1.0
+
+Cutoff       = 4.0
+Epsilon      = 1.0E10
+
+# Ensemble  2
+
+Temperature  =       8.776
+Pressure     =       0.1
+Density      =       0.0932
+PistonMass   =       5.0e-4
+CommonEqui   =       No
+OptPressure  =       yes
+NParticles   =       1372
+NComponents  =       1
+StepsCorrfun =       10
+Corrlength   =       40000
+SpanCorrfun  =       200
+ViewCorrfun  =       1000
+ResultFreqCF =       1
+
+PotModel     =  2clj_02_1.pm
+MoleFract    =       1.0
+ChemPotMethod= Widom
+NTest   =       1372
+
+eta          = 1.0
+xi           = 1.0
+
+Cutoff       = 4.0
+Epsilon      = 1.0E10
+
+# Ensemble  3
+
+Temperature  =       8.776
+Pressure     =       0.1
+Density      =       0.1398
+PistonMass   =       5.0e-4
+CommonEqui   =       No
+OptPressure  =       yes
+NParticles   =       1372
+NComponents  =       1
+StepsCorrfun =       10
+Corrlength   =       40000
+SpanCorrfun  =       200
+ViewCorrfun  =       1000
+ResultFreqCF =       1
+
+PotModel     =  2clj_02_1.pm
+MoleFract    =       1.0
+ChemPotMethod= Widom
+NTest   =       1372
+
+eta          = 1.0
+xi           = 1.0
+
+Cutoff       = 4.0
+Epsilon      = 1.0E10
+
+# Ensemble  4
+
+Temperature  =       8.776
+Pressure     =       0.1
+Density      =       0.1864
+PistonMass   =       5.0e-4
+CommonEqui   =       No
+OptPressure  =       yes
+NParticles   =       1372
+NComponents  =       1
+StepsCorrfun =       10
+Corrlength   =       40000
+SpanCorrfun  =       200
+ViewCorrfun  =       1000
+ResultFreqCF =       1
+
+PotModel     =  2clj_02_1.pm
+MoleFract    =       1.0
+ChemPotMethod= Widom
+NTest   =       1372
+
+eta          = 1.0
+xi           = 1.0
+
+Cutoff       = 4.0
+Epsilon      = 1.0E10
+
+# Ensemble  5
+
+Temperature  =       8.776
+Pressure     =       0.1
+Density      =       0.233
+PistonMass   =       5.0e-4
+CommonEqui   =       No
+OptPressure  =       yes
+NParticles   =       1372
+NComponents  =       1
+StepsCorrfun =       10
+Corrlength   =       40000
+SpanCorrfun  =       200
+ViewCorrfun  =       1000
+ResultFreqCF =       1
+
+PotModel     =  2clj_02_1.pm
+MoleFract    =       1.0
+ChemPotMethod= Widom
+NTest   =       1372
+
+eta          = 1.0
+xi           = 1.0
+
+Cutoff       = 4.0
+Epsilon      = 1.0E10
+
+# Ensemble  6
+
+Temperature  =       8.776
+Pressure     =       0.1
+Density      =       0.2796
+PistonMass   =       5.0e-4
+CommonEqui   =       No
+OptPressure  =       yes
+NParticles   =       1372
+NComponents  =       1
+StepsCorrfun =       8
+Corrlength   =       32000
+SpanCorrfun  =       200
+ViewCorrfun  =       1000
+ResultFreqCF =       1
+
+PotModel     =  2clj_02_1.pm
+MoleFract    =       1.0
+ChemPotMethod= Widom
+NTest   =       1372
+
+eta          = 1.0
+xi           = 1.0
+
+Cutoff       = 4.0
+Epsilon      = 1.0E10

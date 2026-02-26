@@ -30,7 +30,7 @@ batch_system = "slurm"
 queue = "full"
 nodes = 4
 cores_per_node = 48
-max_time = "7-00:00:00"
+max_time = "12:00:00"
 source_scripts = ["/etc/profile"]
 tags = ["x86", "windhpc", "slurm"]
 [targets.module_map]
@@ -56,6 +56,7 @@ host = "windpark.windhpc.de"
 batch_system = "slurm"
 nodes = 5
 cores_per_node = 48
+max_time = "1-00:00:00"
 source_scripts = ["/etc/profile"]
 tags = ["x86", "green", "windhpc", "slurm"]
 [targets.module_map]

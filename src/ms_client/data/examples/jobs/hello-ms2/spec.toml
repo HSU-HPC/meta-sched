@@ -1,0 +1,8 @@
+cmd_setup_target = "cd $MS_INPUT/ms2_src && [ -x ms2_GNU_mpi_trans ] || MPI=1 TRANS=1 make -j$(($(nproc)/2))" # Build or locate existing binary
+cmd_main='STEM=$MS_INPUT/T20; cp ${STEM}/2clj_02_1.pm ./ && cp ${STEM}/2cljq_02_1_$(($MS_ARRAY_IDX+1)).par ./ && mpirun $MS_INPUT/ms2_src/ms2_GNU_mpi_trans *.par' # Index starts at 0
+array_size = 2
+required_modules = ["MPI"]
+nodes = 1
+time = "00-48:00:00"
+# Force using all cores of the node:
+exclusive  = true
