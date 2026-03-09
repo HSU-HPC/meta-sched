@@ -48,13 +48,13 @@ class TargetAdditionalConfigs(BaseModel):
         """
         if (
             config.datacenter_api_endpoint is None
-            and config.datacenter_api_tenant_id is not None
+            and config.datacenter_api_forecast_source_id is not None
         ) or (
             config.datacenter_api_endpoint is not None
-            and config.datacenter_api_tenant_id is None
+            and config.datacenter_api_forecast_source_id is None
         ):
             raise ValueError(
-                'Either all or no fields with the prefix "data_center_api_" must be given. (Suffixes: endpoint, tenant_id)'
+                'Either all or no fields with the prefix "data_center_api_" must be given. (Suffixes: endpoint, forecast_source_id)'
             )
         return config
 
