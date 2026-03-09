@@ -17,7 +17,8 @@ import sys
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import Any, List, Optional, Set, Tuple, Union
+import warnings
 
 import pandas as pd
 import requests
@@ -86,6 +87,7 @@ class _ApiResource(object):
         self: "_ApiResource",
         path: str,
         is_retry: bool = False,
+        debug_stdout: bool = False,
         *args: Any,
         **kwargs: Any,
     ) -> Any:
@@ -98,6 +100,8 @@ class _ApiResource(object):
             The path (without the base path) of the API resource to request
         is_retry : bool
             Indicates that the request is being repeated after an initial (authentication) failure
+        debug_stdout : bool
+            If true, print print the request and received data to stdout
         *args : Any
             Positional arguments to be forwarded to requests.get(...)
         **kwargs : Any
@@ -117,22 +121,30 @@ class _ApiResource(object):
             password = os.getenv("DATACENTER_API_PASS")
             token_env_key = "DATACENTER_API_TOKEN"
             token = os.getenv(token_env_key)
-            if username and password and not token:
-                response = requests.post(
-                    self._apiArgs.endpoint + "/login",
-                    headers={"Content-Type": "application/json"},
-                    data=json.dumps(dict(username=username, password=password)),
-                    verify=self._apiArgs.verify_cert,
-                )
-                response.raise_for_status()
-                token = response.json()["access_token"]
-                os.environ[token_env_key] = token
+            if not token:
+                if username and password:
+                    response = requests.post(
+                        self._apiArgs.endpoint + "/login",
+                        headers={"Content-Type": "application/json"},
+                        json=dict(email=username, password=password),
+                        verify=self._apiArgs.verify_cert,
+                    )
+                    response.raise_for_status()
+                    token = response.json()["access_token"]
+                    os.environ[token_env_key] = token
+                else:
+                    warnings.warn(
+                        "No authentication was provided through environment. (DATACENTER_API_TOKEN or DATACENTER_API_USER and DATACENTER_API_PASS)"
+                    )
             if "headers" not in kwargs:
                 kwargs["headers"] = {}
             if token:
                 kwargs["headers"] |= {"Authorization": f"Bearer {token}"}
+            url = self._apiArgs.endpoint + path
+            if debug_stdout:
+                print(url, args, kwargs)
             response = requests.get(
-                self._apiArgs.endpoint + path,
+                url,
                 *args,
                 **kwargs | dict(verify=self._apiArgs.verify_cert),
             )
@@ -147,7 +159,10 @@ class _ApiResource(object):
                 return self._get(path, *args, **kwargs)
             if response.status_code != http.HTTPStatus.OK:
                 raise http.client.error(response.status_code, response.text)  # pyright: ignore[reportAttributeAccessIssue]
-            return json.loads(response.text)
+            data = json.loads(response.text)
+            if debug_stdout:
+                print(data)
+            return data
 
 
 @dataclass
@@ -269,34 +284,6 @@ class ForecastSource(_ApiResource):
         # Ensure forecasts are sorted chronologically
         return sorted(forecasts, key=lambda f: f.timestamp), determination_timestamp
 
-    @staticmethod
-    def from_links(
-        links: Dict[str, Any], apiArgs: Optional[ApiArgs] = None
-    ) -> Set["ForecastSource"]:
-        """
-        Create forecast source instances from links in the API response.
-
-        Parameters
-        ----------
-        links : Dict[str, Any]
-            The links from a previous API response
-        apiArgs : Optional[ApiArgs]
-            The optional API arguments
-
-        Returns
-        -------
-        Set[ForecastSource]
-            The forecast sources
-        """
-        forecast_sources: Set[ForecastSource] = set()
-        for link in links:
-            assert isinstance(link, dict)
-            entity = str(link["href"]).split("/")[1]  # pyright: ignore[reportArgumentType]
-            if entity == "forecast":
-                forecast_id = int(str(link["href"]).split("/")[-1])  # pyright: ignore[reportArgumentType]
-                forecast_sources.add(ForecastSource(forecast_id, apiArgs))
-        return forecast_sources
-
 
 class Site(_ApiResource):
     """Class representing a site in the API."""
@@ -315,8 +302,7 @@ class Site(_ApiResource):
         super().__init__(id, apiArgs)
         site = self._get(f"/sites/{self.id}")
         self.name = site["name"]
-        self.location = site["location"]
-        self.forecast_sources = ForecastSource.from_links(site["links"])
+        self.resources = set([Resource(i, apiArgs) for i in site["resources"]])
 
 
 class Resource(_ApiResource):
@@ -332,35 +318,6 @@ class Resource(_ApiResource):
             The JSON payload of the API response
         """
         return self._get(f"/resources/{self.id}")
-
-    @staticmethod
-    def from_links(
-        links: Dict[str, Any], apiArgs: Optional[ApiArgs] = None
-    ) -> Set["Resource"]:
-        """
-        Create resource instances from links in the API response.
-
-        Parameters
-        ----------
-        links : Dict[str, Any]
-            The links from a previous API response
-        apiArgs : Optional[ApiArgs]
-            The optional API arguments
-
-        Returns
-        -------
-        Set[Resource]
-            The resources
-        """
-        resources: Set[Resource] = set()
-        for link in links:
-            assert isinstance(link, dict)
-            assert all(isinstance(k, str) for k in link)
-            entity = link["href"].split("/")[1]  # pyright: ignore[reportArgumentType]
-            if entity == "resources":
-                resource_id = int(link["href"].split("/")[-1])  # pyright: ignore[reportArgumentType]
-                resources.add(Resource(resource_id, apiArgs))
-        return resources
 
 
 class Contract(_ApiResource):
@@ -386,11 +343,8 @@ class Contract(_ApiResource):
         super().__init__(id, apiArgs)
         contract = self._get(f"/tenants/{tenant.id}/contracts/{self.id}")
         self.resource_simultaneous_max = contract["resource_simultaneous_max"]
-        self.site = Site(contract["site_id"], self._apiArgs)
-        self.resources = Resource.from_links(contract["links"], self._apiArgs)
-        self.forecast_sources = ForecastSource.from_links(
-            contract["links"], self._apiArgs
-        )
+        self.site = Site(contract["dcsite_id"], self._apiArgs)
+        self.forecast_sources = [ForecastSource(self._id, self._apiArgs)]
 
 
 class Tenant(_ApiResource):
@@ -441,8 +395,9 @@ def __main() -> None:
     contracts: List[Contract] = []
     try:
         contracts = list(tenant.get_contracts())
-    except Exception:
-        print(f"No contracts found for tenant {tenant.id}.", file=sys.stderr)
+    except Exception as e:
+        print(f"Could not fetch contracts for tenant {tenant.id}.", file=sys.stderr)
+        print("Error details:", e)
         sys.exit(1)
     print(
         f"Fetching forecast sources associated with contracts {[c.id for c in contracts]}...",

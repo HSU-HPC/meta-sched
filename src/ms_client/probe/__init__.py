@@ -18,49 +18,12 @@ from ms_client.client import Client
 from ms_client.config import Config
 from ms_client.probe.datacenter_api_client import (
     ApiArgs,
-    Contract,
     Forecast,
     ForecastSource,
-    Tenant,
 )
 from ms_client.remote_target import RemoteTarget
 from ms_client.remote_target.factory import remote_target_from_target
 from ms_client.ssh import has_ssh_config_entry
-
-
-def _get_forecast_source(tenant: Optional[Tenant]) -> Optional[ForecastSource]:
-    """
-    Get the (only) forecast source from a datacenter API tenant.
-
-    Parameters
-    ----------
-    tenant : Optional[Tenant]
-        A datacenter API tenant
-
-    Returns
-    -------
-    Optional[ForecastSource]
-        The forecast source for the datacenter API tenant
-    """
-    if tenant is None:
-        return None
-    contracts: List[Contract] = []
-    try:
-        contracts = list(tenant.get_contracts())
-    except Exception:
-        print(
-            f"[Datacenter API]: No contracts found for tenant {tenant.id}.",
-            file=sys.stderr,
-        )
-        return None
-    assert len(contracts) == 1, (
-        f"[Datacenter API]: Expected exactly one contract for {tenant}"
-    )
-    forecast_sources = [f for f in contracts[0].forecast_sources]
-    assert len(forecast_sources) == 1, (
-        f"[Datacenter API]: Expected exactly one forecast source for {contracts[0]}"
-    )
-    return forecast_sources[0]
 
 
 def _get_target_status(
@@ -122,7 +85,7 @@ def _monitor_target(
     client: Client,
     target: Target,
     interval: float,
-    datacenter_api_tenant: Optional[Tenant],
+    forecast_source: Optional[ForecastSource],
     verbose: bool = False,
 ) -> None:
     """
@@ -136,8 +99,8 @@ def _monitor_target(
         The target to monitor for updates
     interval : float
         The number of seconds between subsequent updates of the target status
-    datacenter_api_tenant : Optional[Tenant]
-        Tenant for the datacenter API of this target
+    forecast_source : Optional[ForecastSource]
+        Forecast source for the datacenter API of this target
         (Used to fetch additional data about the state of the target)
     verbose : bool
         Print some fetched information about the target (Defaults to False)
@@ -145,7 +108,6 @@ def _monitor_target(
     api_key = os.environ["MS_API_KEY"]
     print(f"Started monitor for {target.id} ({target.host})")
     with remote_target_from_target(target) as remote_target:
-        forecast_source = _get_forecast_source(datacenter_api_tenant)
         while True:
             start = time.perf_counter()
             target_status: Optional[TargetStatus]
@@ -224,21 +186,30 @@ def main() -> int:
             if not has_ssh_config_entry(t.id):
                 raise RuntimeError(f"No SSH alias set up for target {t.id} ({t.host})")
             target_ids.remove(t.id)
-            datacenter_api_tenant: Optional[Tenant] = None
+            datacenter_api_forecast_source: Optional[ForecastSource] = None
             if t.id in targets_config:
                 datacenter_api_endpoint = targets_config[t.id].datacenter_api_endpoint
-                datacenter_api_tenant_id = targets_config[t.id].datacenter_api_tenant_id
-                datacenter_api_tenant = (
-                    Tenant(
-                        datacenter_api_tenant_id,
+                datacenter_api_forecast_source_id = targets_config[
+                    t.id
+                ].datacenter_api_forecast_source_id
+                datacenter_api_forecast_source = (
+                    ForecastSource(
+                        datacenter_api_forecast_source_id,
                         ApiArgs(datacenter_api_endpoint),
                     )
-                    if datacenter_api_endpoint and datacenter_api_tenant_id is not None
+                    if datacenter_api_endpoint
+                    and datacenter_api_forecast_source_id is not None
                     else None
                 )
             p = multiprocessing.Process(
                 target=_monitor_target,
-                args=(client, t, args.interval, datacenter_api_tenant, args.verbose),
+                args=(
+                    client,
+                    t,
+                    args.interval,
+                    datacenter_api_forecast_source,
+                    args.verbose,
+                ),
             )
             processes.append(p)
     if len(target_ids) > 0:

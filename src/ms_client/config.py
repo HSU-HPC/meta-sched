@@ -22,14 +22,14 @@ class TargetAdditionalConfigs(BaseModel):
     datacenter_api_endpoint : Optional[str]
         HTTP endpoint for the datacenter API of this target
         (Used to fetch additional data about the state of the target)
-    datacenter_api_tenant_id : Optional[int]
-        The tenant ID to use at the datacenter API for this target
+    datacenter_api_forecast_source_id : Optional[int]
+        The ID of the forecast source to use at the datacenter API for this target
     """
 
     id: str
     tags: Tuple[str, ...] = ()
     datacenter_api_endpoint: Optional[str] = None
-    datacenter_api_tenant_id: Optional[int] = None
+    datacenter_api_forecast_source_id: Optional[int] = None
 
     @model_validator(mode="after")
     def validate_attributes(cls, config: Any) -> Any:

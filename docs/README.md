@@ -148,8 +148,8 @@ id   = "windhpc-hlrs"
 tags = ["test"]
 
 # Fields used by msprobe to gather additional data about the target
-datacenter_api_endpoint = "https://example.org/api"
-datacenter_api_tenant_id = 0
+datacenter_api_endpoint = "https://example.org/api/v1"
+datacenter_api_forecast_source_id = 0
 ```
 
 First, run `mscli ssh-config` to create/update `~/.ssh/config.d/meta-sched` with the targets of the Meta Scheduler server.  
