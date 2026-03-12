@@ -1,6 +1,6 @@
 cmd_setup_local = "cd $MS_INPUT && ./build_ls1.sh --download-only" # target may not be able to access GitHub
 cmd_setup_target = "$MS_INPUT/build_ls1.sh --find --skip-download" # Build or locate existing binary
-cmd_main  = "python3 $MS_INPUT/run_scenario.py --width $(($MS_ARRAY_IDX+1))" # Index starts at 0
+cmd_main = "python3 $MS_INPUT/run_scenario.py --width $(($MS_ARRAY_IDX+1))" # Index starts at 0
 array_size = 10
 # vvv Comment out to only use OpenMP
 required_modules = ["MPI"]
@@ -8,5 +8,5 @@ nodes = 2
 # ^^^ Comment out to only use OpenMP
 # Expression generated using fit_time.py
 time = "=1.75*100*(39.60+391.44*(1+i*1)**1.00*p**(-0.76))"
-# Force using all cores of the node:
-exclusive  = true
+# Force using all cores of the node
+exclusive = true

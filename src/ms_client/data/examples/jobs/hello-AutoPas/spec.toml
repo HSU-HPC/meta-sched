@@ -1,0 +1,8 @@
+cmd_setup_local = "$MS_INPUT/download_autopas.sh" # target may not be able to access GitHub
+cmd_setup_target = "$MS_INPUT/build_autopas.sh"
+cmd_main = "$MS_INPUT/run_autopas.sh"
+time = "01:00:00"
+# Force using all cores of the node
+exclusive = true
+
+# TODO Filter targets for C++20 support
