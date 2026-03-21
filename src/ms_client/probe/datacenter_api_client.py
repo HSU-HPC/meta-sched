@@ -10,6 +10,7 @@
 
 """Module containing the datacenter API client code."""
 
+import argparse
 import http
 import json
 import os
@@ -113,7 +114,6 @@ class _ApiResource(object):
             The JSON payload from the API response
         """
 
-        # TODO (re-)acquire token for authentication and include in request
         with urllib3.warnings.catch_warnings():  # type: ignore[attr-defined]
             urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
             assert self._apiArgs, "No API arguments provided. (Cannot fetch content.)"
@@ -269,6 +269,8 @@ class ForecastSource(_ApiResource):
         """
         forecasts = []
         forecasts_raw = self._get(f"/forecast/{self.id}")
+        if "determination" not in forecasts_raw:
+            raise ValueError(f"Could not get forecasts for source id {self.id}.")
         determination = datetime.fromisoformat(
             forecasts_raw["determination"].replace("Z", "+00:00")
         )
@@ -367,22 +369,22 @@ class Tenant(_ApiResource):
 
 def __main() -> None:
     """
-    Function called when executing module as a script.
-    Fetches forecasts for a single tenant ID (first command line argument).
-    (Demo only!)
+    Demo of datacenter API.
     """
 
-    tenant_id = -1
-    try:
-        tenant_id = int(sys.argv[1])
-    except Exception:
-        print(
-            "Print/plot datacenter forecast using API.\n(Demo only!)",
-            file=sys.stderr,
-        )
-        print(
-            f"\nUsage: {Path(sys.argv[0]).name} <tenant id> [--plot]\n", file=sys.stderr
-        )
+    argparser = argparse.ArgumentParser(description=__main.__doc__)
+    argparser.add_argument("--tenant", "-t", type=int, help="The tenant ID")
+    argparser.add_argument(
+        "--forecast-source", "-f", type=int, help="The forecast source id ID"
+    )
+    argparser.add_argument(
+        "--plot", "-p", action="store_true", help="Plot the forecast"
+    )
+    args = argparser.parse_args()
+    if (args.tenant and args.forecast_source) or not (
+        args.tenant or args.forecast_source
+    ):
+        print("Either tenant or forecast source ID must be provided.")
         sys.exit(1)
 
     endpoint_env_key = "DATACENTER_API_URL"
@@ -390,20 +392,30 @@ def __main() -> None:
         print(f"Environment variable {endpoint_env_key} is not set!")
         sys.exit(1)
     apiArgs = ApiArgs(os.environ[endpoint_env_key])
-    tenant = Tenant(tenant_id, apiArgs)
-    print(f"Fetching contracts associated with tenant {tenant.id}...", file=sys.stderr)
-    contracts: List[Contract] = []
-    try:
-        contracts = list(tenant.get_contracts())
-    except Exception as e:
-        print(f"Could not fetch contracts for tenant {tenant.id}.", file=sys.stderr)
-        print("Error details:", e)
-        sys.exit(1)
-    print(
-        f"Fetching forecast sources associated with contracts {[c.id for c in contracts]}...",
-        file=sys.stderr,
-    )
-    forecast_sources = [f for c in contracts for f in c.forecast_sources]
+
+    forecast_sources = []
+    if args.tenant:
+        tenant = Tenant(args.tenant, apiArgs)
+        print(
+            f"Fetching contracts associated with tenant {tenant.id}...", file=sys.stderr
+        )
+        contracts: List[Contract] = []
+        try:
+            contracts = list(tenant.get_contracts())
+        except Exception as e:
+            print(f"Could not fetch contracts for tenant {tenant.id}.", file=sys.stderr)
+            print("Error details:", e)
+            sys.exit(1)
+        print(
+            f"Fetching forecast sources associated with contracts {[c.id for c in contracts]}...",
+            file=sys.stderr,
+        )
+        forecast_sources = [f for c in contracts for f in c.forecast_sources]
+    elif args.forecast_source:
+        forecast_sources = [ForecastSource(args.forecast_source, apiArgs)]
+    else:
+        raise RuntimeError("Unreachable code somehow reached.")
+
     if len(forecast_sources) == 0:
         print(
             f"No forecast sources found for contracts {[c.id for c in contracts]}.",
@@ -414,7 +426,7 @@ def __main() -> None:
     determination_timestamp: float = -1
     for forecast_source in forecast_sources:
         forecasts, determination_timestamp = forecast_sources[0].get_forecasts()
-        if len(sys.argv) == 3 and sys.argv[2] == "--plot":
+        if args.plot:
             if "uv" in [p.name for p in Path(sys.executable).parents]:
                 print(
                     "Plotting is not supported when running in uv script mode!",

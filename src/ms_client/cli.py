@@ -343,6 +343,7 @@ class CLI:
             The exit status of the operation
         """
         self.require_can_use_client()
+        os.chdir(Path.home())
         df: pd.DataFrame = get_job_outputs()
         # Ignore finished jobs
         df = df.dropna()
