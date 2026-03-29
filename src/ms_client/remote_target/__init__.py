@@ -219,7 +219,9 @@ class RemoteTarget:
             f'-e "ssh -p {self._target.port} {ssh_options_str}"',
         ]
         cmd = f"rsync {' '.join(rsync_flags)} {src} {dst} 1>&2"
-        result = invoke.run(cmd, warn=True)
+        result = invoke.run(
+            cmd, warn=True, in_stream=None, out_stream=sys.stderr, hide=True
+        )
         status = -1 if result is None else result.exited
         if status == EX_BASH_COMMAND_NOT_FOUND:
             # TODO this may cause issues when another job is currently reading existing input files!
@@ -241,7 +243,14 @@ class RemoteTarget:
                 self._run(self._get_connection(), f"mkdir -p {remote_dst}").exited
             )
             cmd = f"scp {' '.join(scp_flags)} {src} {dst} 1>&2"
-            result = invoke.run(cmd, warn=True, pty=False)
+            result = invoke.run(
+                cmd,
+                warn=True,
+                pty=False,
+                in_stream=None,
+                out_stream=sys.stderr,
+                hide=True,
+            )
         status = -1 if result is None else result.exited
         expect_ok(status)
 

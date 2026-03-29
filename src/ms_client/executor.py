@@ -210,7 +210,14 @@ class Executor:
             try:
                 os.chdir(setup_cwd)
                 cmd = self.__job.spec.cmd_setup_local
-                result = invoke.run(cmd, env=env, warn=True, out_stream=sys.stderr)
+                result = invoke.run(
+                    cmd,
+                    env=env,
+                    warn=True,
+                    in_stream=None,
+                    out_stream=sys.stderr,
+                    hide=True,
+                )
                 status = -1 if result is None else result.exited
                 expect_ok(status)
             finally:
