@@ -220,7 +220,13 @@ class RemoteTarget:
         ]
         cmd = f"rsync {' '.join(rsync_flags)} {src} {dst} 1>&2"
         result = invoke.run(
-            cmd, warn=True, in_stream=None, out_stream=sys.stderr, hide=True
+            cmd,
+            warn=True,
+            in_stream=None,
+            out_stream=sys.stderr,
+            hide=True,
+            watch=False,
+            pty=False,
         )
         status = -1 if result is None else result.exited
         if status == EX_BASH_COMMAND_NOT_FOUND:
@@ -246,10 +252,11 @@ class RemoteTarget:
             result = invoke.run(
                 cmd,
                 warn=True,
-                pty=False,
                 in_stream=None,
                 out_stream=sys.stderr,
                 hide=True,
+                watch=False,
+                pty=False,
             )
         status = -1 if result is None else result.exited
         expect_ok(status)
