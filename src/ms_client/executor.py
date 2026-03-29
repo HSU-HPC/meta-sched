@@ -217,6 +217,7 @@ class Executor:
                     in_stream=None,
                     out_stream=sys.stderr,
                     hide=True,
+                    pty=False,
                 )
                 status = -1 if result is None else result.exited
                 expect_ok(status)

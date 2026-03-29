@@ -225,7 +225,6 @@ class RemoteTarget:
             in_stream=None,
             out_stream=sys.stderr,
             hide=True,
-            watch=False,
             pty=False,
         )
         status = -1 if result is None else result.exited
@@ -255,7 +254,6 @@ class RemoteTarget:
                 in_stream=None,
                 out_stream=sys.stderr,
                 hide=True,
-                watch=False,
                 pty=False,
             )
         status = -1 if result is None else result.exited
