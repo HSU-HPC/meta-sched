@@ -9,11 +9,11 @@ import os
 import shutil
 import signal
 import sys
-import time
 from pathlib import Path
 from typing import Any, Dict
 
 import pandas as pd
+from ms_client.utils import sleep
 from ms_common.schemas import Target
 from ms_common.utils import eprint
 from pydantic import ValidationError
@@ -312,7 +312,7 @@ class CLI:
             while True:
                 try:
                     os.kill(pid, SIG_CHECK_PID_EXISTS)
-                    time.sleep(check_interval)
+                    sleep(check_interval)
                 except OSError as e:
                     if e.errno == errno.ESRCH:
                         return

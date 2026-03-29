@@ -21,7 +21,7 @@ from paramiko.ssh_exception import SSHException
 from ms_client import ssh
 from ms_client.job import Instance as Job
 from ms_client.job import get_jobs_dir
-from ms_client.utils import ExponentialBackoff, SuppressStderr, expect_ok
+from ms_client.utils import ExponentialBackoff, SuppressStderr, expect_ok, sleep
 
 
 class RemoteTarget:
@@ -148,7 +148,7 @@ class RemoteTarget:
                     delay = backoff()
                     backoff += 1
                     eprint(f"(Will try again in {delay} seconds.)")
-                    time.sleep(delay)
+                    sleep(delay)
                 else:
                     raise RuntimeError(
                         f"Failed to connect to {self._target.id} after {attempt} attempts."

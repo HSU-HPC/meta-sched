@@ -10,6 +10,7 @@ import time
 from datetime import datetime
 from typing import List, Optional
 
+from ms_client.utils import sleep
 from ms_common.schemas import PowerForecast, Target, TargetStatus
 from ms_common.utils import eprint
 from pydantic import ValidationError
@@ -125,7 +126,7 @@ def _monitor_target(
                 break
             sleep_for = max(0, interval - (time.perf_counter() - start))
             try:
-                time.sleep(sleep_for)
+                sleep(sleep_for)
             except KeyboardInterrupt:
                 break
 

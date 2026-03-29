@@ -26,6 +26,7 @@ from ms_client.utils import (
     RedirectOutputToFile,
     StatusException,
     expect_ok,
+    sleep,
     unwrap_error,
 )
 
@@ -320,7 +321,7 @@ class Executor:
             )
             # Recompute time to wait
             wait_seconds = max(0, decision.timestamp_start - int(time.time()))
-            time.sleep(wait_seconds)
+            sleep(wait_seconds)
             eprint(f"BATCH_EPOCH_SUBMIT={int(time.time())}")
             job_exit_code = remote_target.execute(self.__job, callbacks)
             eprint(f"=== 4. Fetching results from target {target.id} ===")
@@ -361,6 +362,8 @@ class Executor:
                 status = self.__run()
                 final_job_status = job.Status.Completed(status)
             except InterruptedError:
+                # FIXME (temporary debug code for more transparency)
+                traceback.print_exc()
                 self.__scheduler.cancel_job(self.__job_key)
                 final_job_status = job.Status.Canceled()
             except Exception:

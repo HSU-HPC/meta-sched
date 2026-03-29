@@ -74,7 +74,7 @@ def __start_process(job_spec: str, token: str, array_id: int, array_idx: int) ->
         [sys.executable, __file__] + args,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        preexec_fn=os.setpgrp,  # Do not receive signals from current process
+        preexec_fn=os.setsid,  # Do not receive signals from current process
         env=env,
     )
     return p.pid

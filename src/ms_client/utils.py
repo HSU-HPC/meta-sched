@@ -1,11 +1,13 @@
 """Module containing general purpose utility classes and functions for the submit component."""
 
+import errno
 import fcntl
 import os
 import sys
 from io import TextIOWrapper
 from os import PathLike
 from pathlib import Path
+import time
 from typing import Any, Optional, Set, Type, TypeVar, Union
 
 E = TypeVar("E", bound=BaseException)
@@ -263,3 +265,41 @@ def expect_ok(status: int, details: Optional[str] = None) -> None:
     """
     if status != os.EX_OK:
         raise StatusException(status, details)
+
+
+def sleep(seconds: float) -> float:
+    """
+    Sleep for the requested number of seconds and ignore EINTR (harmless interrupts).
+
+    Parameters
+    ----------
+    seconds : float
+        Seconds to sleep
+
+    Returns
+    -------
+    float
+        Actual total time slept
+    """
+    end_time = time.time() + seconds
+    slept_total = 0.0
+
+    while True:
+        now = time.time()
+        remaining = end_time - now
+        if remaining <= 0:
+            break
+        try:
+            start = time.time()
+            time.sleep(remaining)
+            slept_total += time.time() - start
+            break  # Finished sleeping without being interrupted
+        except InterruptedError as e:
+            if getattr(e, "errno", None) == errno.EINTR:
+                # Ignore harmless interrupt and continue sleeping
+                slept_total += time.time() - start
+                continue
+            else:
+                # Propagate unexpected interrupt
+                raise
+    return slept_total
