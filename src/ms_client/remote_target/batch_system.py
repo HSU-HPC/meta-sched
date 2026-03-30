@@ -10,7 +10,7 @@ from ms_common.utils import eprint
 
 from ms_client.job import Instance as Job
 from ms_client.remote_target import RemoteTarget
-from ms_client.utils import ExponentialBackoff, expect_ok
+from ms_client.utils import ExponentialBackoff, expect_ok, sleep
 
 
 class BatchSystemTarget(RemoteTarget):
@@ -246,12 +246,12 @@ class BatchSystemTarget(RemoteTarget):
             Wait until the job has been started by the local batch system.
             """
             eprint("--- b. Awaiting job start ---")
-            time.sleep(1)
+            sleep(1)
             backoff = ExponentialBackoff()
             while True:
                 if self._has_job_started(self._get_connection(), local_job_id):
                     break
-                time.sleep(backoff())
+                sleep(backoff())
                 backoff += 1
             callbacks.on_start(
                 self._get_job_start_time(self._get_connection(), local_job_id)
@@ -263,7 +263,7 @@ class BatchSystemTarget(RemoteTarget):
             """
             eprint("--- c. Awaiting job completion ---")
             # Do not wait requested time in case job completes earlier
-            # time.sleep(requested_seconds)
+            # sleep(requested_seconds)
             # Check repeatedly in intervals of 1-10% of the job time
             wait_until = time.time() + requested_seconds
             backoff = ExponentialBackoff(
@@ -274,7 +274,7 @@ class BatchSystemTarget(RemoteTarget):
                     break
                 # Do not oversleep (but sleep at least 1 second)
                 seconds = max(1, min(backoff(), wait_until - time.time()))
-                time.sleep(seconds)
+                sleep(seconds)
                 backoff += 1
             callbacks.on_end(
                 self._get_job_end_time(self._get_connection(), local_job_id)
@@ -302,7 +302,7 @@ class BatchSystemTarget(RemoteTarget):
                 The InterruptedError passed to the function
             """
             eprint("--- d. Cleaning up output/error files and getting exit code ---")
-            time.sleep(
+            sleep(
                 1
             )  # Wait a bit for the output/error to be received when streaming
             # Use a fresh, ephemeral connection to ensure correct paths
