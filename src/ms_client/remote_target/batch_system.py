@@ -302,9 +302,7 @@ class BatchSystemTarget(RemoteTarget):
                 The InterruptedError passed to the function
             """
             eprint("--- d. Cleaning up output/error files and getting exit code ---")
-            sleep(
-                1
-            )  # Wait a bit for the output/error to be received when streaming
+            sleep(1)  # Wait a bit for the output/error to be received when streaming
             # Use a fresh, ephemeral connection to ensure correct paths
             with self._get_connection(
                 fresh=True, ignore_interrupted_error=True

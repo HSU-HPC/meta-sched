@@ -168,7 +168,7 @@ def get_job_outputs() -> pd.DataFrame:
     column_types = dict(job_spec=str, array_id=int, array_idx=int)
     df = pd.DataFrame(rows).astype(column_types)
 
-    def get_job_output(row: pd.Series) -> Path:
+    def get_job_output(row: pd.Series) -> Path:  # type: ignore[type-arg]
         """Wrapper for _get_job_output(...) for use with df.apply"""
         return _get_job_output(*row)
 
