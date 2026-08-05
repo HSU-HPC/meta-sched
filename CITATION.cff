@@ -1,0 +1,27 @@
+cff-version: 1.2.0
+message: "This file contains CFF citation information, cf. https://citation-file-format.github.io/, for the initial publication for the meta-scheduler."
+title: "Pooling HPC Resources Across Organizations and Reducing Carbon Emissions with Transparent, User-Centric Meta-Scheduling"
+
+authors:
+  - family-names: Horn
+    given-names: Ruben
+  - family-names: Plaß
+    given-names: Marco
+  - family-names: Neumann
+    given-names: Philipp
+
+type: conference-paper
+
+year: 2026
+month: 7
+
+conference:
+  name: "2026 25th International Symposium on Parallel and Distributed Computing (ISPDC)"
+  location: "Hamburg, Germany"
+
+publisher: IEEE
+
+start: 20
+end: 29
+
+doi: 10.1109/ISPDC69862.2026.00012

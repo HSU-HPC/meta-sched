@@ -23,7 +23,7 @@ from ms_client.scheduler_interface import SchedulerClientInterface
 
 
 class Client(SchedulerClientInterface):
-    """Client for the meta-scheduler HTTP API."""
+    """Client for the meta scheduler HTTP API."""
 
     def __init__(self: "Client", config: Config):
         """

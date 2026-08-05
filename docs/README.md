@@ -157,7 +157,7 @@ Then, edit this SSH configuration file (e.g. using `vim` or `nano`), providing c
 
 ### Job Control
 
-1. To create a new job spec, run `mscli create <template> <job spec>` where `template` may be `hello-<mamico|mpi|array|ls1>`. (Check the [corresponding source code folder](../src/ms_client/data/examples/jobs/).)
+1. To create a new job spec, run `mscli create <template> <job spec>` where `template` may be `hello-<array|AutoPas|ls1|mamico|mpi|ms2>`. (Check the [corresponding source code folder](../src/ms_client/data/examples/jobs/).)
 
 2. Modify the job files template instantiated at `$HOME/meta-sched/jobs/<job spec>`.
 

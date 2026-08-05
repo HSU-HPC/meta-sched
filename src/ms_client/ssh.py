@@ -29,12 +29,12 @@ def has_ssh_config_entry(target_id: str) -> bool:
 
 def get_config_paths() -> Tuple[Path, Path]:
     """
-    Get the paths of the main SSH configuration file and the meta-scheduler SSH configuration file of the current user.
+    Get the paths of the main SSH configuration file and the meta scheduler SSH configuration file of the current user.
 
     Returns
     -------
     Tuple[Path, Path]
-        the paths of the main and meta-scheduler SSH configuration file of the current user
+        the paths of the main and meta scheduler SSH configuration file of the current user
     """
     dir_path = Path.home() / ".ssh"
     base_config_path = dir_path / "config"
@@ -64,7 +64,7 @@ def update_config(include_targets_hostnames: Dict[str, str]) -> int:
     Parameters
     ----------
     include_targets_hostnames : Dict[str, str]
-        The mapping of target identifiers to hostnames for the targets available for executing jobs through the meta-scheduler
+        The mapping of target identifiers to hostnames for the targets available for executing jobs through the meta scheduler
 
     Returns
     -------

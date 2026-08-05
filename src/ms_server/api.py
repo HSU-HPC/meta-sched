@@ -62,7 +62,7 @@ class API(FastAPI):
         kwargs : Any
             Named arguments to be passed on to FastAPI
         """
-        kwargs = dict(title="Meta-Scheduler API") | kwargs
+        kwargs = {"title": "Meta Scheduler API"} | kwargs
         self.__host = host
         self.__port = port
         self.__targets = targets
