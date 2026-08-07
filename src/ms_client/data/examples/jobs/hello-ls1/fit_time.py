@@ -13,9 +13,10 @@
 
 import os
 import sys
+from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, Dict, Iterator
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -48,7 +49,7 @@ df = pd.DataFrame(df.groupby(["cores", "film_width"], as_index=False)["seconds"]
 df.sort_values(["film_width", "cores"], inplace=True)
 print("Benchmarks Mean:")
 film_widths = df["film_width"].unique()
-data: Dict[str, Any] = dict(
+data: dict[str, Any] = dict(
     film_width=film_widths,
 )
 for cores in df["cores"].unique()[::-1]:

@@ -3,7 +3,7 @@
 import abc
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 import pandas as pd
 import tomli
@@ -28,7 +28,7 @@ def get_jobs_dir(hidden: bool = False) -> Path:
     return Path(("." if hidden else "") + "meta-sched/jobs")
 
 
-def list_job_spec_names() -> List[str]:
+def list_job_spec_names() -> list[str]:
     """
     List all available job specifications for the current user.
 
@@ -214,7 +214,6 @@ class Status(abc.ABC):
     class Unknown(_Enum):
         """Class representing a job that has an unknown state (which should only be temporary)."""
 
-        pass
 
     class Scheduled(_Enum):
         """State representing a job that has been assigned to a target but is not yet running."""
@@ -264,12 +263,10 @@ class Status(abc.ABC):
     class Completing(_Enum):
         """Class representing a job that has successfully finished executing with some pending operations (e.g. downloading results)."""
 
-        pass
 
     class Pending(_Enum):
         """Class representing a job that has been submitted but not yet assigned to a target."""
 
-        pass
 
     class Failed(_Enum):
         """Class representing a job that was started on a target but has exited unsuccessfully."""
@@ -291,7 +288,6 @@ class Status(abc.ABC):
     class Canceled(_Enum):
         """Class representing a job that was cancelled by the user."""
 
-        pass
 
 
 @dataclass(frozen=True)

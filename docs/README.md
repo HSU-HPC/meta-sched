@@ -32,7 +32,7 @@ The core concepts of the Meta Scheduler are illustrated in the diagrams below:
 
 After [installing the server package](#installation), execute it using `MS_API_KEY=someSecret msserver`. 
 A [default configuration file](../src/server/server/config/default.toml) is displayed, if no configuration is found at `/etc/meta-sched.toml`.
-(Alternatively a different path can be used with `--config <path/to/config.toml>`.)
+(Alternatively, a different path can be used with `--config <path/to/config.toml>`.)
 If the application is running under a non-root user and requires `sudo`, add the flag `--sudo`.
 
 To persistently execute the server in the background after the system has booted, create a new [systemd unit](https://www.freedesktop.org/software/systemd/man/latest/systemd.service.html) or use a terminal multiplexer like [tmux](https://github.com/tmux/tmux/wiki) to manually run it in the background.

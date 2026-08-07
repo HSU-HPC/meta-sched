@@ -2,7 +2,6 @@
 
 import getpass
 from pathlib import Path
-from typing import Dict, Tuple
 
 from paramiko import SSHConfig
 
@@ -27,7 +26,7 @@ def has_ssh_config_entry(target_id: str) -> bool:
     )
 
 
-def get_config_paths() -> Tuple[Path, Path]:
+def get_config_paths() -> tuple[Path, Path]:
     """
     Get the paths of the main SSH configuration file and the meta scheduler SSH configuration file of the current user.
 
@@ -57,7 +56,7 @@ def get_config() -> SSHConfig:
         return SSHConfig()
 
 
-def update_config(include_targets_hostnames: Dict[str, str]) -> int:
+def update_config(include_targets_hostnames: dict[str, str]) -> int:
     """
     Update the SSH configuration files of the current user.
 

@@ -3,7 +3,7 @@
 import io
 import sys
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 import pandas as pd
 from fabric import Connection  # type: ignore[attr-defined]
@@ -24,8 +24,8 @@ class SlurmRemoteTarget(BatchSystemTarget):
         self: "SlurmRemoteTarget",
         connection: Connection,
         job: Job,
-        oe: Tuple[str, str],
-        env: Dict[str, Any],
+        oe: tuple[str, str],
+        env: dict[str, Any],
     ) -> str:
         """
         Submit a job for execution using the batch system.

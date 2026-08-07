@@ -1,12 +1,12 @@
 """Module containing the configuration for the Meta Scheduler client."""
 
 from pathlib import Path
-from typing import Any, List, Optional, Tuple
+from typing import Any, Optional
 
 import tomli
 from pydantic import BaseModel, Field, model_validator
 
-import ms_client.data as data
+from ms_client import data
 
 
 class TargetAdditionalConfigs(BaseModel):
@@ -27,7 +27,7 @@ class TargetAdditionalConfigs(BaseModel):
     """
 
     id: str
-    tags: Tuple[str, ...] = ()
+    tags: tuple[str, ...] = ()
     datacenter_api_endpoint: Optional[str] = None
     datacenter_api_forecast_source_id: Optional[int] = None
 
@@ -78,7 +78,7 @@ class Config(BaseModel):
     host: str
     port: int
 
-    targets: List[TargetAdditionalConfigs] = Field(default_factory=list)
+    targets: list[TargetAdditionalConfigs] = Field(default_factory=list)
 
     @model_validator(mode="after")
     def validate_attributes(cls, config: Any) -> Any:

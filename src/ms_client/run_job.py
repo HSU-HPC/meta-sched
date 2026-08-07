@@ -125,7 +125,7 @@ def launch_job_array(job_spec: str) -> str:
     if len(suitable_targets) == 0:
         raise NoTargetsAvailableError(job_spec)
     response = scheduler.submit_job_array(spec, suitable_targets)
-    for array_idx in range(0, response.array_size):
+    for array_idx in range(response.array_size):
         __start_process(job_spec, response.token, response.array_id, array_idx)
     # TODO consider returning raw array_id, array_idxs, and PIDs
     return f"JOBS {job_spec} {response.array_id}_[0-{response.array_size - 1}]"
@@ -153,7 +153,6 @@ if __name__ == "__main__":
             (Unused)
 
         """
-        pass
 
     if args.nohup:
         signal.signal(signal.SIGHUP, ignore_signal)

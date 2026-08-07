@@ -2,7 +2,7 @@
 
 import sys
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
 
 import pandas as pd
 from fabric import Connection  # type: ignore[attr-defined]
@@ -22,8 +22,8 @@ class PBSRemoteTarget(BatchSystemTarget):
         self: "PBSRemoteTarget",
         connection: Connection,
         job: Job,
-        oe: Tuple[str, str],
-        env: Dict[str, Any],
+        oe: tuple[str, str],
+        env: dict[str, Any],
     ) -> str:
         """
         Submit a job for execution using the batch system.
@@ -279,7 +279,7 @@ class PBSRemoteTarget(BatchSystemTarget):
             state="job_state",
             time="resources_used.walltime",
         )
-        data: Dict[str, List[str]] = {k: [] for k in qstat_job_fields}
+        data: dict[str, list[str]] = {k: [] for k in qstat_job_fields}
         qstat_job_fields = {v: k for k, v in qstat_job_fields.items()}
         job_ids = [s.strip() for s in output.splitlines()]
         cmd = f"qstat -f {' '.join(job_ids)}"

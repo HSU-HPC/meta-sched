@@ -1,10 +1,13 @@
 #! /usr/bin/env python3
 
-from pathlib import Path
+"""Plot iteration performance of AutoPas (CSV)."""
+
 import sys
+from pathlib import Path
 from typing import Union
-import pandas as pd
+
 import matplotlib.pyplot as plt  # type:ignore[import-not-found]
+import pandas as pd
 from matplotlib.lines import Line2D  # type:ignore[import-not-found]
 
 
@@ -14,6 +17,20 @@ def plot_tuning_phases(
     y_col: str = "energyJoules[J]",
     num_plots: int = 4,
 ) -> None:
+    """
+    Plot tuning phases.
+
+    Parameters
+    ----------
+    csv_path : str | Path
+        Path to the CSV file to plot
+    x_col : str
+        Column name for the x-axis data
+    y_col : str
+        Column name for the y-axis data
+    num_plots : int
+        Number of subplots
+    """
 
     df = pd.read_csv(csv_path)
     df["inTuningPhase"] = df["inTuningPhase"].astype(bool)
@@ -32,7 +49,7 @@ def plot_tuning_phases(
 
     phases = tuning_df["phase"].unique()[:num_plots]
 
-    fig, axes = plt.subplots(len(phases), 1, figsize=(7, 4 * len(phases)), sharex=True)
+    _, axes = plt.subplots(len(phases), 1, figsize=(7, 4 * len(phases)), sharex=True)
 
     if len(phases) == 1:
         axes = [axes]

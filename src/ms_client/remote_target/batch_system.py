@@ -3,7 +3,7 @@
 import abc
 import sys
 import time
-from typing import Any, Dict, Optional, Tuple
+from typing import Any, Optional
 
 from fabric import Connection  # type: ignore[attr-defined]
 from ms_common.utils import eprint
@@ -23,8 +23,8 @@ class BatchSystemTarget(RemoteTarget):
         self: "BatchSystemTarget",
         connection: Connection,
         job: Job,
-        oe: Tuple[str, str],
-        env: Dict[str, Any],
+        oe: tuple[str, str],
+        env: dict[str, Any],
     ) -> str:
         """
         Submit a job for execution using the batch system.
@@ -207,7 +207,7 @@ class BatchSystemTarget(RemoteTarget):
         self: "BatchSystemTarget",
         job: Job,
         callbacks: RemoteTarget.JobExecutionCallbacks,
-        env: Dict[str, Any] = {},
+        env: dict[str, Any] = {},
     ) -> int:
         """
         Execute the job directly on the target.
@@ -226,7 +226,7 @@ class BatchSystemTarget(RemoteTarget):
         int
             The exit code of the job or -1 if it could not be determined
         """
-        output_error_files: Tuple[str, str]
+        output_error_files: tuple[str, str]
         local_job_id: str
         stream_oe = False  # Must be false if not using long living connection
 
@@ -306,25 +306,24 @@ class BatchSystemTarget(RemoteTarget):
             # Use a fresh, ephemeral connection to ensure correct paths
             with self._get_connection(
                 fresh=True, ignore_interrupted_error=True
-            ) as connection:
-                with connection.cd(job.remote_output):
-                    if not stream_oe:
-                        eprint()  # Separate with blank line
-                        for filename, stream in zip(
-                            output_error_files, (sys.stdout, sys.stderr)
-                        ):
-                            expect_ok(
-                                self._run(
-                                    connection,
-                                    f"cat {filename} && rm {filename}",
-                                    out_stream=stream,
-                                ).exited
-                            )
-                    expect_ok(
-                        self._run(
-                            connection, f"rm -f {' '.join(output_error_files)}"
-                        ).exited
-                    )
+            ) as connection, connection.cd(job.remote_output):
+                if not stream_oe:
+                    eprint()  # Separate with blank line
+                    for filename, stream in zip(
+                        output_error_files, (sys.stdout, sys.stderr)
+                    ):
+                        expect_ok(
+                            self._run(
+                                connection,
+                                f"cat {filename} && rm {filename}",
+                                out_stream=stream,
+                            ).exited
+                        )
+                expect_ok(
+                    self._run(
+                        connection, f"rm -f {' '.join(output_error_files)}"
+                    ).exited
+                )
             sys.stdout.flush()
             sys.stderr.flush()
             if interrupted_error is not None:

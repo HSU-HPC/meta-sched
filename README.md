@@ -20,7 +20,7 @@ If you use the Meta Scheduler in scientific work, please cite:
 ```bibtex
 @inproceedings{Horn2026,
   title           = "Pooling {HPC} Resources Across Organizations and Reducing
-                     Carbon Emissions with Transparent,  User-Centric
+                     Carbon Emissions with Transparent, User-Centric
                      Meta-Scheduling",
   booktitle       = "2026 25th International Symposium on Parallel and
                      Distributed Computing ({ISPDC})",

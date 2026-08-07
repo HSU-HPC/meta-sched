@@ -6,8 +6,8 @@ import argparse
 import os
 import shutil
 import sys
-from pathlib import Path
 import time
+from pathlib import Path
 
 # 1. Parse arguments
 arg_parser = argparse.ArgumentParser()

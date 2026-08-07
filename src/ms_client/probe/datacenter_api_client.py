@@ -15,11 +15,11 @@ import http
 import json
 import os
 import sys
+import warnings
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import Any, List, Optional, Set, Tuple, Union
-import warnings
+from typing import Any, Optional, Union
 
 import pandas as pd
 import requests
@@ -46,7 +46,7 @@ class ApiArgs:
     ).lower() in ["1", "true", "yes", "on"]
 
 
-class _ApiResource(object):
+class _ApiResource:
     """
     Resource which can be requested through the API
     """
@@ -82,7 +82,7 @@ class _ApiResource(object):
         return self._id
 
     def __repr__(self: "_ApiResource") -> str:
-        return f"<{type(self).__name__} #{getattr(self, 'id')}>"
+        return f"<{type(self).__name__} #{self.id}>"
 
     def _get(
         self: "_ApiResource",
@@ -185,7 +185,7 @@ class Forecast:
     reliability: float
 
     @staticmethod
-    def forecasts_to_dataframe(forecasts: List["Forecast"]) -> pd.DataFrame:
+    def forecasts_to_dataframe(forecasts: list["Forecast"]) -> pd.DataFrame:
         """
         Convert list of forecasts to a Pandas dataframe with the corresponding columns.
 
@@ -212,7 +212,7 @@ class Forecast:
 
     @staticmethod
     def plot_forecasts(
-        forecasts: List["Forecast"], title: Union[bool, Optional[str]] = True
+        forecasts: list["Forecast"], title: Optional[Union[bool, str]] = True
     ) -> None:
         """
         Plot and show a list of forecasts using Matplotlib.
@@ -246,7 +246,7 @@ class Forecast:
         plt.ylabel("Reliability", color="C1")
         plt.gca().xaxis.set_major_formatter(mdates.DateFormatter("%d.%m. %H:%M"))
         plt.gcf().autofmt_xdate()
-        if title == True:  # noqa: E712
+        if title == True:
             plt.title("Forecast")
         elif title:
             plt.title(title)
@@ -258,7 +258,7 @@ class ForecastSource(_ApiResource):
     """Class representing a forecast source in the API."""
 
     # Currently unused
-    def get_forecasts(self: "ForecastSource") -> Tuple[List[Forecast], float]:
+    def get_forecasts(self: "ForecastSource") -> tuple[list[Forecast], float]:
         """
         Fetch forecasts from the forecast source.
 
@@ -352,7 +352,7 @@ class Contract(_ApiResource):
 class Tenant(_ApiResource):
     """Class representing a tenant in the API."""
 
-    def get_contracts(self: "Tenant") -> Set[Contract]:
+    def get_contracts(self: "Tenant") -> set[Contract]:
         """
         Get the contracts associated with this tenant.
 
@@ -394,12 +394,12 @@ def __main() -> None:
     apiArgs = ApiArgs(os.environ[endpoint_env_key])
 
     forecast_sources = []
+    contracts: list[Contract] = []
     if args.tenant:
         tenant = Tenant(args.tenant, apiArgs)
         print(
             f"Fetching contracts associated with tenant {tenant.id}...", file=sys.stderr
         )
-        contracts: List[Contract] = []
         try:
             contracts = list(tenant.get_contracts())
         except Exception as e:

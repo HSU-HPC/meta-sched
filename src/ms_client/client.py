@@ -3,7 +3,6 @@
 import http
 import http.client
 import json
-from typing import Dict, List, Set
 
 import ms_common
 import requests
@@ -87,7 +86,7 @@ class Client(SchedulerClientInterface):
             raise http.client.error(response.status_code, response.text)
 
     @property
-    def targets(self: "Client") -> List[Target]:
+    def targets(self: "Client") -> list[Target]:
         """
         Get all targets which jobs may be assigned to.
 
@@ -103,7 +102,7 @@ class Client(SchedulerClientInterface):
         return [Target.model_validate(o) for o in content]
 
     def submit_job_array(
-        self: "Client", job_spec: Spec, available_targets: Set[str]
+        self: "Client", job_spec: Spec, available_targets: set[str]
     ) -> ScheduleResponse:
         """
         Create a new unique identifier for a new job array and schedule the corresponding jobs.
@@ -131,7 +130,7 @@ class Client(SchedulerClientInterface):
         content = response.json()
         return ScheduleResponse.model_validate(content)
 
-    def __get_job_request_headers(self: "Client", job_token: str) -> Dict[str, str]:
+    def __get_job_request_headers(self: "Client", job_token: str) -> dict[str, str]:
         """
         Create the HTTP headers for requests pertaining to a single job.
 
@@ -244,7 +243,7 @@ class Client(SchedulerClientInterface):
     def reschedule_job(
         self: "Client",
         job_key: JobKey,
-        available_targets: Set[str],
+        available_targets: set[str],
     ) -> None:
         """
         TODO: Currently unused

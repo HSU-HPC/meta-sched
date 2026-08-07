@@ -32,7 +32,6 @@ class RemoteTarget:
     class _FactoryAccessToken:
         """This class should only be used internally by factory.py"""
 
-        pass
 
     def __init__(self, sentinel: _FactoryAccessToken, target: Target) -> None:
         """
@@ -140,7 +139,7 @@ class RemoteTarget:
             except InterruptedError:  # If ignored, does not count toward attempts
                 if not ignore_interrupted_error:
                     raise
-            except (SSHException, socket.error, EOFError, ConnectionResetError) as e:
+            except (OSError, SSHException, EOFError, ConnectionResetError) as e:
                 attempt += 1
                 eprint(f"Connection failed on attempt #{attempt}:")
                 eprint(e)
@@ -203,10 +202,10 @@ class RemoteTarget:
             expect_ok(
                 self._run(self._get_connection(), f"mkdir -p $(dirname {dst})").exited
             )
-            dst = f"{str(self._target.id)}:{dst}"
+            dst = f"{self._target.id!s}:{dst}"
         elif mode == self.TransferMode.DOWNLOAD:
             Path(dst).parent.mkdir(parents=True, exist_ok=True)
-            src = f"{str(self._target.id)}:{src}"
+            src = f"{self._target.id!s}:{src}"
         else:
             raise NotImplementedError()
         ssh_options = ["StrictHostKeyChecking=no"]
@@ -242,7 +241,7 @@ class RemoteTarget:
             ]
             # scp uses src = A:/path/to/dir/* dst = B:/path/to/dir so dir is in path/to/
             dst = Path(dst) / Path(src).name
-            src = f"{str(src)}/*"
+            src = f"{src!s}/*"
             remote_dst = str(dst).split(":")[-1]
             expect_ok(
                 self._run(self._get_connection(), f"mkdir -p {remote_dst}").exited
@@ -284,7 +283,7 @@ class RemoteTarget:
 
     def _create_oe_files(
         self: "RemoteTarget", connection: Connection, stream_contents: bool
-    ) -> Tuple[str, str]:
+    ) -> tuple[str, str]:
         """
         Create job output and error files and optionally stream their contents as they are appended.
 
@@ -323,10 +322,10 @@ class RemoteTarget:
         warn: bool = True,
         hide: bool = False,
         asynchronous: bool = False,
-        env: Dict[str, Any] = {},
+        env: dict[str, Any] = {},
         out_stream: Union[TextIO, Any] = sys.stdout,
         err_stream: Union[TextIO, Any] = sys.stderr,
-        modules: List[str] = [],
+        modules: list[str] = [],
     ) -> Result:
         """
         Prefix a shell command with commands to source target shell scripts and load environment modules before executing it.
@@ -376,7 +375,7 @@ class RemoteTarget:
         return result
 
     @staticmethod
-    def __get_job_env(job: Job) -> Dict[str, Any]:
+    def __get_job_env(job: Job) -> dict[str, Any]:
         """
         Get the environment variables for a job to be set on the target.
 
@@ -472,7 +471,7 @@ class RemoteTarget:
         self: "RemoteTarget",
         job: Job,
         callbacks: JobExecutionCallbacks,
-        env: Dict[str, Any] = {},
+        env: dict[str, Any] = {},
     ) -> int:
         """
         Execute the job on the remote target.

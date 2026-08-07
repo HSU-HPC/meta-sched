@@ -4,17 +4,17 @@ import errno
 import fcntl
 import os
 import sys
+import time
 from io import TextIOWrapper
 from os import PathLike
 from pathlib import Path
-import time
-from typing import Any, Optional, Set, Type, TypeVar, Union
+from typing import Any, Optional, TypeVar, Union
 
 E = TypeVar("E", bound=BaseException)
 
 
 def unwrap_error(
-    error: BaseException, target_type: Type[E], max_depth: int = 10
+    error: BaseException, target_type: type[E], max_depth: int = 10
 ) -> Optional[E]:
     """
     Traverse the exception chain to find an exception of a specific type.
@@ -33,7 +33,7 @@ def unwrap_error(
     Optional[BaseException]
         The first matching exception of the specified type, or None if not found.
     """
-    seen: Set[int] = set()
+    seen: set[int] = set()
     for _ in range(max_depth):
         seen.add(id(error))
         if isinstance(error, target_type):
@@ -289,8 +289,8 @@ def sleep(seconds: float) -> float:
         remaining = end_time - now
         if remaining <= 0:
             break
+        start = time.time()
         try:
-            start = time.time()
             time.sleep(remaining)
             slept_total += time.time() - start
             break  # Finished sleeping without being interrupted

@@ -10,16 +10,14 @@ import shutil
 import signal
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any
 
 import pandas as pd
-from ms_client.utils import sleep
 from ms_common.schemas import Target
 from ms_common.utils import eprint
 from pydantic import ValidationError
 
-import ms_client.data as data
-from ms_client import ssh
+from ms_client import data, ssh
 from ms_client.client import Client
 from ms_client.config import Config
 from ms_client.job import (
@@ -30,6 +28,7 @@ from ms_client.job import (
 )
 from ms_client.remote_target.factory import remote_target_from_target
 from ms_client.run_job import NoTargetsAvailableError, launch_job_array
+from ms_client.utils import sleep
 
 
 class CLI:
@@ -412,7 +411,7 @@ class CLI:
                 dest = arg.replace("_", "-")
                 if dest == "self":
                     continue
-                kwargs: Dict[str, Any] = dict()
+                kwargs: dict[str, Any] = dict()
                 default = None
                 if i >= len(args) - len(defaults):
                     default = defaults[i - (len(args) - len(defaults))]

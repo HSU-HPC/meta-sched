@@ -1,7 +1,6 @@
 """Module containing the interface for the scheduling policy."""
 
 import abc
-from typing import List, Set
 
 from ms_common.schemas import (
     JobKey,
@@ -17,7 +16,7 @@ class SchedulerClientInterface(abc.ABC):
 
     @property
     @abc.abstractmethod
-    def targets(self: "SchedulerClientInterface") -> List[Target]:
+    def targets(self: "SchedulerClientInterface") -> list[Target]:
         """
         Get all targets which jobs may be assigned to.
 
@@ -35,7 +34,7 @@ class SchedulerClientInterface(abc.ABC):
 
     @abc.abstractmethod
     def submit_job_array(
-        self: "SchedulerClientInterface", job_spec: Spec, available_targets: Set[str]
+        self: "SchedulerClientInterface", job_spec: Spec, available_targets: set[str]
     ) -> ScheduleResponse:
         """
         Create a new unique identifier for a new job array and schedule the corresponding jobs.

@@ -8,9 +8,8 @@ import os
 import sys
 import time
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
-from ms_client.utils import sleep
 from ms_common.schemas import PowerForecast, Target, TargetStatus
 from ms_common.utils import eprint
 from pydantic import ValidationError
@@ -25,6 +24,7 @@ from ms_client.probe.datacenter_api_client import (
 from ms_client.remote_target import RemoteTarget
 from ms_client.remote_target.factory import remote_target_from_target
 from ms_client.ssh import has_ssh_config_entry
+from ms_client.utils import sleep
 
 
 def _get_target_status(
@@ -180,7 +180,7 @@ def main() -> int:
         return os.EX_CONFIG
     client = Client(config)
     client.check_version_ok()
-    processes: List[multiprocessing.Process] = []
+    processes: list[multiprocessing.Process] = []
     targets_config = {t.id: t for t in config.targets}
     for t in client.targets:
         if t.id in target_ids:

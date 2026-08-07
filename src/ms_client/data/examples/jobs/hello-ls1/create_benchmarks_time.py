@@ -100,13 +100,12 @@ def run_benchmark(
         print(e)
         raise
 
-    with lock:
-        with open(benchmarks_path, "a") as file:
-            file.write(
-                ",".join(map(str, [cores, film_width, n_steps, sample, seconds]))
-            )
-            file.write("\n")
-            file.flush()
+    with lock, open(benchmarks_path, "a") as file:
+        file.write(
+            ",".join(map(str, [cores, film_width, n_steps, sample, seconds]))
+        )
+        file.write("\n")
+        file.flush()
     print(
         f"Finished benchmark sample #{sample} for",
         film_width,

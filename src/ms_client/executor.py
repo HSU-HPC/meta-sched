@@ -6,13 +6,12 @@ import sys
 import time
 import traceback
 from types import FrameType
-from typing import List, Optional, Set, Tuple
+from typing import Optional
 
 import invoke
 import ms_common.schemas
-from ms_common.schemas import JobKey
+from ms_common.schemas import JobKey, Target
 from ms_common.schemas import Spec as JobSpec
-from ms_common.schemas import Target
 from ms_common.utils import eprint, is_env_flag_set, time_to_seconds
 
 from ms_client import job, ssh
@@ -94,7 +93,7 @@ class Executor:
         target: Target,
         job_spec: JobSpec,
         additional_configs: Optional[TargetAdditionalConfigs] = None,
-    ) -> Tuple[bool, str]:
+    ) -> tuple[bool, str]:
         """
         Check if the target is suitable for executing a specific job.
 
@@ -148,8 +147,8 @@ class Executor:
     def filter_targets(
         job_spec: JobSpec,
         scheduler: SchedulerClientInterface,
-        targets_additional_configs: List[TargetAdditionalConfigs],
-    ) -> Set[str]:
+        targets_additional_configs: list[TargetAdditionalConfigs],
+    ) -> set[str]:
         """
         Obtain the set of available targets of the scheduler for a given job specification.
 
@@ -167,7 +166,7 @@ class Executor:
         Set[Target]
             All targets on which the job could be executed
         """
-        available_targets: Set[str] = set()
+        available_targets: set[str] = set()
         try:
             targets = scheduler.targets
         except Exception as e:
