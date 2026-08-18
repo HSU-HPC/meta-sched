@@ -137,7 +137,7 @@ class Config(BaseModel):
             raise ValueError(f'Could not load scheduler "{config["scheduler_class"]}"')
         if not issubclass(scheduler_class, Policy):
             raise ValueError(
-                f'"{config.scheduler_class_name}" is not a subclass of "{Policy.__class__.__qualname__}"'
+                f'"{config.scheduler_class_name}" is not a subclass of "{Policy.__class__.__qualname__}"' # pyright: ignore [reportAttributeAccessIssue]
             )
         config._scheduler_class = scheduler_class
         target_ids = set()

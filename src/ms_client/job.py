@@ -168,11 +168,11 @@ def get_job_outputs() -> pd.DataFrame:
     column_types = dict(job_spec=str, array_id=int, array_idx=int)
     df = pd.DataFrame(rows).astype(column_types)
 
-    def get_job_output(row: pd.Series) -> Path:  # type: ignore[type-arg]
+    def get_job_output(row: pd.Series) -> Path:
         """Wrapper for _get_job_output(...) for use with df.apply"""
         return _get_job_output(*row)
 
-    df["path"] = df.apply(lambda r: get_job_output(r), axis=1)  # type: ignore[call-overload, unused-ignore]
+    df["path"] = df.apply(lambda r: get_job_output(r), axis=1)  # type: ignore[call-overload]
     df["pid"] = df["path"].apply(get_pid).astype(float)
     df["status"] = df["path"].apply(get_status).astype(str)
     # Try to interpret array_id as int to allow for correct sorting

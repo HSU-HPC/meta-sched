@@ -80,10 +80,12 @@ nodes          = 571
 cores_per_node = 72
 max_time       = "72:00:00" # Formated as d-hh:MM:ss
 max_nodes      = 5
+min_nodes      = 1
 tags           = ["x86"]
 # Specify concrete environment modules available
 [targets.module_map]
 MPI            = "intel-oneapi-mpi"
+# MPI            = "gcc/14.2.0 openmpi/4.1.7" # Hierarchical module system (If e.g. OpenMPI depends on GCC)
 # Optionally source system wide scripts
 # source_scripts = ["/etc/profile"]
 

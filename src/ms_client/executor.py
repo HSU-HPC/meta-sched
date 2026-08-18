@@ -125,6 +125,9 @@ class Executor:
         )
         if job_spec.nodes > max_nodes:
             return False, "Too many nodes required"
+        min_nodes = target.min_nodes if target.min_nodes else 1
+        if job_spec.nodes < min_nodes:
+            return False, "Too few nodes required"
         cores_per_node = (
             target.cores_per_node
             if job_spec.ranks_per_node is None

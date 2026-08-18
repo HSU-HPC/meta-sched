@@ -16,7 +16,7 @@ import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 import numpy as np
 import pandas as pd
@@ -44,7 +44,7 @@ if not benchmark_path.is_file():
     sys.exit(1)
 df = pd.read_csv(benchmark_path)
 assert len(df["steps"].unique()) == 1, "Some experiments ran for different lenghts."
-experiment_steps = df["steps"].values[0]
+experiment_steps = cast(float, df["steps"].values[0])
 df = pd.DataFrame(df.groupby(["cores", "film_width"], as_index=False)["seconds"].mean())
 df.sort_values(["film_width", "cores"], inplace=True)
 print("Benchmarks Mean:")
@@ -56,7 +56,7 @@ for cores in df["cores"].unique()[::-1]:
     mask_cores = df["cores"] == cores
     column_seconds = []
     for film_width in film_widths:
-        seconds = df[mask_cores & (df["film_width"] == film_width)]["seconds"].values
+        seconds = df[mask_cores & (df["film_width"] == film_width)]["seconds"].values 
         column_seconds.append(seconds[0] if len(seconds) == 1 else np.nan)
     data[f"{cores} cores"] = column_seconds
 print(pd.DataFrame(data).to_string(index=False), end="\n\n")

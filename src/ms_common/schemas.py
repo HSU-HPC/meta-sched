@@ -102,6 +102,8 @@ class Target(BaseModel):
         The maximum time for which a job may run on this target formatted as "d-hh:MM:ss"
     max_nodes : Optional[int]
         The maximum number of compute nodes which may be allocated to a job
+    min_nodes : Optional[int]
+        The minimum number of compute nodes which may be allocated to a job
     source_scripts : Tuple[str, ...]
         A list of files which should be sourced after connecting to the target before running any commands
     module_map : Dict[str, str]
@@ -119,6 +121,7 @@ class Target(BaseModel):
     port: int = utils.DEFAULT_SSH_PORT
     max_time: Optional[str] = None
     max_nodes: Optional[int] = None
+    min_nodes: Optional[int] = None
     source_scripts: Tuple[str, ...] = ()
     _module_map: frozendict[str, str] = frozendict[str, str]()
 
@@ -197,6 +200,8 @@ class Target(BaseModel):
             raise ValueError(
                 f"Invalid batch system {target.batch_system} for target {target.id}"
             )
+        if target.min_nodes and target.max_nodes and target.min_nodes > target.max_nodes:
+            raise ValueError(f"Target {target.id} cannot have min_nodes > max_nodes")
         if target.batch_system == "none":
             if target.nodes != 1 or target.max_nodes is not None:
                 raise ValueError(

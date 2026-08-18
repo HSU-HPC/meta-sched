@@ -42,7 +42,7 @@ def plot_tuning_phases(
     tuning_df = df[df["inTuningPhase"]].copy()
 
     config_cols = list(
-        df.columns[df.columns.get_loc("Container") : df.columns.get_loc("ThreadCount")]  # type: ignore[misc]
+        df.columns[df.columns.get_loc("Container") : df.columns.get_loc("ThreadCount")]
     )
 
     tuning_df["cluster"] = tuning_df[config_cols].astype(str).agg("|".join, axis=1)
