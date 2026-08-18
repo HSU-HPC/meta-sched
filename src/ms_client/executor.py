@@ -61,6 +61,7 @@ class Executor:
         self.__job_key = JobKey(job_token, job.array_id, job.array_idx)
         self.__scheduler = scheduler
         self.__redirect_output = redirect_output
+        self.__print_cmd = is_env_flag_set("MS_DEBUG_CMD")
 
     def __signal_handler(
         self: "Executor", signal_number: int, frame: Optional[FrameType]
@@ -212,6 +213,8 @@ class Executor:
             try:
                 os.chdir(setup_cwd)
                 cmd = self.__job.spec.cmd_setup_local
+                if self.__print_cmd:
+                    eprint(f"<local>:{os.getcwd()}$", cmd)
                 result = invoke.run(
                     cmd,
                     env=env,
@@ -276,15 +279,15 @@ class Executor:
             eprint(
                 f"=== 2. Copying input files to target {target.id} and run optional target setup step ==="
             )
-            with LockFile(f"{os.getuid()}/locks/{self.__job.spec.name}.lock"):
+            eprint("--- a. Copying input files to the target ---")
+            with LockFile(f"{os.getuid()}/locks/{self.__job.spec.name}/local.lock"):
                 src = self.__job.local_input
                 dst = self.__job.remote_input.parent
-                eprint("--- a. Copying input files to the target ---")
                 remote_target.transfer(src, dst, RemoteTarget.TransferMode.UPLOAD)
-                eprint("--- b. Run run optional target setup step ---")
+            eprint("--- b. Run run optional target setup step ---")
             # Try to avoid race conditions remotely outside of the scope of a batch system
             with LockFile(
-                f"{os.getuid()}/locks/targets/{target.id}/{self.__job.spec.name}.lock"
+                f"{os.getuid()}/locks/targets/{self.__job.spec.name}/{target.id}.lock"
             ):
                 remote_target.setup(self.__job)
             eprint(f"=== 3. Executing job on target {target.id} ===")

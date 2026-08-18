@@ -191,6 +191,7 @@ class WeightedByCoresAvailabilityAbsolute(GreedyPolicy):
         jsonl_line = json.dumps(log_data)
         eprint(jsonl_line)
 
+        # TODO use propper logging library
         # e.g. /var/log/meta-sched-policy.log
         filename = os.getenv("MS_POLICY_LOG")
         if filename:

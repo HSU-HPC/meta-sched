@@ -214,3 +214,5 @@ $ MS_DEBUG_FILTER_TARGETS=1 mscli-dev submit <job spec>
 [DEBUG]: Can the job run on windhpc-wwit? No. (Too many cores required.)
 # ...
 ```
+
+Use `export MS_DEBUG_CMD=1` to print the commands that are run locally and remotely to the `sterr` file of the job output.

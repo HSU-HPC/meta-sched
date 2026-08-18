@@ -2,20 +2,20 @@
 
 import abc
 import enum
-import socket
+import os
 import sys
 import time
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TextIO, Tuple, Union
+from typing import Any, Optional, TextIO, Union
 
 import invoke
 from fabric import Connection  # type: ignore[attr-defined]
 from fabric.config import Config
 from invoke.runners import Result
 from ms_common.schemas import Target, TargetStatus
-from ms_common.utils import DEFAULT_SSH_PORT, EX_BASH_COMMAND_NOT_FOUND, eprint
+from ms_common.utils import DEFAULT_SSH_PORT, EX_BASH_COMMAND_NOT_FOUND, eprint, is_env_flag_set
 from paramiko.ssh_exception import SSHException
 
 from ms_client import ssh
@@ -50,6 +50,7 @@ class RemoteTarget:
             )
         self._target = target
         self._connection: Optional[Connection] = None
+        self.__print_cmd = is_env_flag_set("MS_DEBUG_CMD")
 
     def _get_connection(
         self: "RemoteTarget",
@@ -126,7 +127,7 @@ class RemoteTarget:
         while attempt < retry_count:
             try:
                 self._connection = Connection(  # type: ignore[no-untyped-call]
-                    self._target.id,
+                    self._target.id, # Alias from SSH configuration
                     config=config,
                     connect_kwargs=connect_kwargs,
                     connect_timeout=timeout,
@@ -190,6 +191,8 @@ class RemoteTarget:
             Destination directory
         mode : TransferMode
             Direction in which data is transferred between submit host and target
+        print_cmd: bool
+            Print the command(s) to be executed for debugging purposes
         """
         eprint(
             "Up" if mode == self.TransferMode.UPLOAD else "Down",
@@ -218,6 +221,8 @@ class RemoteTarget:
             f'-e "ssh -p {self._target.port} {ssh_options_str}"',
         ]
         cmd = f"rsync {' '.join(rsync_flags)} {src} {dst} 1>&2"
+        if self.__print_cmd:
+            eprint(f"<local>:{os.getcwd()}$", cmd)
         result = invoke.run(
             cmd,
             warn=True,
@@ -247,6 +252,8 @@ class RemoteTarget:
                 self._run(self._get_connection(), f"mkdir -p {remote_dst}").exited
             )
             cmd = f"scp {' '.join(scp_flags)} {src} {dst} 1>&2"
+            if self.__print_cmd:
+                eprint(f"<local>:{os.getcwd()}$", cmd)
             result = invoke.run(
                 cmd,
                 warn=True,
@@ -264,7 +271,7 @@ class RemoteTarget:
         """
         expect_ok(
             self._run(
-                self._get_connection(), f"rm -rf {get_jobs_dir(hidden=True)}"
+                self._get_connection(), f"rm -rf {get_jobs_dir(hidden=True)}",
             ).exited
         )
 
@@ -278,7 +285,7 @@ class RemoteTarget:
             The job of which related files should be deleted on the target
         """
         expect_ok(
-            self._run(self._get_connection(), f"rm -rf {job.remote_output}").exited
+            self._run(self._get_connection(), f"rm -rf {job.remote_output}",).exited
         )
 
     def _create_oe_files(
@@ -363,6 +370,14 @@ class RemoteTarget:
             + [f"module load {module}" for module in specific_modules]
             + [cmd]
         )
+        if self.__print_cmd:
+            cwd = connection.cwd
+            if not cwd:
+                cwd = ""
+            if not cwd.startswith("/"):
+                prefix = "~" if len(cwd) == 0 else "~/"
+                cwd = f"{prefix}{cwd}"
+            eprint(f"{self._target.id}:{cwd}$", cmd)
         result: Result = connection.run(
             cmd,
             warn=warn,
@@ -409,6 +424,8 @@ class RemoteTarget:
         """
         # Use a fresh, ephemeral connection to ensure correct paths
         with self._get_connection(fresh=True) as connection:
+            # Create the job output folder (delete any existing one to avoid confusion)
+            expect_ok(self._run(connection, f"rm -rf {job.remote_output}").exited)
             expect_ok(self._run(connection, f"mkdir -p {job.remote_output}").exited)
             with connection.cd(job.remote_output):
                 if job.spec.cmd_setup_target:
@@ -460,10 +477,6 @@ class RemoteTarget:
         int
             The exit code of the job or -1 if it could not be determined
         """
-        with self._get_connection() as connection:
-            # Create the job output folder (delete any existing one to avoid confusion)
-            expect_ok(self._run(connection, f"rm -rf {job.remote_output}").exited)
-            expect_ok(self._run(connection, f"mkdir -p {job.remote_output}").exited)
         return self._execute(job, callbacks, RemoteTarget.__get_job_env(job))
 
     @abc.abstractmethod
