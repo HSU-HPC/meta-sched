@@ -74,7 +74,17 @@ def update_config(include_targets_hostnames: dict[str, str]) -> int:
     config_path, base_config_path = get_config_paths()
     config_path.parent.mkdir(parents=True, exist_ok=True)
     if not config_path.exists():
-        config_path.write_text("")
+        header = "\n".join([
+            "# === Meta Scheduler SSH configuration ===",
+            "# This file must contain all targets to be used",
+            "# AND any required proxy configurations.",
+            "# (Entries in ~/.ssh/config are not used!)",
+            "# Ensure non-interactiv connections are possible!",
+            "# (Test with: ssh <target> hostname)"
+            "",
+            "",
+        ])
+        config_path.write_text(header)
     base_config = base_config_path.read_text() if base_config_path.is_file() else ""
     include = "Include config.d/meta-sched"
     if include not in [s.strip() for s in base_config.splitlines()]:

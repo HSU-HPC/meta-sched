@@ -67,6 +67,9 @@ echo "--- Analyze ms_common package ---"
 cd "$BASE_DIR/src/ms_common"
 check-coverage-and-annotations || :
 echo "--- Done analyzing $PACKAGE package ---"
+cd "$BASE_DIR/tests"
+check-coverage-and-annotations || :
+echo "--- Done analyzing tests ---"
 
 echo "--- Build distributable module ---"
 cd "$BASE_DIR/packages/$PACKAGE"
