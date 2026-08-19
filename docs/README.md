@@ -216,3 +216,10 @@ $ MS_DEBUG_FILTER_TARGETS=1 mscli-dev submit <job spec>
 ```
 
 Use `export MS_DEBUG_CMD=1` to print the commands that are run locally and remotely to the `sterr` file of the job output.
+
+If a command is not found, consider adding the following to the target in the server configuration:
+
+```toml
+# SSH connections use non-interactive shell
+source_scripts = ["/etc/profile"]
+```
