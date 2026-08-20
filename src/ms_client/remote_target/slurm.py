@@ -46,7 +46,7 @@ class SlurmRemoteTarget(BatchSystemTarget):
         str
             The local job ID
         """
-        argv = ["sbatch"]
+        argv = ["sbatch", "--export=ALL"]
         if self._target.queue:
             argv.append(f"--partition={self._target.queue}")
         if job.spec.exclusive:

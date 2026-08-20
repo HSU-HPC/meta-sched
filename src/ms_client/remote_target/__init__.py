@@ -21,7 +21,7 @@ from paramiko.ssh_exception import SSHException
 from ms_client import ssh
 from ms_client.job import Instance as Job
 from ms_client.job import get_jobs_dir
-from ms_client.utils import ExponentialBackoff, SuppressStderr, expect_ok, sleep
+from ms_client.utils import ExponentialBackoff, SuppressStderr, debug_print_cmd, expect_ok, sleep
 
 
 class RemoteTarget:
@@ -50,7 +50,6 @@ class RemoteTarget:
             )
         self._target = target
         self._connection: Optional[Connection] = None
-        self.__print_cmd = is_env_flag_set("MS_DEBUG_CMD")
 
     def _get_connection(
         self: "RemoteTarget",
@@ -221,8 +220,6 @@ class RemoteTarget:
             f'-e "ssh -p {self._target.port} {ssh_options_str}"',
         ]
         cmd = f"rsync {' '.join(rsync_flags)} {src} {dst} 1>&2"
-        if self.__print_cmd:
-            eprint(f"<local>:{os.getcwd()}$", cmd)
         result = invoke.run(
             cmd,
             warn=True,
@@ -231,6 +228,7 @@ class RemoteTarget:
             hide=True,
             pty=False,
         )
+        debug_print_cmd(cmd, result)
         status = -1 if result is None else result.exited
         if status == EX_BASH_COMMAND_NOT_FOUND:
             # TODO this may cause issues when another job is currently reading existing input files!
@@ -252,8 +250,6 @@ class RemoteTarget:
                 self._run(self._get_connection(), f"mkdir -p {remote_dst}").exited
             )
             cmd = f"scp {' '.join(scp_flags)} {src} {dst} 1>&2"
-            if self.__print_cmd:
-                eprint(f"<local>:{os.getcwd()}$", cmd)
             result = invoke.run(
                 cmd,
                 warn=True,
@@ -262,6 +258,7 @@ class RemoteTarget:
                 hide=True,
                 pty=False,
             )
+            debug_print_cmd(cmd, result)
         status = -1 if result is None else result.exited
         expect_ok(status)
 
@@ -370,14 +367,6 @@ class RemoteTarget:
             + [f"module load {module}" for module in specific_modules]
             + [cmd]
         )
-        if self.__print_cmd:
-            cwd = connection.cwd
-            if not cwd:
-                cwd = ""
-            if not cwd.startswith("/"):
-                prefix = "~" if len(cwd) == 0 else "~/"
-                cwd = f"{prefix}{cwd}"
-            eprint(f"{self._target.id}:{cwd}$", cmd)
         result: Result = connection.run(
             cmd,
             warn=warn,
@@ -387,6 +376,7 @@ class RemoteTarget:
             out_stream=out_stream,
             err_stream=err_stream,
         )
+        debug_print_cmd(cmd, result, connection, self._target)
         return result
 
     @staticmethod

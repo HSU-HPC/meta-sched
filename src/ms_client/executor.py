@@ -24,6 +24,7 @@ from ms_client.utils import (
     LockFile,
     RedirectOutputToFile,
     StatusException,
+    debug_print_cmd,
     expect_ok,
     sleep,
     unwrap_error,
@@ -61,7 +62,6 @@ class Executor:
         self.__job_key = JobKey(job_token, job.array_id, job.array_idx)
         self.__scheduler = scheduler
         self.__redirect_output = redirect_output
-        self.__print_cmd = is_env_flag_set("MS_DEBUG_CMD")
 
     def __signal_handler(
         self: "Executor", signal_number: int, frame: Optional[FrameType]
@@ -213,8 +213,6 @@ class Executor:
             try:
                 os.chdir(setup_cwd)
                 cmd = self.__job.spec.cmd_setup_local
-                if self.__print_cmd:
-                    eprint(f"<local>:{os.getcwd()}$", cmd)
                 result = invoke.run(
                     cmd,
                     env=env,
@@ -224,6 +222,7 @@ class Executor:
                     hide=True,
                     pty=False,
                 )
+                debug_print_cmd(cmd, result)
                 status = -1 if result is None else result.exited
                 expect_ok(status)
             finally:

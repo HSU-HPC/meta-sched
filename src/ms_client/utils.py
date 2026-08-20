@@ -10,6 +10,12 @@ from os import PathLike
 from pathlib import Path
 from typing import Any, Optional, TypeVar, Union
 
+from ms_common.schemas import Target
+from ms_common.utils import eprint, is_env_flag_set
+
+from fabric import Connection  # type: ignore[attr-defined]
+from invoke.runners import Result
+
 E = TypeVar("E", bound=BaseException)
 
 
@@ -265,6 +271,46 @@ def expect_ok(status: int, details: Optional[str] = None) -> None:
     """
     if status != os.EX_OK:
         raise StatusException(status, details)
+
+
+def debug_print_cmd(cmd: str, result: Optional[Result], connection: Optional[Connection] = None, target: Optional[Target] = None) -> None:
+    """
+    Print executed command and output if the environment variable MS_DEBUG_CMD is set.
+
+    Parameters
+    ----------
+    cmd : str
+        The command that was executed
+    result : Optional[Result]
+        The result of the command, if it was executed
+    connection : Optional[Connection]
+        The corresponding connection object, if the command is executed remotely
+    target : Optional[Target]
+        The corresponding target object, if the command is executed remotely
+    """
+    if not is_env_flag_set("MS_DEBUG_CMD"):
+        return
+    host = None
+    cwd = None
+    if connection:
+        host = target.id if target else "<remote>"
+        cwd = connection.cwd
+        if not cwd:
+            cwd = ""
+        if not cwd.startswith("/"):
+            prefix = "~" if len(cwd) == 0 else "~/"
+            cwd = f"{prefix}{cwd}"
+    else:
+        host = "<local>"
+        cwd = os.getcwd()
+    eprint(f"{host}:{cwd}$", cmd)
+    if result:
+        eprint("status:", result.exited)
+        eprint("stdout:", result.stdout, sep="\n")
+        eprint("stderr:", result.stderr, sep="\n")
+    else:
+        eprint("<no result>")
+    eprint()
 
 
 def sleep(seconds: float) -> float:
