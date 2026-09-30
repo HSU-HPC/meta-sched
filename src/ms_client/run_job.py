@@ -2,6 +2,8 @@
 
 """Script for running a single job. (Invoked by CLI.)"""
 
+from __future__ import annotations
+
 import argparse
 import os
 import signal
@@ -9,7 +11,6 @@ import subprocess
 import sys
 from pathlib import Path
 from types import FrameType
-from typing import Optional
 
 from ms_common.utils import eprint
 from pydantic import ValidationError
@@ -74,7 +75,8 @@ def __start_process(job_spec: str, token: str, array_id: int, array_idx: int) ->
         [sys.executable, __file__] + args,
         stdout=subprocess.DEVNULL,
         stderr=subprocess.DEVNULL,
-        preexec_fn=os.setpgrp,  # Do not receive signals from current process
+        stdin=subprocess.DEVNULL,
+        start_new_session=True,  # Do not receive signals from current process
         env=env,
     )
     return p.pid
@@ -141,7 +143,7 @@ if __name__ == "__main__":
     args = arg_parser.parse_args()
     assert args.array_index >= 0
 
-    def ignore_signal(signalnum: int, frame: Optional[FrameType]) -> None:
+    def ignore_signal(signalnum: int, frame: FrameType | None) -> None:
         """
         Handle a signal sent to the process and do nothing.
 
@@ -149,7 +151,7 @@ if __name__ == "__main__":
         ----------
         signalnum : int
             (Unused)
-        frame : Optional[FrameType]
+        frame : FrameType | None
             (Unused)
 
         """

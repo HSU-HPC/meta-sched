@@ -4,12 +4,14 @@ import functools
 import os
 import shlex
 import sys
-from typing import Any, Callable, Optional, TypeVar, Union, cast
 import warnings
+from collections.abc import Callable
+from typing import Any, TypeVar, cast
 
 # See https://www.gnu.org/software/bash/manual/html_node/Exit-Status.html
 EX_BASH_COMMAND_NOT_FOUND = 127
 DEFAULT_SSH_PORT = 22
+
 
 def eprint(*args: Any, **kwargs: Any) -> None:
     """
@@ -28,6 +30,7 @@ def eprint(*args: Any, **kwargs: Any) -> None:
 
 F = TypeVar("F", bound=Callable[..., Any])
 
+
 def deprecated(reason: str) -> Callable[[F], F]:
     """
     Mark a function as deprecated.
@@ -43,6 +46,7 @@ def deprecated(reason: str) -> Callable[[F], F]:
     Callable
         The decorated function
     """
+
     def decorator(func: F) -> F:
         """
         Deprecation decorator.
@@ -57,6 +61,7 @@ def deprecated(reason: str) -> Callable[[F], F]:
         F
             The deprecated function
         """
+
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
             """
@@ -65,13 +70,17 @@ def deprecated(reason: str) -> Callable[[F], F]:
             warnings.warn(
                 f"{func.__name__}() is deprecated: {reason}",
                 category=DeprecationWarning,
-                stacklevel=2
+                stacklevel=2,
             )
             return func(*args, **kwargs)
+
         return cast(F, wrapper)
+
     return decorator
 
+
 C = TypeVar("C", bound=type)
+
 
 def deprecated_class(reason: str) -> Callable[[C], C]:
     """
@@ -87,6 +96,7 @@ def deprecated_class(reason: str) -> Callable[[C], C]:
     Callable
         The decorated class
     """
+
     def decorator(cls: C) -> C:
         """
         Deprecation decorator.
@@ -101,7 +111,7 @@ def deprecated_class(reason: str) -> Callable[[C], C]:
         C
             The deprecated class
         """
-        original_init = cls.__init__ # type: ignore
+        original_init = cls.__init__  # type: ignore
 
         @functools.wraps(original_init)
         def new_init(self: C, *args: Any, **kwargs: Any) -> None:
@@ -111,14 +121,15 @@ def deprecated_class(reason: str) -> Callable[[C], C]:
             warnings.warn(
                 f"{cls.__name__} is deprecated: {reason}",
                 category=DeprecationWarning,
-                stacklevel=2
+                stacklevel=2,
             )
             original_init(self, *args, **kwargs)
 
-        cls.__init__ = new_init # type: ignore
+        cls.__init__ = new_init  # type: ignore
         return cls
 
     return decorator
+
 
 @deprecated(reason="Maybe not needed anymore.")
 def try_become_root(required: bool = False) -> None:
@@ -137,7 +148,7 @@ def try_become_root(required: bool = False) -> None:
                 "sudo",
                 "--preserve-env=PATH,VIRTUAL_ENV,PYTHONPATH",  # Critical for venv or uv
                 sys.executable,
-                *map(shlex.quote, sys.argv)
+                *map(shlex.quote, sys.argv),
             ]
             os.execv("/usr/bin/sudo", argv)
         elif required:
@@ -145,14 +156,14 @@ def try_become_root(required: bool = False) -> None:
             sys.exit(os.EX_NOPERM)
 
 
-def time_to_seconds(time: Union[str, int]) -> int:
+def time_to_seconds(time: str | int) -> int:
     """
     Compute duration in seconds from string in the format "d-hh:MM:ss".
     (Components are parsed from right to left and left-incomplete strings are allowed.)
 
     Parameters
     ----------
-    time : Union[str, int]
+    time : str |  int
         Formatted time duration or seconds (no parsing needed)
 
 
@@ -165,7 +176,7 @@ def time_to_seconds(time: Union[str, int]) -> int:
         return time
     seconds = 0
     # Parse char by char from right to left
-    emit = time[::-1] # emit is time, but backwards ;)
+    emit = time[::-1]  # emit is time, but backwards ;)
     cs = ""
     seconds_per_unit = 1
     seconds_per_hour = 3600
@@ -174,7 +185,9 @@ def time_to_seconds(time: Union[str, int]) -> int:
         if c == "-":
             # Hours -> Days
             if c == "-" and seconds_per_unit != seconds_per_hour:
-                raise ValueError("Error parsing formatted time \"{time}\". (Day separator found at invalid position.)")
+                raise ValueError(
+                    'Error parsing formatted time "{time}". (Day separator found at invalid position.)'
+                )
             seconds += int(cs[::-1]) * seconds_per_unit
             seconds_per_unit *= 24
             cs = ""
@@ -187,7 +200,9 @@ def time_to_seconds(time: Union[str, int]) -> int:
             cs += c
     seconds += int(cs[::-1]) * seconds_per_unit
     if seconds_per_unit > seconds_per_day:
-        raise ValueError(f"Error parsing formatted time \"{time}\". (Found additional unit separator after days.)")
+        raise ValueError(
+            f'Error parsing formatted time "{time}". (Found additional unit separator after days.)'
+        )
     return seconds
 
 
@@ -221,7 +236,8 @@ def seconds_to_time(seconds: int, include_days: bool = True) -> str:
         return f"{days}-{hours:02d}:{minutes:02d}:{seconds:02d}"
     else:
         return f"{24 * days + hours:02d}:{minutes:02d}:{seconds:02d}"
-    
+
+
 def is_env_flag_set(key: str) -> bool:
     """
     Check if a flag is set as an environment variable is set (and not empty, 0, false, no).
@@ -237,4 +253,6 @@ def is_env_flag_set(key: str) -> bool:
         The status of the flag from the environment variable
     """
     val = os.getenv(key, "").strip()
-    return len(val) > 0 and val != "0" and val.lower() != "false" and val.lower() != "no"
+    return (
+        len(val) > 0 and val != "0" and val.lower() != "false" and val.lower() != "no"
+    )

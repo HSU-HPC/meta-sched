@@ -2,18 +2,24 @@
 
 import math
 import time
-from typing import Any, Dict, List, Literal, NamedTuple, Optional, Tuple, Union
-
 from dataclasses import dataclass
+from typing import Any, Literal, NamedTuple
+
 import sympy
-from sympy import Float
-from sympy import Integer
+from frozendict import frozendict
+from pydantic import (
+    BaseModel,
+    TypeAdapter,
+    computed_field,
+    field_validator,
+    model_validator,
+)
+from sympy import Float, Integer
 from sympy.parsing import sympy_parser
 
-from frozendict import frozendict
-from pydantic import BaseModel, TypeAdapter, field_validator, model_validator, computed_field
 from ms_common import utils
 from ms_common.utils import eprint, time_to_seconds
+
 
 class PowerForecast(BaseModel):
     """
@@ -28,9 +34,11 @@ class PowerForecast(BaseModel):
     reliability : float
         Forecast reliability as a fraction (0-1)
     """
+
     timestamp: float
     nodes_renewable_powered: float
     reliability: float
+
 
 class JobStatus(BaseModel):
     """
@@ -47,10 +55,12 @@ class JobStatus(BaseModel):
     time_ramining : int
         The remaining walltime in seconds for this job
     """
+
     nodes: int
     time_limit: int
     is_using_nodes: bool
     time_remaining: int
+
 
 class TargetStatus(BaseModel):
     """
@@ -66,17 +76,21 @@ class TargetStatus(BaseModel):
         The number of nodes which are available for running jobs
     nodes_unavailable : int
         The number of nodes which are not in used but are not available for running jobs (e.g. due to maintenance)
-    power_forecasts: List[PowerForecast]
+    power_forecasts: list[PowerForecast]
         Information about the (renewable) power forecast to be available for the target
-    jobs_status : List[JobStatus]
+    jobs_status : list[JobStatus]
         Information about the jobs currently running or scheduled on the target's local batch system
     """
+
     timestamp: int
     nodes_in_use: int
-    nodes_available:int
+    nodes_available: int
     nodes_unavailable: int
-    power_forecasts: List[PowerForecast] = [] # Empty by default (Available from external data source)
-    jobs_status: List[JobStatus]
+    power_forecasts: list[
+        PowerForecast
+    ] = []  # Empty by default (Available from external data source)
+    jobs_status: list[JobStatus]
+
 
 class Target(BaseModel):
     """
@@ -88,7 +102,7 @@ class Target(BaseModel):
         The unique identifier of the target also used as its SSH alias
     batch_system : str
         The batch system used by the target, e.g. "slurm", "pbs", "none" (default, direct execution)
-    queue : Optional[str]
+    queue : str | None
         The name of the queue/partition used by the target (if applicable, e.g. for Slurm or PBS)
     host : str
         The hostname used to connect to the target
@@ -98,35 +112,36 @@ class Target(BaseModel):
         The number of CPU cores per compute node for this target
     port : int
         The port used to connect to the target (defaults to default SSH port)
-    max_time : Optional[str]
+    max_time : str | None
         The maximum time for which a job may run on this target formatted as "d-hh:MM:ss"
-    max_nodes : Optional[int]
+    max_nodes : int | None
         The maximum number of compute nodes which may be allocated to a job
-    source_scripts : Tuple[str, ...]
+    source_scripts : tuple[str, ...]
         A list of files which should be sourced after connecting to the target before running any commands
     module_map : Dict[str, str]
         A mapping of abstract environment modules such as "MPI" to concrete ones such as "mpi/openmpi",
         which should be loaded after connecting to the target
-    tags : Tuple[str, ...]
+    tags : tuple[str, ...]
         A list of tags for the target such as "gpu", "x86", "green", etc.
     """
+
     id: str
     batch_system: str = "none"
-    queue: Optional[str] = None
+    queue: str | None = None
     host: str
     nodes: int
     cores_per_node: int
     port: int = utils.DEFAULT_SSH_PORT
-    max_time: Optional[str] = None
-    max_nodes: Optional[int] = None
-    source_scripts: Tuple[str, ...] = ()
+    max_time: str | None = None
+    max_nodes: int | None = None
+    source_scripts: tuple[str, ...] = ()
     _module_map: frozendict[str, str] = frozendict[str, str]()
 
-    @computed_field(return_type=Dict[str, str])
-    def module_map(self) -> Dict[str, str]:
+    @computed_field(return_type=dict[str, str])
+    def module_map(self) -> dict[str, str]:
         """
         Target module mapping (e.g. MPI -> OpenMPI).
-        
+
         Returns
         -------
         Dict[str, str]
@@ -134,12 +149,12 @@ class Target(BaseModel):
         """
         return dict(self._module_map)
 
-    tags: Tuple[str, ...] = ()
+    tags: tuple[str, ...] = ()
 
-    model_config = dict(frozen=True, arbitrary_types_allowed=True)
+    model_config = {"frozen": True, "arbitrary_types_allowed": True}
 
     @field_validator("module_map", mode="before")
-    def convert_module_map(cls, v: Any) -> frozendict[str,str]:
+    def convert_module_map(cls, v: Any) -> frozendict[str, str]:
         """
         Validates "module_map" attribute of the target.
 
@@ -154,7 +169,7 @@ class Target(BaseModel):
             The validated value of the attribute "module_map" assigned to the target
         """
         is_valid = True
-        if isinstance(v, frozendict) or isinstance(v, dict):
+        if isinstance(v, (frozendict, dict)):
             for k, val in v.items():
                 if not isinstance(k, str) or not isinstance(val, str):
                     is_valid = False
@@ -162,21 +177,23 @@ class Target(BaseModel):
         else:
             is_valid = False
         if not is_valid:
-            raise TypeError("\"module_map\" must be a dict or frozendict with keys and values only of type str")
+            raise TypeError(
+                '"module_map" must be a dict or frozendict with keys and values only of type str'
+            )
         return frozendict(v)
 
     def __init__(self: "Target", **data: Any) -> None:
         """Create a new instance of the target objects.
-        
+
         Parameters
         ----------
         data : Any
             Fields of the object to be created (Must contain "module_map")
         """
         # Convert module_map to frozendict during initialization
-        module_map = data.pop('module_map', {})
+        module_map = data.pop("module_map", {})
         super().__init__(**data)
-        object.__setattr__(self, '_module_map', frozendict(module_map))
+        object.__setattr__(self, "_module_map", frozendict(module_map))
 
     @model_validator(mode="after")
     def validate_attributes(cls, target: Any) -> Any:
@@ -226,11 +243,11 @@ class Spec(BaseModel):
     time : str
         The maximum runtime of a job in the array or unrestricted if None (default)
         May be given as formatted duration ("d-hh:MM:SS") or SymPy expression for seconds starting with "=" where p is the total number of cores
-    seconds : Optional[int]
+    seconds : int | None
         The amount of time in seconds that the job may run for (Alternative to parameter "time")
-    cmd_setup_local : Optional[str] = None
+    cmd_setup_local : str | None = None
         The shell command to run on the submit host before the execution of any remote commands
-    cmd_setup_target : Optional[str] = None
+    cmd_setup_target : str | None = None
         The shell command to run before the execution of the main command without using a batch system
     array_size : int
         The number of jobs in the array (defaults to 1)
@@ -240,9 +257,9 @@ class Spec(BaseModel):
         The number of ranks required per node (defaults to 1)
     cores_per_rank : int
         The number of cores required per rank (defaults to 1)
-    required_modules : List[str]
+    required_modules : list[str]
         The list of required abstract environment modules (e.g. "MPI" instead of "openmpi" or "mpi/openmpi")
-    required_tags : List[str]
+    required_tags : list[str]
         The list of required tags (e.g. "x86", "gpu", "green")
     exclusive : bool
         If true, the allocated nodes should only be used by this job
@@ -250,22 +267,21 @@ class Spec(BaseModel):
 
     name: str
     cmd_main: str
-    time: Optional[str] = None
+    time: str | None = None
     seconds: int = 0
-    cmd_setup_local: Optional[str] = None
-    cmd_setup_target: Optional[str] = None
+    cmd_setup_local: str | None = None
+    cmd_setup_target: str | None = None
     array_size: int = 1
     nodes: int = 1
-    ranks_per_node: Optional[int] = None
+    ranks_per_node: int | None = None
     cores_per_rank: int = 1
-    required_modules: List[str] = []
-    required_tags: List[str] = []
+    required_modules: list[str] = []
+    required_tags: list[str] = []
     exclusive: bool = False
 
-    
     def get_target_seconds(self: "Spec", target: Target, array_idx: int) -> int:
         """
-        Get the requested seconds based on a concrete target. 
+        Get the requested seconds based on a concrete target.
         (Evaluates expression if applicable.)
 
         Parameters
@@ -281,21 +297,32 @@ class Spec(BaseModel):
             The duration in seconds
         """
         if self.seconds > 0:
-            return self.seconds # Fixed value
+            return self.seconds  # Fixed value
         else:
             # Expression based value
             assert self.time is not None
             total_cores, idx = sympy.symbols("p,i")
             substitutions = {
-                total_cores: self.nodes * (self.ranks_per_node if self.ranks_per_node else target.cores_per_node),
+                total_cores: self.nodes
+                * (
+                    self.ranks_per_node
+                    if self.ranks_per_node
+                    else target.cores_per_node
+                ),
                 idx: array_idx,
             }
             try:
-                expression = sympy_parser.parse_expr(self.time[1:].strip()).subs(substitutions)
+                expression = sympy_parser.parse_expr(self.time[1:].strip()).subs(
+                    substitutions
+                )
             except SyntaxError as e:
-                assert False, f"Could not parse expression: {e.msg} in \"{e.text}\" at {e.offset}"
-            assert type(expression) in [Integer, Float], "Time expression must evaluate to a number"
-            seconds = int(math.ceil(expression.evalf()))
+                assert False, (
+                    f'Could not parse expression: {e.msg} in "{e.text}" at {e.offset}'
+                )
+            assert type(expression) in [Integer, Float], (
+                "Time expression must evaluate to a number"
+            )
+            seconds = int(math.ceil(expression.evalf()))  # noqa: RUF046
             return seconds
 
     @model_validator(mode="after")
@@ -326,17 +353,20 @@ class Spec(BaseModel):
             spec.time = None
         if spec.seconds < 0:
             raise ValueError('Duration ("time" or "seconds") must be a positive value')
+
         @dataclass
         class MockTarget:
             """
             Stand in for target objects used to resolve the job seconds to request.
             (Only used here for validation.)
             """
-            nodes=1
-            cores_per_node=1
+
+            nodes = 1
+            cores_per_node = 1
+
         # Evaluate expression (force potential expression error)
         spec.get_target_seconds(MockTarget, 0)
-        for k,v in {
+        for k, v in {
             spec.array_size: "Array size",
             spec.nodes: "Node count",
             spec.ranks_per_node: "Ranks per node",
@@ -353,13 +383,13 @@ class ScheduleRequest(BaseModel):
 
     Attributes
     ----------
-    available_targets : List[str]
+    available_targets : list[str]
         The target identifiers of all targets which the jobs may be scheduled on
     job_spec : JobSpec
         The specification of the job array
     """
 
-    available_targets: List[str]
+    available_targets: list[str]
     job_spec: Spec
 
 
@@ -376,6 +406,7 @@ class ScheduleResponse(BaseModel):
     token : str
         The random string required to look up the jobs in the array
     """
+
     array_id: int
     array_size: int
     token: str
@@ -394,6 +425,7 @@ class JobKey(NamedTuple):
     array_idx : int
         The index of the job within its array
     """
+
     token: str
     array_id: int
     array_idx: int
@@ -401,23 +433,25 @@ class JobKey(NamedTuple):
     def __str__(self: "JobKey") -> str:
         return f"{self.token}_{self.array_id}_{self.array_idx}"
 
+
 class Impossible(BaseModel):
     """Scheduling decision indicating that a job cannot be scheduled (as requested).
-    
+
     Attributes
     ----------
     type : str
         The type of the scheduling decision ("impossible")
-    reason : Optional[str]
+    reason : str | None
         An optional reason of why the job could not be scheduled
     """
+
     type: Literal["impossible"] = "impossible"
-    reason: Optional[str] = None
+    reason: str | None = None
 
 
 class Assigned(BaseModel):
     """Scheduling decision indicating an assignment to a target for execution of the job.
-        
+
     Attributes
     ----------
     type : str
@@ -427,13 +461,13 @@ class Assigned(BaseModel):
     timestamp_start : int
         The timestamp when the job may be started (unix epoch in seconds)
     """
+
     type: Literal["assigned"] = "assigned"
     target_id: str
     timestamp_start: int = int(time.time())
 
 
-
-SchedulingDecisionType = Union[Impossible, Assigned]
+SchedulingDecisionType = Impossible | Assigned
 
 
 class SchedulingDecision:
@@ -444,7 +478,7 @@ class SchedulingDecision:
         raise NotImplementedError("SchedulingDecision is a type alias, not a class.")
 
     @staticmethod
-    def parse(data: Dict[str, Any]) -> SchedulingDecisionType:
+    def parse(data: dict[str, Any]) -> SchedulingDecisionType:
         """Parse a scheduling decision from a dictionary.
 
         Parameters
@@ -457,5 +491,7 @@ class SchedulingDecision:
         SchedulingDecisionType
             The parsed scheduling decision object
         """
-        adapter: TypeAdapter[SchedulingDecisionType] = TypeAdapter(SchedulingDecisionType)
+        adapter: TypeAdapter[SchedulingDecisionType] = TypeAdapter(
+            SchedulingDecisionType
+        )
         return adapter.validate_python(data)

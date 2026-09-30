@@ -1,7 +1,5 @@
 """Module containing a dummy scheduling policy for testing and development."""
 
-from typing import List
-
 from ms_common.schemas import Assigned, Impossible, SchedulingDecisionType
 
 from ms_server.model import Job, TargetsStatus
@@ -14,7 +12,7 @@ class Dummy(GreedyPolicy):
     async def schedule_job(
         self: "Dummy",
         job: Job,
-        decided_jobs: List[Job],
+        decided_jobs: list[Job],
         targets_status: TargetsStatus,
     ) -> None:
         """
@@ -24,7 +22,7 @@ class Dummy(GreedyPolicy):
         ----------
         job : Job
             The job to schedule
-        decided_jobs : List[Job]
+        decided_jobs : list[Job]
             The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available

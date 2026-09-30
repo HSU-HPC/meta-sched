@@ -1,7 +1,9 @@
 """Module containing the configuration for the Meta Scheduler client."""
 
+from __future__ import annotations
+
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import tomli
 from pydantic import BaseModel, Field, model_validator
@@ -17,19 +19,19 @@ class TargetAdditionalConfigs(BaseModel):
     ----------
     id : str
         The target ID
-    tags : Tuple[str, ...]
+    tags : tuple[str, ...]
         Additional user defined tags to filter this target by
-    datacenter_api_endpoint : Optional[str]
+    datacenter_api_endpoint : str | None
         HTTP endpoint for the datacenter API of this target
         (Used to fetch additional data about the state of the target)
-    datacenter_api_forecast_source_id : Optional[int]
+    datacenter_api_forecast_source_id : int | None
         The ID of the forecast source to use at the datacenter API for this target
     """
 
     id: str
     tags: tuple[str, ...] = ()
-    datacenter_api_endpoint: Optional[str] = None
-    datacenter_api_forecast_source_id: Optional[int] = None
+    datacenter_api_endpoint: str | None = None
+    datacenter_api_forecast_source_id: int | None = None
 
     @model_validator(mode="after")
     def validate_attributes(cls, config: Any) -> Any:
@@ -70,7 +72,7 @@ class Config(BaseModel):
     host : str
         The host of the Meta Scheduler server
     port : int
-    targets: List[_TargetAdditionalConfigs]
+    targets: list[_TargetAdditionalConfigs]
         Additional user configurations for targets from the Meta Scheduler server
     """
 
@@ -102,7 +104,7 @@ class Config(BaseModel):
         return config
 
     @property
-    def endpoint(self: "Config") -> str:
+    def endpoint(self: Config) -> str:
         """
         Get the full endpoint URL of the Meta Scheduler server.
 
@@ -114,7 +116,7 @@ class Config(BaseModel):
         return f"{self.protocol}://{self.host}:{self.port}"
 
     @classmethod
-    def load(cls, raise_on_missing: bool = False) -> "Config":
+    def load(cls, raise_on_missing: bool = False) -> Config:
         """
         Load and validate the client configuration.
 

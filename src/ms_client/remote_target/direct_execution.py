@@ -1,5 +1,7 @@
 """Module containing class for remote target without a batch system."""
 
+from __future__ import annotations
+
 from typing import Any
 
 from ms_client.job import Instance as Job
@@ -11,10 +13,10 @@ class DirectExecutionRemoteTarget(RemoteTarget):
     """RemoteTarget implementation a target without any batch system."""
 
     def _execute(
-        self: "DirectExecutionRemoteTarget",
+        self: DirectExecutionRemoteTarget,
         job: Job,
         callbacks: RemoteTarget.JobExecutionCallbacks,
-        env: dict[str, Any] = {},
+        env: dict[str, Any] | None = None,
     ) -> int:
         """
         Execute the job directly on the target.
@@ -40,6 +42,8 @@ class DirectExecutionRemoteTarget(RemoteTarget):
 
         # TODO avoid long running SSH connection using nohup
 
+        if env is None:
+            env = {}
         cmd = job.spec.cmd_main
         callbacks.on_start()
         try:

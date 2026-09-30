@@ -14,8 +14,8 @@ import os
 import shutil
 import subprocess
 import sys
+from contextlib import AbstractContextManager
 from pathlib import Path
-from typing import ContextManager
 
 import pandas as pd
 
@@ -38,7 +38,7 @@ def get_slots_per_node() -> int:
 
 
 def run_benchmark(
-    cores: int, film_width: float, sample: int, lock: ContextManager[None]
+    cores: int, film_width: float, sample: int, lock: AbstractContextManager[None]
 ) -> None:
     """Run the scenario (run_scenario.py) and append the results to the benchmark file."""
     seconds = float("nan")
@@ -101,9 +101,7 @@ def run_benchmark(
         raise
 
     with lock, open(benchmarks_path, "a") as file:
-        file.write(
-            ",".join(map(str, [cores, film_width, n_steps, sample, seconds]))
-        )
+        file.write(",".join(map(str, [cores, film_width, n_steps, sample, seconds])))
         file.write("\n")
         file.flush()
     print(
@@ -139,9 +137,7 @@ def main() -> None:
     min_cores = int(min_nodes * cores_per_node)
     df = None
     if not benchmarks_path.exists():
-        benchmarks_path.write_text(
-            ",".join(["cores", "film_width", "steps", "sample", "seconds"]) + "\n"
-        )
+        benchmarks_path.write_text("cores,film_width,steps,sample,seconds" + "\n")
     df = pd.read_csv(benchmarks_path)
     cores = max_cores * 2
     benchmark_parameters = []

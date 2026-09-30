@@ -32,7 +32,7 @@ def get_config_paths() -> tuple[Path, Path]:
 
     Returns
     -------
-    Tuple[Path, Path]
+    tuple[Path, Path]
         the paths of the main and meta scheduler SSH configuration file of the current user
     """
     dir_path = Path.home() / ".ssh"

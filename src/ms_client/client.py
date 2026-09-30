@@ -49,7 +49,7 @@ class Client(SchedulerClientInterface):
         response: requests.Response
         try:
             response = requests.get(f"{self.__endpoint}/version")
-        except Exception:
+        except requests.RequestException:
             raise RuntimeError(
                 f"Could not check server version at {self.__endpoint}. (Is it running?)"
             )
@@ -92,7 +92,7 @@ class Client(SchedulerClientInterface):
 
         Returns
         -------
-        List[Target]
+        list[Target]
             The list of all targets which jobs may be assigned to
         """
         response = requests.get(f"{self.__endpoint}/targets")
@@ -111,7 +111,7 @@ class Client(SchedulerClientInterface):
         ----------
         job_spec : Spec
             The job specification
-        available_targets : List[str]
+        available_targets : list[str]
             List of identifiers of targets available to the client for job submission
 
         Returns
@@ -253,7 +253,7 @@ class Client(SchedulerClientInterface):
         ----------
         job_key : JobKey
             The token, array id, and array index required to look up the job
-        available_targets : Set[str]
+        available_targets : set[str]
             The set of target IDs which this job may be assigned to
         """
         token, array_id, array_idx = job_key

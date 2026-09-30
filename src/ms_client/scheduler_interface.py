@@ -22,7 +22,7 @@ class SchedulerClientInterface(abc.ABC):
 
         Returns
         -------
-        List[Target]
+        list[Target]
             The list of all targets which jobs may be assigned to
 
         Raises
@@ -43,7 +43,7 @@ class SchedulerClientInterface(abc.ABC):
         ----------
         job_spec : Spec
             The job specification
-        available_targets : List[str]
+        available_targets : list[str]
             List of identifiers of targets available to the client for job submission
 
         Returns

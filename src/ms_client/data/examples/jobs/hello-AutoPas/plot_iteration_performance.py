@@ -2,9 +2,10 @@
 
 """Plot iteration performance of AutoPas (CSV)."""
 
+from __future__ import annotations
+
 import sys
 from pathlib import Path
-from typing import Union
 
 import matplotlib.pyplot as plt  # type:ignore[import-not-found]
 import pandas as pd
@@ -12,7 +13,7 @@ from matplotlib.lines import Line2D  # type:ignore[import-not-found]
 
 
 def plot_tuning_phases(
-    csv_path: Union[str, Path],
+    csv_path: str | Path,
     x_col: str = "ThreadCount",
     y_col: str = "energyJoules[J]",
     num_plots: int = 4,
@@ -42,7 +43,7 @@ def plot_tuning_phases(
     tuning_df = df[df["inTuningPhase"]].copy()
 
     config_cols = list(
-        df.columns[df.columns.get_loc("Container") : df.columns.get_loc("ThreadCount")]  # type: ignore[misc]
+        df.columns[df.columns.get_loc("Container") : df.columns.get_loc("ThreadCount")]
     )
 
     tuning_df["cluster"] = tuning_df[config_cols].astype(str).agg("|".join, axis=1)
@@ -175,7 +176,7 @@ def plot_tuning_phases(
 if __name__ == "__main__":
     try:
         plot_tuning_phases(sys.argv[1])
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print("Error:", e, file=sys.stderr)
         print(f"Usage: {sys.argv[0]} path/to/iterationPerformance.csv", file=sys.stderr)
         sys.exit(1)

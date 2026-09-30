@@ -8,9 +8,10 @@ import secrets
 import string
 import sys
 import time
+from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import Any, AsyncGenerator, Optional
+from typing import Any
 
 import ms_common
 import ms_common.schemas
@@ -164,14 +165,14 @@ def main() -> int:
         scheduling_decision : SchedulingDecisionType
             The scheduling decision that should be applied to the job
         """
-        seconds: Optional[int] = None
+        seconds: int | None = None
         if isinstance(scheduling_decision, ms_common.schemas.Assigned):
             target = targets[scheduling_decision.target_id]
             job = await model.get_job(job_key)
             seconds = job.spec.get_target_seconds(target, job.array_idx)
         await model.update_job(
             job_key,
-            dict(scheduling_decision=scheduling_decision, requested_seconds=seconds),
+            {"scheduling_decision": scheduling_decision, "requested_seconds": seconds},
         )
 
     scheduler: Policy = config.scheduler_class(on_schedule_job)

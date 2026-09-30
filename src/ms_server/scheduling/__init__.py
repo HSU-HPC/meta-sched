@@ -1,6 +1,6 @@
 """Module containing the base class for implementing scheduling policies."""
 
-from typing import Awaitable, Callable, List
+from collections.abc import Awaitable, Callable
 
 from ms_common.schemas import JobKey, SchedulingDecisionType
 
@@ -29,8 +29,8 @@ class Policy:
 
     async def update(
         self: "Policy",
-        pending_jobs: List[Job],
-        decided_jobs: List[Job],
+        pending_jobs: list[Job],
+        decided_jobs: list[Job],
         targets_status: TargetsStatus,
     ) -> None:
         """
@@ -38,9 +38,9 @@ class Policy:
 
         Parameters
         ----------
-        pending_jobs : List[Job]
+        pending_jobs : list[Job]
             The jobs which are pending scheduling
-        decided_jobs : List[Job]
+        decided_jobs : list[Job]
             The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available
@@ -60,7 +60,7 @@ class GreedyPolicy(Policy):
     async def schedule_job(
         self: "GreedyPolicy",
         job: Job,
-        decided_jobs: List[Job],
+        decided_jobs: list[Job],
         targets_status: TargetsStatus,
     ) -> None:
         """
@@ -70,7 +70,7 @@ class GreedyPolicy(Policy):
         ----------
         job : Job
             The job to schedule
-        decided_jobs : List[Job]
+        decided_jobs : list[Job]
             The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available
@@ -84,8 +84,8 @@ class GreedyPolicy(Policy):
 
     async def update(
         self: "GreedyPolicy",
-        pending_jobs: List[Job],
-        decided_jobs: List[Job],
+        pending_jobs: list[Job],
+        decided_jobs: list[Job],
         targets_status: TargetsStatus,
     ) -> None:
         """
@@ -93,9 +93,9 @@ class GreedyPolicy(Policy):
 
         Parameters
         ----------
-        pending_jobs : List[Job]
+        pending_jobs : list[Job]
             The jobs which are pending scheduling
-        decided_jobs : List[Job]
+        decided_jobs : list[Job]
             The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available

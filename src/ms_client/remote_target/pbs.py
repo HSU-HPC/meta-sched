@@ -1,8 +1,10 @@
 """Module containing class for remote target using the PBS Pro/OpenPBS batch system."""
 
+from __future__ import annotations
+
 import sys
 import time
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
 from fabric import Connection  # type: ignore[attr-defined]
@@ -19,7 +21,7 @@ class PBSRemoteTarget(BatchSystemTarget):
     """RemoteTarget implementation for a PBS Pro/OpenPBS system."""
 
     def _submit_job(
-        self: "PBSRemoteTarget",
+        self: PBSRemoteTarget,
         connection: Connection,
         job: Job,
         oe: tuple[str, str],
@@ -34,7 +36,7 @@ class PBSRemoteTarget(BatchSystemTarget):
             The SSH connection to the remote target
         job : Job
             The job to be executed
-        oe : Tuple[str, str]
+        oe : tuple[str, str]
             The filename for the output and error files to be used by the job
         env : Dict[str, Any]
             Environment variables to be set
@@ -88,7 +90,7 @@ class PBSRemoteTarget(BatchSystemTarget):
         return str(pbs_job_id)
 
     def _has_job_started(
-        self: "PBSRemoteTarget", connection: Connection, local_job_id: str
+        self: PBSRemoteTarget, connection: Connection, local_job_id: str
     ) -> bool:
         """
         Check if the job has started being executed by the batch system.
@@ -113,8 +115,8 @@ class PBSRemoteTarget(BatchSystemTarget):
         )
 
     def _get_job_start_time(
-        self: "PBSRemoteTarget", connection: Connection, local_job_id: str
-    ) -> Optional[int]:
+        self: PBSRemoteTarget, connection: Connection, local_job_id: str
+    ) -> int | None:
         """
         Get the timestamp of when the job started executing.
 
@@ -127,21 +129,21 @@ class PBSRemoteTarget(BatchSystemTarget):
 
         Returns
         -------
-        Optional[int]
+        int | None
             The unix timestamp (seconds since epoch) of when the job has started or None if it could not be determined
         """
         timestamp_start = None
+        cmd = (
+            "qstat PBS_JOB_ID -xf | grep 'stime = ' | sed 's/.*stime = //' | xargs -I{} date -d \"{}\" +%s"
+        ).replace("PBS_JOB_ID", local_job_id)
         try:
-            cmd = (
-                "qstat PBS_JOB_ID -xf | grep 'stime = ' | sed 's/.*stime = //' | xargs -I{} date -d \"{}\" +%s"
-            ).replace("PBS_JOB_ID", local_job_id)
             timestamp_start = int(self._run(connection, cmd, hide=True).stdout)
-        except Exception:
-            pass
+        except ValueError:
+            return None
         return timestamp_start
 
     def _has_job_ended(
-        self: "PBSRemoteTarget", connection: Connection, local_job_id: str
+        self: PBSRemoteTarget, connection: Connection, local_job_id: str
     ) -> bool:
         """
         Check if the job has stopped being executed by the batch system.
@@ -163,8 +165,8 @@ class PBSRemoteTarget(BatchSystemTarget):
         return len(result.stdout.strip()) == 0
 
     def _get_job_end_time(
-        self: "PBSRemoteTarget", connection: Connection, local_job_id: str
-    ) -> Optional[int]:
+        self: PBSRemoteTarget, connection: Connection, local_job_id: str
+    ) -> int | None:
         """
         Get the timestamp of when the job stopped executing.
 
@@ -177,7 +179,7 @@ class PBSRemoteTarget(BatchSystemTarget):
 
         Returns
         -------
-        Optional[int]
+        int | None
             The unix timestamp (seconds since epoch) of when the job has stopped executing or None if it could not be determined
         """
         walltime_fmtd = (
@@ -192,14 +194,15 @@ class PBSRemoteTarget(BatchSystemTarget):
         timestamp_end = None
         try:
             timestamp_start = self._get_job_start_time(connection, local_job_id)
-            assert timestamp_start is not None
+            if timestamp_start is None:
+                return None
             timestamp_end = timestamp_start + utils.time_to_seconds(walltime_fmtd)
-        except Exception:
-            pass
+        except (TypeError, ValueError):
+            return None
         return timestamp_end
 
     def _cancel_job(
-        self: "PBSRemoteTarget", connection: Connection, local_job_id: str
+        self: PBSRemoteTarget, connection: Connection, local_job_id: str
     ) -> None:
         """
         Cancel the job submitted to the batch system.
@@ -214,8 +217,8 @@ class PBSRemoteTarget(BatchSystemTarget):
         expect_ok(self._run(connection, f"qdel {local_job_id}").exited)
 
     def _get_job_exit_code(
-        self: "PBSRemoteTarget", connection: Connection, local_job_id: str
-    ) -> Optional[int]:
+        self: PBSRemoteTarget, connection: Connection, local_job_id: str
+    ) -> int | None:
         """
         Check if the job has started being executed by the batch system.
 
@@ -228,7 +231,7 @@ class PBSRemoteTarget(BatchSystemTarget):
 
         Returns
         -------
-        Optional[int]
+        int | None
             The exit code of the job or None if it could not be determined
         """
         exit_code = None
@@ -248,11 +251,11 @@ class PBSRemoteTarget(BatchSystemTarget):
                     has_exit_code = True
                     break
             assert has_exit_code
-        except Exception:
+        except (AssertionError, ValueError, IndexError):
             eprint(f"Job completed, but could not determine exit code using {cmd}:")
         return exit_code
 
-    def get_status(self: "PBSRemoteTarget") -> TargetStatus:
+    def get_status(self: PBSRemoteTarget) -> TargetStatus:
         """
         Get the status of the remote PBS target.
 
@@ -273,12 +276,12 @@ class PBSRemoteTarget(BatchSystemTarget):
         output = self._run(
             self._get_connection(), cmd, hide=True, out_stream=None
         ).stdout.strip()
-        qstat_job_fields = dict(
-            nodes="Resource_List.nodect",
-            time_limit="Resource_List.walltime",
-            state="job_state",
-            time="resources_used.walltime",
-        )
+        qstat_job_fields = {
+            "nodes": "Resource_List.nodect",
+            "time_limit": "Resource_List.walltime",
+            "state": "job_state",
+            "time": "resources_used.walltime",
+        }
         data: dict[str, list[str]] = {k: [] for k in qstat_job_fields}
         qstat_job_fields = {v: k for k, v in qstat_job_fields.items()}
         job_ids = [s.strip() for s in output.splitlines()]
@@ -294,13 +297,15 @@ class PBSRemoteTarget(BatchSystemTarget):
                     "0"
                 )  # Job has not started and has no "resources_used.walltime"
                 continue
-            try:
-                assert line is not None
-                k, v = line.strip().split(" = ")
-                k = qstat_job_fields[k]
-                data[k].append(v)
-            except Exception:
+            if line is None:
                 continue
+            parts = line.strip().split(" = ")
+            if len(parts) != 2:
+                continue
+            key, value = parts
+            data_key = qstat_job_fields.get(key)
+            if data_key is not None:
+                data[data_key].append(value)
         df = pd.DataFrame(data)
         df["time_limit"] = df["time_limit"].apply(lambda s: time_to_seconds(s))
         df["time"] = df["time"].apply(lambda s: time_to_seconds(s))
@@ -341,11 +346,11 @@ class PBSRemoteTarget(BatchSystemTarget):
                     nodes_state.append(state)
                 is_node_in_queue = False
                 state = ["state-unknown"]
-        node_states = dict(
-            nodes_in_use=0,
-            nodes_unavailable=0,
-            nodes_available=0,
-        )
+        node_states = {
+            "nodes_in_use": 0,
+            "nodes_unavailable": 0,
+            "nodes_available": 0,
+        }
         for node_state in nodes_state:
             # https://linux.die.net/man/8/pbsnodes
             if any(s in node_state for s in ["job-exclusive", "reserved", "busy"]):

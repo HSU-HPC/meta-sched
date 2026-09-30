@@ -1,9 +1,11 @@
 """Module containing functions and classes related to the jobs executed by the Meta Scheduler client component."""
 
+from __future__ import annotations
+
 import abc
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
 import tomli
@@ -34,7 +36,7 @@ def list_job_spec_names() -> list[str]:
 
     Returns
     -------
-    List[str]
+    list[str]
         A list of job specification names
     """
     if not get_jobs_dir().is_dir():
@@ -100,7 +102,7 @@ def get_job_outputs() -> pd.DataFrame:
 
     rows = []
 
-    def get_pid(job_output_path: Path) -> Optional[int]:
+    def get_pid(job_output_path: Path) -> int | None:
         """
         Get the PID for the process executing a job on the submit host.
 
@@ -111,7 +113,7 @@ def get_job_outputs() -> pd.DataFrame:
 
         Returns
         -------
-        Optional[int]
+        int | None
             The PID if the job is running or None
         """
         pid_file = job_output_path / ".pid"
@@ -119,10 +121,10 @@ def get_job_outputs() -> pd.DataFrame:
             return None
         try:
             return int(pid_file.read_text())
-        except Exception:
+        except (OSError, TypeError, ValueError, UnicodeError):
             return None
 
-    def get_status(job_output_path: Path) -> Optional[str]:
+    def get_status(job_output_path: Path) -> str | None:
         """
         Get the status of the job on the submit host.
 
@@ -133,7 +135,7 @@ def get_job_outputs() -> pd.DataFrame:
 
         Returns
         -------
-        Optional[str]
+        str | None
             The status of the job or None if unknown
         """
         status_file = job_output_path / ".status"
@@ -158,17 +160,17 @@ def get_job_outputs() -> pd.DataFrame:
                 except ValueError:
                     continue
                 rows.append(
-                    dict(
-                        job_spec=job_spec,
-                        array_id=array_id,
-                        array_idx=array_idx,
-                    )
+                    {
+                        "job_spec": job_spec,
+                        "array_id": array_id,
+                        "array_idx": array_idx,
+                    }
                 )
 
-    column_types = dict(job_spec=str, array_id=int, array_idx=int)
+    column_types = {"job_spec": str, "array_id": int, "array_idx": int}
     df = pd.DataFrame(rows).astype(column_types)
 
-    def get_job_output(row: pd.Series) -> Path:  # type: ignore[type-arg]
+    def get_job_output(row: pd.Series) -> Path:
         """Wrapper for _get_job_output(...) for use with df.apply"""
         return _get_job_output(*row)
 
@@ -178,7 +180,7 @@ def get_job_outputs() -> pd.DataFrame:
     # Try to interpret array_id as int to allow for correct sorting
     try:
         df["array_id"] = df["array_id"].astype(int)
-    except Exception:
+    except (TypeError, ValueError):
         eprint("Non integer array_id may result in incorrect sorting")
     df.set_index(["array_id", "array_idx"], inplace=True)
     job_ids = pd.Series([f"{i[0]}_{i[1]}" for i in df.index.values], index=df.index)
@@ -193,7 +195,7 @@ class Status(abc.ABC):
     class _Enum:
         """The base class for the status of a job."""
 
-        def __init__(self: "Status._Enum") -> None:
+        def __init__(self: Status._Enum) -> None:
             """
             Create a new instance of a job status.
 
@@ -206,7 +208,7 @@ class Status(abc.ABC):
                 raise NotImplementedError()
             self._data: Any = []
 
-        def __str__(self: "Status._Enum") -> str:
+        def __str__(self: Status._Enum) -> str:
             return " ".join(
                 [self.__class__.__name__.lower()] + [str(x) for x in self._data]
             )
@@ -214,11 +216,10 @@ class Status(abc.ABC):
     class Unknown(_Enum):
         """Class representing a job that has an unknown state (which should only be temporary)."""
 
-
     class Scheduled(_Enum):
         """State representing a job that has been assigned to a target but is not yet running."""
 
-        def __init__(self: "Status._Enum", target_id: str) -> None:
+        def __init__(self: Status._Enum, target_id: str) -> None:
             """
             Create a new instance of a state representing a scheduled job.
 
@@ -232,7 +233,7 @@ class Status(abc.ABC):
     class Running(_Enum):
         """Class representing a job that is currently running on a target."""
 
-        def __init__(self: "Status._Enum", target_id: str) -> None:
+        def __init__(self: Status._Enum, target_id: str) -> None:
             """
             Create a new instance of a state representing a running job.
 
@@ -246,7 +247,7 @@ class Status(abc.ABC):
     class Completed(_Enum):
         """Class representing a job that has successfully exited."""
 
-        def __init__(self: "Status._Enum", status: int = 0) -> None:
+        def __init__(self: Status._Enum, status: int = 0) -> None:
             """
             Create a new instance of a state representing a failed job.
 
@@ -257,21 +258,19 @@ class Status(abc.ABC):
             """
             self._data = [status]
 
-        def __str__(self: "Status._Enum") -> str:
+        def __str__(self: Status._Enum) -> str:
             return f"completed ({'?' if self._data[0] == -1 else self._data[0]})"
 
     class Completing(_Enum):
         """Class representing a job that has successfully finished executing with some pending operations (e.g. downloading results)."""
 
-
     class Pending(_Enum):
         """Class representing a job that has been submitted but not yet assigned to a target."""
-
 
     class Failed(_Enum):
         """Class representing a job that was started on a target but has exited unsuccessfully."""
 
-        def __init__(self: "Status._Enum", status: int) -> None:
+        def __init__(self: Status._Enum, status: int) -> None:
             """
             Create a new instance of a state representing a failed job.
 
@@ -282,12 +281,11 @@ class Status(abc.ABC):
             """
             self._data = [status]
 
-        def __str__(self: "Status._Enum") -> str:
+        def __str__(self: Status._Enum) -> str:
             return f"failed ({self._data[0]})"
 
     class Canceled(_Enum):
         """Class representing a job that was cancelled by the user."""
-
 
 
 @dataclass(frozen=True)
@@ -310,7 +308,7 @@ class Instance:
     array_idx: int
 
     @property
-    def local_output(self: "Instance") -> Path:
+    def local_output(self: Instance) -> Path:
         """
         Get the relative path to the output files of the job on the submit host.
 
@@ -324,7 +322,7 @@ class Instance:
         )
 
     @property
-    def local_dir(self: "Instance") -> Path:
+    def local_dir(self: Instance) -> Path:
         """
         Get the relative path to the directory containing the files of the job on the submit host.
 
@@ -336,7 +334,7 @@ class Instance:
         return get_jobs_dir(hidden=False) / self.spec.name
 
     @property
-    def local_input(self: "Instance") -> Path:
+    def local_input(self: Instance) -> Path:
         """
         Get the relative path to the input files of the job on the submit host.
 
@@ -348,7 +346,7 @@ class Instance:
         return self.local_dir / "input"
 
     @property
-    def remote_output(self: "Instance") -> Path:
+    def remote_output(self: Instance) -> Path:
         """
         Get the relative path to the output files of the job on the target.
 
@@ -362,7 +360,7 @@ class Instance:
         )
 
     @property
-    def remote_input(self: "Instance") -> Path:
+    def remote_input(self: Instance) -> Path:
         """
         Get the relative path to the input files of the job on the target.
 
@@ -373,7 +371,7 @@ class Instance:
         """
         return get_jobs_dir(hidden=True) / self.spec.name / "input"
 
-    def set_status(self: "Instance", status: Status._Enum) -> None:
+    def set_status(self: Instance, status: Status._Enum) -> None:
         """
         Update the status of the job on the submit host.
 

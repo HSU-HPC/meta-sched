@@ -10,6 +10,8 @@
 
 """Module containing the datacenter API client code."""
 
+from __future__ import annotations
+
 import argparse
 import http
 import json
@@ -17,9 +19,9 @@ import os
 import sys
 import warnings
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import UTC, datetime, timezone
 from pathlib import Path
-from typing import Any, Optional, Union
+from typing import Any
 
 import pandas as pd
 import requests
@@ -51,9 +53,7 @@ class _ApiResource:
     Resource which can be requested through the API
     """
 
-    def __init__(
-        self: "_ApiResource", id: int, apiArgs: Optional[ApiArgs] = None
-    ) -> None:
+    def __init__(self: _ApiResource, id: int, apiArgs: ApiArgs | None = None) -> None:
         """
         Create a new instance of an _ApiResource.
 
@@ -61,7 +61,7 @@ class _ApiResource:
         ----------
         id : int
             The id of the resource of that type
-        apiArgs : Optional[ApiArgs]
+        apiArgs : ApiArgs | None
             The API args for requesting data belonging to this resource from the API
         """
         if type(self).__name__ == "_ApiResource":
@@ -70,7 +70,7 @@ class _ApiResource:
         self._apiArgs = apiArgs
 
     @property
-    def id(self: "_ApiResource") -> int:
+    def id(self: _ApiResource) -> int:
         """
         The ID the resource for this type
 
@@ -81,11 +81,11 @@ class _ApiResource:
         """
         return self._id
 
-    def __repr__(self: "_ApiResource") -> str:
+    def __repr__(self: _ApiResource) -> str:
         return f"<{type(self).__name__} #{self.id}>"
 
     def _get(
-        self: "_ApiResource",
+        self: _ApiResource,
         path: str,
         is_retry: bool = False,
         debug_stdout: bool = False,
@@ -126,7 +126,7 @@ class _ApiResource:
                     response = requests.post(
                         self._apiArgs.endpoint + "/login",
                         headers={"Content-Type": "application/json"},
-                        json=dict(email=username, password=password),
+                        json={"email": username, "password": password},
                         verify=self._apiArgs.verify_cert,
                     )
                     response.raise_for_status()
@@ -146,7 +146,7 @@ class _ApiResource:
             response = requests.get(
                 url,
                 *args,
-                **kwargs | dict(verify=self._apiArgs.verify_cert),
+                **kwargs | {"verify": self._apiArgs.verify_cert},
             )
             if (
                 response.status_code == http.HTTPStatus.UNAUTHORIZED
@@ -185,44 +185,52 @@ class Forecast:
     reliability: float
 
     @staticmethod
-    def forecasts_to_dataframe(forecasts: list["Forecast"]) -> pd.DataFrame:
+    def forecasts_to_dataframe(
+        forecasts: list[Forecast], tz: timezone | None = None
+    ) -> pd.DataFrame:
         """
         Convert list of forecasts to a Pandas dataframe with the corresponding columns.
 
         Parameters
         ----------
-        forecasts : List[Forecast]
+        forecasts : list[Forecast]
             The list of forecasts to be included in the dataframe
+        tz : timezone
+            The optional timezone used when loading the timestamp
 
         Returns
         -------
         pd.DataFrame
             The dataframe containing the forecast data
         """
-        timestamp = [datetime.fromtimestamp(f.timestamp) for f in forecasts]
+        timestamp = [datetime.fromtimestamp(f.timestamp, tz) for f in forecasts]
         renewable_powered = [f.renewable_powered for f in forecasts]
         reliability = [f.reliability for f in forecasts]
         return pd.DataFrame(
-            dict(
-                timestamp=timestamp,
-                renewable_powered=renewable_powered,
-                reliability=reliability,
-            )
+            {
+                "timestamp": timestamp,
+                "renewable_powered": renewable_powered,
+                "reliability": reliability,
+            }
         )
 
     @staticmethod
     def plot_forecasts(
-        forecasts: list["Forecast"], title: Optional[Union[bool, str]] = True
+        forecasts: list[Forecast],
+        title: bool | str | None = True,
+        tz: timezone | None = None,
     ) -> None:
         """
         Plot and show a list of forecasts using Matplotlib.
 
         Parameters
         ----------
-        forecasts : List[Forecast]
+        forecasts : list[Forecast]
             The list of forecasts to be plotted
-        title : Union[bool, Optional[str]]
+        title : bool |  str | None
             Optional title of the figure or "Forecast" if True
+        tz : timezone
+            The optional timezone used when loading the timestamp
         """
         try:
             import matplotlib.dates as mdates  # type: ignore[import-not-found]
@@ -235,7 +243,7 @@ class Forecast:
             print("(Did you forget to install it?)")
             return
 
-        df = Forecast.forecasts_to_dataframe(forecasts)
+        df = Forecast.forecasts_to_dataframe(forecasts, tz)
         plt.step(df["timestamp"], df["renewable_powered"], "C0")
         plt.ylim(-0.5, df["renewable_powered"].max() + 0.5)
         plt.ylabel("Renewable Powered", color="C0")
@@ -258,22 +266,20 @@ class ForecastSource(_ApiResource):
     """Class representing a forecast source in the API."""
 
     # Currently unused
-    def get_forecasts(self: "ForecastSource") -> tuple[list[Forecast], float]:
+    def get_forecasts(self: ForecastSource) -> tuple[list[Forecast], float]:
         """
         Fetch forecasts from the forecast source.
 
         Returns
         -------
-        Tuple[List[Forecast], float]
+        tuple[list[Forecast], float]
             List of forecasts and the current timestamp (determination)
         """
         forecasts = []
         forecasts_raw = self._get(f"/forecast/{self.id}")
         if "determination" not in forecasts_raw:
             raise ValueError(f"Could not get forecasts for source id {self.id}.")
-        determination = datetime.fromisoformat(
-            forecasts_raw["determination"].replace("Z", "+00:00")
-        )
+        determination = datetime.fromisoformat(forecasts_raw["determination"])
         determination_timestamp = determination.timestamp()
         for forecast_raw in forecasts_raw["forecast_list"]:
             forecasts.append(
@@ -290,7 +296,7 @@ class ForecastSource(_ApiResource):
 class Site(_ApiResource):
     """Class representing a site in the API."""
 
-    def __init__(self: "Site", id: int, apiArgs: Optional[ApiArgs] = None) -> None:
+    def __init__(self: Site, id: int, apiArgs: ApiArgs | None = None) -> None:
         """
         Create a new instance of a site.
 
@@ -298,20 +304,20 @@ class Site(_ApiResource):
         ----------
         id : int
             The id of the site
-        apiArgs : Optional[ApiArgs]
+        apiArgs : ApiArgs | None
             The optional API arguments
         """
         super().__init__(id, apiArgs)
         site = self._get(f"/sites/{self.id}")
         self.name = site["name"]
-        self.resources = set([Resource(i, apiArgs) for i in site["resources"]])
+        self.resources = {Resource(i, apiArgs) for i in site["resources"]}
 
 
 class Resource(_ApiResource):
     """Class representing a resource in the API."""
 
     # Currently unused
-    def get_data(self: "Resource") -> Any:
+    def get_data(self: Resource) -> Any:
         """Fetch the resource data.
 
         Returns
@@ -328,7 +334,7 @@ class Contract(_ApiResource):
     """
 
     def __init__(
-        self: "Contract", tenant: "Tenant", id: int, apiArgs: Optional[ApiArgs] = None
+        self: Contract, tenant: Tenant, id: int, apiArgs: ApiArgs | None = None
     ) -> None:
         """
         Create a new instance of a contract.
@@ -339,7 +345,7 @@ class Contract(_ApiResource):
             The tenant belonging to the contract
         id : int
             The id of the contract
-        apiArgs : Optional[ApiArgs]
+        apiArgs : ApiArgs | None
             The optional API arguments
         """
         super().__init__(id, apiArgs)
@@ -352,19 +358,19 @@ class Contract(_ApiResource):
 class Tenant(_ApiResource):
     """Class representing a tenant in the API."""
 
-    def get_contracts(self: "Tenant") -> set[Contract]:
+    def get_contracts(self: Tenant) -> set[Contract]:
         """
         Get the contracts associated with this tenant.
 
         Returns
         -------
-        Set[Contract]
+        set[Contract]
             The contracts for this tenant
         """
-        return set(
+        return {
             Contract(self, contract["contract_id"], self._apiArgs)
             for contract in self._get(f"/tenants/{self.id}/contracts")
-        )
+        }
 
 
 def __main() -> None:
@@ -402,7 +408,7 @@ def __main() -> None:
         )
         try:
             contracts = list(tenant.get_contracts())
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             print(f"Could not fetch contracts for tenant {tenant.id}.", file=sys.stderr)
             print("Error details:", e)
             sys.exit(1)
@@ -424,6 +430,7 @@ def __main() -> None:
         sys.exit(1)
     dfs = []
     determination_timestamp: float = -1
+    tz = UTC
     for forecast_source in forecast_sources:
         forecasts, determination_timestamp = forecast_sources[0].get_forecasts()
         if args.plot:
@@ -434,9 +441,9 @@ def __main() -> None:
                 )
             else:
                 Forecast.plot_forecasts(
-                    forecasts, f"Forecast (Source {forecast_source.id})"
+                    forecasts, f"Forecast (Source {forecast_source.id})", tz
                 )
-        df = Forecast.forecasts_to_dataframe(forecasts)
+        df = Forecast.forecasts_to_dataframe(forecasts, tz)
         df["forecast_source"] = forecast_source.id
         dfs.append(df)
     df = pd.concat(dfs)
