@@ -23,47 +23,31 @@ fi
 SCRIPT_PATH="$(readlink -f "$0")"
 cd "$(dirname "$(dirname "$SCRIPT_PATH")")"
 PYTHON_VERSION=$(cat .python-version)
-PROFILE="$HOME/.bashrc"
 
 echo "=== Set up environment ==="
-if [[ -z "$(which pyenv)" ]]; then
+PYENV_ROOT="${PYENV_ROOT:-$HOME/.pyenv}"
+PYENV_BIN="$PYENV_ROOT/bin/pyenv"
+if [[ ! -x "$PYENV_BIN" ]]; then
     echo "--- Install pyenv ---"
     wget -qO- https://pyenv.run | bash
-    {
-        echo -e '\n# pyenv configuration'
-        # shellcheck disable=SC2016
-        echo 'export PYENV_ROOT="$HOME/.pyenv"'
-        # shellcheck disable=SC2016
-        echo '[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"'
-        # shellcheck disable=SC2016
-        echo 'eval "$(pyenv init - bash)"'
-    } >> "$PROFILE"
-    # shellcheck source=/dev/null
-    source "$PROFILE"
 else
     echo "--- Found pyenv ---"
 fi
 
 PYTHON_BINS=("${PYENV_ROOT}/versions/${PYTHON_VERSION}"*/bin/python)
 if [[ ! -e "${PYTHON_BINS[0]}" ]]; then
-    echo "--- Install Python $PYTHON_VERSION"
-    pyenv install "$PYTHON_VERSION"
+    echo "--- Install Python $PYTHON_VERSION ---"
+    $PYENV_BIN install "$PYTHON_VERSION"
     PYTHON_BINS=("${PYENV_ROOT}/versions/${PYTHON_VERSION}"*/bin/python)
 else
-    echo "--- Found Python ${PYTHON_BINS[0]}"
+    echo "--- Found Python ${PYTHON_BINS[0]} ---"
 fi
 PYTHON_BIN="${PYTHON_BINS[0]}"
 
-if [[ -z "$(which pipx)" ]]; then
-    echo "--- Install pipx ---"
-    "$PYTHON_BIN" -m pip install --upgrade pip
-    "$PYTHON_BIN" -m pip install --user pipx
-    "$PYTHON_BIN" -m pipx ensurepath
-    # shellcheck source=/dev/null
-    source "$PROFILE"
-else
-    echo "--- Found pipx ---"
-fi
+echo "--- Install pipx ---"
+"$PYTHON_BIN" -m pip install --upgrade pip
+"$PYTHON_BIN" -m pip install --user pipx
+"$PYTHON_BIN" -m pipx ensurepath
 
 echo "=== Install $COMPONENT package ==="
 
@@ -75,9 +59,9 @@ if [[ ! -f $WHEEL ]]; then
 fi
 
 echo "--- Uninstall old $COMPONENT package (if present) ---"
-pipx uninstall "meta-sched-$COMPONENT" || :
+"$PYTHON_BIN" -m pipx uninstall "meta-sched-$COMPONENT" || :
 
 echo "--- Install $COMPONENT package ---"
-pipx install "$WHEEL" --python "$PYTHON_BIN"
+"$PYTHON_BIN" -m pipx install "$WHEEL" --python "$PYTHON_BIN"
 
 echo "--- Done ---"
