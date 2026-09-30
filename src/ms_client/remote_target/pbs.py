@@ -85,7 +85,7 @@ class PBSRemoteTarget(BatchSystemTarget):
             out_stream=sys.stderr,
             modules=job.spec.required_modules,
         )
-        expect_ok(result.exited)
+        expect_ok(result.exited, f"stderr: {result.stderr}")
         pbs_job_id = result.stdout.strip()
         return str(pbs_job_id)
 

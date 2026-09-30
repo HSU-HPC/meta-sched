@@ -74,7 +74,7 @@ class SlurmRemoteTarget(BatchSystemTarget):
             out_stream=sys.stderr,
             modules=job.spec.required_modules,
         )
-        expect_ok(result.exited)
+        expect_ok(result.exited, f"stderr: {result.stderr}")
         slurm_job_id = result.stdout.strip().split()[-1]
         return str(slurm_job_id)
 

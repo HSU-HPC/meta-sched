@@ -22,6 +22,7 @@ tags = ["x86", "slurm"]
 [targets.module_map]
 MPI = "intel-oneapi-mpi"
 
+# vvv========== WindHPC Project ==========vvv
 
 [[targets]]
 id = "windhpc-hsu-full"
@@ -61,3 +62,56 @@ source_scripts = ["/etc/profile"]
 tags = ["x86", "green", "windhpc", "slurm"]
 [targets.module_map]
 MPI = "mpi/openmpi"
+
+# ^^^========== WindHPC Project ==========^^^
+
+# vvv========== NHR Systems ==========vvv
+
+[[targets]]
+# https://docs.hpc.gwdg.de/how_to_use/compute_partitions/cpu_partitions/index.html
+id = "emmy-standard96s"
+host = "glogin.hpc.gwdg.de"
+batch_system = "slurm"
+queue = "standard96s"
+nodes = 200
+cores_per_node = 96
+max_time = "2-00:00:00"
+max_nodes = 256
+tags = ["x86", "nhr", "slurm"]
+[targets.module_map]
+MPI = "gcc/14.2.0 openmpi/4.1.7" # Hierarchical module system
+
+
+[[targets]]
+# https://doc.nhr.fau.de/clusters/fritz/
+id = "fritz-singlenode"
+host = "fritz.nhr.fau.de"
+batch_system = "slurm"
+queue = "singlenode"
+nodes = 992
+cores_per_node = 72
+max_time = "1-00:00:00"
+max_nodes = 1
+source_scripts = ["/etc/profile"]
+tags = ["x86", "nhr", "slurm"]
+[targets.module_map]
+MPI = "openmpi/5.0.8-gcc11.5.0"
+
+
+[[targets]]
+# https://doc.nhr.fau.de/clusters/fritz/
+id = "fritz-multinode"
+host = "fritz.nhr.fau.de"
+batch_system = "slurm"
+queue = "multinode"
+nodes = 992
+cores_per_node = 72
+max_time = "1-00:00:00"
+max_nodes = 64
+min_nodes = 2
+source_scripts = ["/etc/profile"]
+tags = ["x86", "nhr", "slurm"]
+[targets.module_map]
+MPI = "openmpi/5.0.8-gcc11.5.0"
+
+# ^^^========== NHR Systems ==========^^^

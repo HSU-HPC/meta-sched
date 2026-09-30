@@ -114,6 +114,8 @@ class Target(BaseModel):
         The port used to connect to the target (defaults to default SSH port)
     max_time : str | None
         The maximum time for which a job may run on this target formatted as "d-hh:MM:ss"
+    min_nodes : int | None
+        The minimum number of compute nodes which have to be allocated to a job
     max_nodes : int | None
         The maximum number of compute nodes which may be allocated to a job
     source_scripts : tuple[str, ...]
@@ -133,6 +135,7 @@ class Target(BaseModel):
     cores_per_node: int
     port: int = utils.DEFAULT_SSH_PORT
     max_time: str | None = None
+    min_nodes: int | None = None
     max_nodes: int | None = None
     source_scripts: tuple[str, ...] = ()
     _module_map: frozendict[str, str] = frozendict[str, str]()
