@@ -140,12 +140,13 @@ For each `job spec` this directory contains a `<job spec>/input/` folder where j
 
 Upon running the command for the first time, the default configuration file at `$HOME/.config/meta-sched.toml` is created.  
 This file contains the endpoint of the Meta Scheduler server component used by the client.
-For additional filtering of targets used for scheduling of a particular job, custom tags can be added to the user configuration:
+For additional filtering of targets used for scheduling of a particular job, custom tags or source scripts can be added to the user configuration:
 
 ```toml
 [[targets]]
 id   = "windhpc-hlrs"
 tags = ["test"]
+source_scripts = ["~/spack/share/spack/setup-env.sh"]
 
 # Fields used by msprobe to gather additional data about the target
 datacenter_api_endpoint = "https://example.org/api/v1"

@@ -21,6 +21,8 @@ class TargetAdditionalConfigs(BaseModel):
         The target ID
     tags : tuple[str, ...]
         Additional user defined tags to filter this target by
+    source_scripts : tuple[str, ...]
+        Additional user defined source sccripts to load
     datacenter_api_endpoint : str | None
         HTTP endpoint for the datacenter API of this target
         (Used to fetch additional data about the state of the target)
@@ -30,6 +32,7 @@ class TargetAdditionalConfigs(BaseModel):
 
     id: str
     tags: tuple[str, ...] = ()
+    source_scripts: tuple[str, ...] = ()
     datacenter_api_endpoint: str | None = None
     datacenter_api_forecast_source_id: int | None = None
 

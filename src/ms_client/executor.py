@@ -16,7 +16,7 @@ from ms_common.schemas import Spec as JobSpec
 from ms_common.utils import eprint, is_env_flag_set, time_to_seconds
 
 from ms_client import job, ssh
-from ms_client.config import TargetAdditionalConfigs
+from ms_client.config import Config, TargetAdditionalConfigs
 from ms_client.job import Instance as Job
 from ms_client.remote_target import RemoteTarget
 from ms_client.remote_target.factory import remote_target_from_target
@@ -274,6 +274,16 @@ class Executor:
             self.__job.set_status(job.Status.Scheduled(target.id))
         else:
             raise TypeError("Unknown scheduling decision type")
+        # Consider additional source scrips
+        targets_additional_configs = {t.id: t for t in Config.load().targets}
+        if target.id in targets_additional_configs:
+            additional_configs = targets_additional_configs[target.id]
+            target = target.model_copy(
+                update={
+                    "source_scripts": target.source_scripts
+                    + additional_configs.source_scripts
+                }
+            )
         with remote_target_from_target(target) as remote_target:
             eprint(
                 f"=== 2. Copying input files to target {target.id} and run optional target setup step ==="

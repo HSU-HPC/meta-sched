@@ -14,7 +14,7 @@ from ms_common.utils import eprint, seconds_to_time, time_to_seconds
 
 from ms_client.job import Instance as Job
 from ms_client.remote_target.batch_system import BatchSystemTarget
-from ms_client.utils import expect_ok
+from ms_client.utils import StatusException, expect_ok
 
 
 class SlurmRemoteTarget(BatchSystemTarget):
@@ -236,7 +236,7 @@ class SlurmRemoteTarget(BatchSystemTarget):
             expect_ok(result.exited)
             _sacct_state, sacct_exit_code = result.stdout.splitlines()[0].split()
             exit_code = int(sacct_exit_code.split(":")[0])
-        except (IndexError, ValueError):
+        except (IndexError, ValueError, StatusException):
             eprint(f"Job completed, but could not determine exit code using {cmd}:")
         return exit_code
 
