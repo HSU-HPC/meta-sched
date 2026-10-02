@@ -3,6 +3,7 @@
 """Script for generating MaMiCo/ls1 configuration files."""
 
 import argparse
+import sys
 from functools import reduce
 from pathlib import Path
 
@@ -33,16 +34,16 @@ for ax_ranks, ax in zip(md_mpi_size, "xyz"):
         print(
             f"Cannot have {ax_ranks} ranks for MD along {ax}-axis of size {cells} cells."
         )
-        exit(1)
+        sys.exit(1)
 
 # 3. Apply substitution for template files
-subsitutions = dict(
-    MD_SIZE=10,
-    MD_MPI_SIZE_X=md_mpi_size[0],
-    MD_MPI_SIZE_Y=md_mpi_size[1],
-    MD_MPI_SIZE_Z=md_mpi_size[2],
-    CELL_SIZE=cell_size,
-)
+subsitutions = {
+    "MD_SIZE": 10,
+    "MD_MPI_SIZE_X": md_mpi_size[0],
+    "MD_MPI_SIZE_Y": md_mpi_size[1],
+    "MD_MPI_SIZE_Z": md_mpi_size[2],
+    "CELL_SIZE": cell_size,
+}
 
 
 def apply_template_substitution(name: str) -> None:

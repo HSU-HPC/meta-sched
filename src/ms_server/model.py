@@ -1,11 +1,12 @@
 """Module containing the model for the Meta Scheduler server component."""
 
-import abc
-from typing import Any, Dict, List, Optional, Set
+from __future__ import annotations
 
-from ms_common.schemas import JobKey, SchedulingDecisionType
+import abc
+from typing import Any
+
+from ms_common.schemas import JobKey, SchedulingDecisionType, Target, TargetStatus
 from ms_common.schemas import Spec as JobSpec
-from ms_common.schemas import Target, TargetStatus
 from pydantic import BaseModel, ConfigDict
 
 
@@ -23,15 +24,15 @@ class Job(BaseModel):
         The index of the job in the job array
     spec : JobSpec
         The specification of the job to be scheduled
-    available_targets : List[str]
+    available_targets : list[str]
         The set of target IDs which this job may be assigned to
-    scheduling_decision : Optional[SchedulingDecisionType]
+    scheduling_decision : SchedulingDecisionType | None
         The decision by the scheduling policy regarding this job or None, if the job has not yet been scheduled
     requested_seconds : int
         The number of seconds that will be requested on the concrete target that this job is assigned to (0 while not assigned)
-    timestamp_start : Optional[int]
+    timestamp_start : int | None
         The unix timestamp (seconds since epoch) of the job start or None, if the job has not yet started
-    timestamp_end : Optional[int]
+    timestamp_end : int | None
         The unix timestamp (seconds since epoch) of the job end or None, if the job has not yet ended
     """
 
@@ -39,17 +40,17 @@ class Job(BaseModel):
     array_id: int
     array_idx: int
     spec: JobSpec
-    available_targets: List[str]
-    scheduling_decision: Optional[SchedulingDecisionType]
+    available_targets: list[str]
+    scheduling_decision: SchedulingDecisionType | None
     requested_seconds: int = 0
-    timestamp_start: Optional[int] = None
-    timestamp_end: Optional[int] = None
+    timestamp_start: int | None = None
+    timestamp_end: int | None = None
 
     # Used by pydantic to allow instantiation from SQLAlchemy model
     model_config = ConfigDict(from_attributes=True)
 
     @property
-    def key(self: "Job") -> JobKey:
+    def key(self: Job) -> JobKey:
         """
         Get the key of the job.
 
@@ -61,7 +62,7 @@ class Job(BaseModel):
         return JobKey(self.token, self.array_id, self.array_idx)
 
 
-TargetsStatus = Dict[Target, Optional[TargetStatus]]
+TargetsStatus = dict[Target, TargetStatus | None]
 
 
 class Model(abc.ABC):
@@ -70,7 +71,7 @@ class Model(abc.ABC):
     """
 
     async def create_job_array(
-        self: "Model", spec: JobSpec, available_targets: Set[str], token: str
+        self: Model, spec: JobSpec, available_targets: set[str], token: str
     ) -> int:
         """
         Create a new array of jobs for scheduling.
@@ -79,7 +80,7 @@ class Model(abc.ABC):
         ----------
         spec : job.Spec
             The job specification (also determines the number of jobs in the array)
-        available_targets: Set[str]
+        available_targets: set[str]
             The set of targets on which the jobs may be executed
         token: str
             The token to associate with the jobs (required to look them up in the database)
@@ -91,13 +92,13 @@ class Model(abc.ABC):
         """
         raise NotImplementedError()
 
-    async def get_pending_jobs(self: "Model") -> List[Job]:
+    async def get_pending_jobs(self: Model) -> list[Job]:
         """
         Get a list of jobs which are pending scheduling.
 
         Returns
         -------
-        List[Job]
+        list[Job]
             The list of pending jobs
 
         Raises
@@ -107,13 +108,13 @@ class Model(abc.ABC):
         """
         raise NotImplementedError()
 
-    async def get_decided_jobs(self: "Model") -> List[Job]:
+    async def get_decided_jobs(self: Model) -> list[Job]:
         """
         Get a list of jobs for which a scheduling decision has been made.
 
         Returns
         -------
-        List[Job]
+        list[Job]
             The list of scheduled jobs
 
         Raises
@@ -123,7 +124,7 @@ class Model(abc.ABC):
         """
         raise NotImplementedError()
 
-    async def get_job(self: "Model", job_key: JobKey) -> Job:
+    async def get_job(self: Model, job_key: JobKey) -> Job:
         """
         Get an existing job.
 
@@ -146,7 +147,7 @@ class Model(abc.ABC):
         """
         raise NotImplementedError()
 
-    async def update_job(self: "Model", job_key: JobKey, data: Dict[str, Any]) -> None:
+    async def update_job(self: Model, job_key: JobKey, data: dict[str, Any]) -> None:
         """
         Update an existing job.
 
@@ -154,7 +155,7 @@ class Model(abc.ABC):
         ----------
         job_key : JobKey
             The key of the job to be updated
-        data : Dict[str, Any]
+        data : dict[str, Any]
             The keys and corresponding values which should be updated at the job
 
         Raises
@@ -166,7 +167,7 @@ class Model(abc.ABC):
         """
         raise NotImplementedError()
 
-    async def remove_job(self: "Model", job_key: JobKey) -> None:
+    async def remove_job(self: Model, job_key: JobKey) -> None:
         """
         Remove a job.
 
@@ -185,7 +186,7 @@ class Model(abc.ABC):
         raise NotImplementedError()
 
     async def await_scheduling_decision(
-        self: "Model", job_key: JobKey
+        self: Model, job_key: JobKey
     ) -> SchedulingDecisionType:
         """
         Await a scheduling decision for a specific job.
@@ -205,7 +206,7 @@ class Model(abc.ABC):
         raise NotImplementedError()
 
     async def update_targets_status(
-        self: "Model", target_id: str, status: TargetStatus
+        self: Model, target_id: str, status: TargetStatus
     ) -> None:
         """
         Update the status of a target.
@@ -225,7 +226,7 @@ class Model(abc.ABC):
         raise NotImplementedError()
 
     async def get_targets_status(
-        self: "Model",
+        self: Model,
     ) -> TargetsStatus:
         """
         Get all targets and their last known status.

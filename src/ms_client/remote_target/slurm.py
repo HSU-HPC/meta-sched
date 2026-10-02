@@ -1,9 +1,11 @@
 """Module containing class for remote target using the Slurm batch system."""
 
+from __future__ import annotations
+
 import io
 import sys
 import time
-from typing import Any, Optional
+from typing import Any
 
 import pandas as pd
 from fabric import Connection  # type: ignore[attr-defined]
@@ -12,7 +14,7 @@ from ms_common.utils import eprint, seconds_to_time, time_to_seconds
 
 from ms_client.job import Instance as Job
 from ms_client.remote_target.batch_system import BatchSystemTarget
-from ms_client.utils import expect_ok
+from ms_client.utils import StatusException, expect_ok
 
 
 class SlurmRemoteTarget(BatchSystemTarget):
@@ -21,7 +23,7 @@ class SlurmRemoteTarget(BatchSystemTarget):
     __template_cmd_sacct = "sacct -j SLURM_JOB_ID --noheader --format=FORMAT | head -n 1 | awk '{print $1}' | xargs -I{} date -d {} +%s"
 
     def _submit_job(
-        self: "SlurmRemoteTarget",
+        self: SlurmRemoteTarget,
         connection: Connection,
         job: Job,
         oe: tuple[str, str],
@@ -36,9 +38,9 @@ class SlurmRemoteTarget(BatchSystemTarget):
             The SSH connection to the remote target
         job : Job
             The job to be executed
-        oe : Tuple[str, str]
+        oe : tuple[str, str]
             The filename for the output and error files to be used by the job
-        env : Dict[str, Any]
+        env : dict[str, Any]
             Environment variables to be set
 
         Returns
@@ -72,12 +74,12 @@ class SlurmRemoteTarget(BatchSystemTarget):
             out_stream=sys.stderr,
             modules=job.spec.required_modules,
         )
-        expect_ok(result.exited)
+        expect_ok(result.exited, f"stderr: {result.stderr}")
         slurm_job_id = result.stdout.strip().split()[-1]
         return str(slurm_job_id)
 
     def _has_job_started(
-        self: "SlurmRemoteTarget", connection: Connection, local_job_id: str
+        self: SlurmRemoteTarget, connection: Connection, local_job_id: str
     ) -> bool:
         """
         Check if the job has started being executed by the batch system.
@@ -100,8 +102,8 @@ class SlurmRemoteTarget(BatchSystemTarget):
         return len(output) == 0 or output == "RUNNING"
 
     def _get_job_start_time(
-        self: "SlurmRemoteTarget", connection: Connection, local_job_id: str
-    ) -> Optional[int]:
+        self: SlurmRemoteTarget, connection: Connection, local_job_id: str
+    ) -> int | None:
         """
         Get the timestamp of when the job started executing.
 
@@ -114,7 +116,7 @@ class SlurmRemoteTarget(BatchSystemTarget):
 
         Returns
         -------
-        Optional[int]
+        int | None
             The unix timestamp (seconds since epoch) of when the job has started or None if it could not be determined
         """
         cmd = SlurmRemoteTarget.__template_cmd_sacct.replace("FORMAT", "start").replace(
@@ -129,12 +131,12 @@ class SlurmRemoteTarget(BatchSystemTarget):
                     hide=True,
                 ).stdout.strip()
             )
-        except Exception:
-            pass
+        except ValueError:
+            timestamp_start = None
         return timestamp_start
 
     def _has_job_ended(
-        self: "SlurmRemoteTarget", connection: Connection, local_job_id: str
+        self: SlurmRemoteTarget, connection: Connection, local_job_id: str
     ) -> bool:
         """
         Check if the job has stopped being executed by the batch system.
@@ -157,8 +159,8 @@ class SlurmRemoteTarget(BatchSystemTarget):
         return len(output) == 0
 
     def _get_job_end_time(
-        self: "SlurmRemoteTarget", connection: Connection, local_job_id: str
-    ) -> Optional[int]:
+        self: SlurmRemoteTarget, connection: Connection, local_job_id: str
+    ) -> int | None:
         """
         Get the timestamp of when the job stopped executing.
 
@@ -171,7 +173,7 @@ class SlurmRemoteTarget(BatchSystemTarget):
 
         Returns
         -------
-        Optional[int]
+        int | None
             The unix timestamp (seconds since epoch) of when the job has stopped executing or None if it could not be determined
         """
         cmd = SlurmRemoteTarget.__template_cmd_sacct.replace("FORMAT", "end").replace(
@@ -186,12 +188,12 @@ class SlurmRemoteTarget(BatchSystemTarget):
                     hide=True,
                 ).stdout.strip()
             )
-        except Exception:
-            pass
+        except ValueError:
+            timestamp_end = None
         return timestamp_end
 
     def _cancel_job(
-        self: "SlurmRemoteTarget", connection: Connection, local_job_id: str
+        self: SlurmRemoteTarget, connection: Connection, local_job_id: str
     ) -> None:
         """
         Cancel the job submitted to the batch system.
@@ -206,8 +208,8 @@ class SlurmRemoteTarget(BatchSystemTarget):
         expect_ok(self._run(connection, f"scancel {local_job_id}").exited)
 
     def _get_job_exit_code(
-        self: "SlurmRemoteTarget", connection: Connection, local_job_id: str
-    ) -> Optional[int]:
+        self: SlurmRemoteTarget, connection: Connection, local_job_id: str
+    ) -> int | None:
         """
         Check if the job has started being executed by the batch system.
 
@@ -220,7 +222,7 @@ class SlurmRemoteTarget(BatchSystemTarget):
 
         Returns
         -------
-        Optional[int]
+        int | None
             The exit code of the job or None if it could not be determined
         """
         exit_code = None
@@ -232,13 +234,13 @@ class SlurmRemoteTarget(BatchSystemTarget):
         )
         try:
             expect_ok(result.exited)
-            sacct_state, sacct_exit_code = result.stdout.splitlines()[0].split()
+            _sacct_state, sacct_exit_code = result.stdout.splitlines()[0].split()
             exit_code = int(sacct_exit_code.split(":")[0])
-        except Exception:
+        except (IndexError, ValueError, StatusException):
             eprint(f"Job completed, but could not determine exit code using {cmd}:")
         return exit_code
 
-    def get_status(self: "SlurmRemoteTarget") -> TargetStatus:
+    def get_status(self: SlurmRemoteTarget) -> TargetStatus:
         """
         Get the status of the remote Slurm target.
 
@@ -280,11 +282,11 @@ class SlurmRemoteTarget(BatchSystemTarget):
             .stdout.strip()
             .splitlines()
         )
-        node_states = dict(
-            nodes_in_use=0,
-            nodes_unavailable=0,
-            nodes_available=0,
-        )
+        node_states = {
+            "nodes_in_use": 0,
+            "nodes_unavailable": 0,
+            "nodes_available": 0,
+        }
         for node_state in nodes_state:
             # https://slurm.schedmd.com/sinfo.html#SECTION_NODE-STATE-CODES
             if node_state.startswith("alloc"):

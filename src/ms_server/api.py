@@ -1,18 +1,11 @@
 """Module containing the HTTP API (FastAPI) for the Meta Scheduler server component."""
 
+from __future__ import annotations
+
 import asyncio
 import secrets
-from typing import (
-    Any,
-    AsyncGenerator,
-    Awaitable,
-    Coroutine,
-    List,
-    Optional,
-    Set,
-    Tuple,
-    TypeVar,
-)
+from collections.abc import AsyncGenerator, Awaitable, Coroutine
+from typing import Any, TypeVar
 
 import ms_common
 import pandas as pd  # noqa: F401
@@ -36,10 +29,10 @@ class API(FastAPI):
     """
 
     def __init__(
-        self: "API",
+        self: API,
         host: str,
         port: int,
-        targets: List[Target],
+        targets: list[Target],
         model: Model,
         api_key: str,
         **kwargs: Any,
@@ -53,7 +46,7 @@ class API(FastAPI):
             The hostname of the HTTP server (use "0.0.0.0" for public and "localhost" for private API)
         port : str
             The port of the HTTP server
-        targets : List[Target]
+        targets : list[Target]
             The targets available through the Meta Scheduler
         model : Model
             The model containing the state of the Meta Scheduler
@@ -71,7 +64,7 @@ class API(FastAPI):
         super().__init__(**kwargs)
         self.set_up_endpoints()
 
-    def set_up_endpoints(self: "API") -> None:
+    def set_up_endpoints(self: API) -> None:
         """Set up the HTTP API endpoints."""
 
         @self.get("/version", response_model=str)
@@ -86,19 +79,19 @@ class API(FastAPI):
             """
             return ms_common.__version__
 
-        @self.get("/targets", response_model=List[Target])
-        def get_targets() -> List[Target]:
+        @self.get("/targets", response_model=list[Target])
+        def get_targets() -> list[Target]:
             """
             Get all targets which jobs may be assigned to. (API endpoint)
 
             Returns
             -------
-            List[Target]
+            list[Target]
                 The list of all targets which jobs may be assigned to
             """
             return self.__targets
 
-        def get_api_key(x_api_key: Optional[str] = Header(None)) -> str:
+        def get_api_key(x_api_key: str | None = Header(None)) -> str:
             """
             Extract the API key from the current request headers.
 
@@ -147,7 +140,7 @@ class API(FastAPI):
             # df = pd.DataFrame.from_records(status.model_dump()["jobs_status"])
             # print(df)
 
-        def get_job_token(x_job_token: Optional[str] = Header(None)) -> str:
+        def get_job_token(x_job_token: str | None = Header(None)) -> str:
             """
             Extract the job token from the current request headers.
 
@@ -190,9 +183,9 @@ class API(FastAPI):
             ScheduleResponse
                 The id of the created job array, its size and the token required to access the jobs
             """
-            target_ids = set([t.id for t in self.__targets])
+            target_ids = {t.id for t in self.__targets}
             if len(request.available_targets) == 0 or any(
-                [t not in target_ids for t in request.available_targets]
+                t not in target_ids for t in request.available_targets
             ):
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -298,7 +291,7 @@ class API(FastAPI):
                         ),
                         timeout=await_scheduling_timeout,
                     )
-                except asyncio.TimeoutError:
+                except TimeoutError:
                     raise HTTPException(
                         status_code=status.HTTP_504_GATEWAY_TIMEOUT,
                     )
@@ -339,8 +332,8 @@ class API(FastAPI):
         async def update_job_time(
             array_id: int,
             array_idx: int,
-            timestamp_start: Optional[int] = Query(None),
-            timestamp_end: Optional[int] = Query(None),
+            timestamp_start: int | None = Query(None),
+            timestamp_end: int | None = Query(None),
             token: str = Depends(get_job_token),
         ) -> None:
             """
@@ -352,9 +345,9 @@ class API(FastAPI):
                 The ID of the job array
             array_idx : int
                 The index of the job within the array
-            timestamp_start : Optional[int]
+            timestamp_start : int | None
                 The start time of the job as a unix timestamp (seconds since epoch), or None if the job has not started yet
-            timestamp_end : Optional[int]
+            timestamp_end : int | None
                 The end time of the job as a unix timestamp (seconds since epoch), or None if the job has not ended yet
             token : str
                 The random string required to look up the job
@@ -367,11 +360,11 @@ class API(FastAPI):
                     detail='Either "timestamp_start" or "timestamp_end" must be provided, but not both.',
                 )
             job_key = JobKey(token, array_id, array_idx)
-            update_data = dict()
+            update_data = {}
             if timestamp_start is not None:
-                update_data = dict(timestamp_start=timestamp_start)
+                update_data = {"timestamp_start": timestamp_start}
             elif timestamp_end is not None:
-                update_data = dict(timestamp_end=timestamp_end)
+                update_data = {"timestamp_end": timestamp_end}
             else:
                 raise RuntimeError("Unreachable code was reached somehow")
             await await_or_not_found(self.__model.update_job(job_key, update_data))
@@ -383,7 +376,7 @@ class API(FastAPI):
         async def reschedule_job(
             array_id: int,
             array_idx: int,
-            available_targets: Set[str],
+            available_targets: set[str],
             token: str = Depends(get_job_token),
         ) -> None:
             """
@@ -395,7 +388,7 @@ class API(FastAPI):
                 The ID of the job array
             array_idx : int
                 The index of the job within the array
-            available_targets : Set[str]
+            available_targets : set[str]
                 The new set of target IDs which this job may be assigned to
             token : str
                 The random string required to look up the job
@@ -404,12 +397,12 @@ class API(FastAPI):
             await await_or_not_found(
                 self.__model.update_job(
                     job_key,
-                    dict(
-                        timestamp_start=None,
-                        timestamp_end=None,
-                        available_targets=available_targets,
-                        scheduling_decision=None,
-                    ),
+                    {
+                        "timestamp_start": None,
+                        "timestamp_end": None,
+                        "available_targets": available_targets,
+                        "scheduling_decision": None,
+                    },
                 )
             )
 
@@ -438,12 +431,12 @@ class API(FastAPI):
 
         # endregion job control
 
-    def serve(self: "API") -> Tuple[uvicorn.Server, Coroutine[Any, Any, None]]:
+    def serve(self: API) -> tuple[uvicorn.Server, Coroutine[Any, Any, None]]:
         """Start the HTTP API  (non-blocking).
 
         Returns
         -------
-        Tuple[uvicorn.Server, CoroutineType[Any,Any,None]]
+        tuple[uvicorn.Server, CoroutineType[Any,Any,None]]
             The HTTP server and corresponding asyncio task
         """
         config = uvicorn.Config(

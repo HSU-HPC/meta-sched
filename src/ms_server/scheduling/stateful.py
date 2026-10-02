@@ -2,8 +2,6 @@
 Module containing stateful scheduling policies which update and use information across scheduling requests.
 """
 
-from typing import Dict, List
-
 from ms_common.schemas import Assigned
 
 from ms_server.model import Job, TargetsStatus
@@ -26,12 +24,12 @@ class LeastUsed(GreedyPolicy):
             Callback to apply scheduling decision to a job
         """
         super().__init__(on_schedule_job)
-        self.__job_count: Dict[str, int] = dict()
+        self.__job_count: dict[str, int] = {}
 
     async def schedule_job(
         self: "LeastUsed",
         job: Job,
-        decided_jobs: List[Job],
+        decided_jobs: list[Job],
         targets_status: TargetsStatus,
     ) -> None:
         """
@@ -41,7 +39,7 @@ class LeastUsed(GreedyPolicy):
         ----------
         job : Job
             The job to be scheduled
-        decided_jobs : List[Job]
+        decided_jobs : list[Job]
             The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available
@@ -51,7 +49,7 @@ class LeastUsed(GreedyPolicy):
             if target.id not in self.__job_count:
                 self.__job_count[target.id] = 0
         # Select least used available
-        available_targets = sorted(list(job.available_targets))
+        available_targets = sorted(job.available_targets)
         target_ids = available_targets
         selected_idx = 0
         for i in range(len(target_ids)):

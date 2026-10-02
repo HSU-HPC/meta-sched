@@ -1,27 +1,39 @@
 """Module containing code for executing jobs on a remote target."""
 
+from __future__ import annotations
+
 import abc
 import enum
-import os
 import sys
 import time
+import types
 from dataclasses import dataclass
 from os import PathLike
 from pathlib import Path
-from typing import Any, Optional, TextIO, Union
+from typing import Any, Self, TextIO
 
 import invoke
 from fabric import Connection  # type: ignore[attr-defined]
 from fabric.config import Config
 from invoke.runners import Result
 from ms_common.schemas import Target, TargetStatus
-from ms_common.utils import DEFAULT_SSH_PORT, EX_BASH_COMMAND_NOT_FOUND, eprint, is_env_flag_set
+from ms_common.utils import (
+    DEFAULT_SSH_PORT,
+    EX_BASH_COMMAND_NOT_FOUND,
+    eprint,
+)
 from paramiko.ssh_exception import SSHException
 
 from ms_client import ssh
 from ms_client.job import Instance as Job
 from ms_client.job import get_jobs_dir
-from ms_client.utils import ExponentialBackoff, SuppressStderr, debug_print_cmd, expect_ok, sleep
+from ms_client.utils import (
+    ExponentialBackoff,
+    SuppressStderr,
+    debug_print_cmd,
+    expect_ok,
+    sleep,
+)
 
 
 class RemoteTarget:
@@ -31,7 +43,6 @@ class RemoteTarget:
 
     class _FactoryAccessToken:
         """This class should only be used internally by factory.py"""
-
 
     def __init__(self, sentinel: _FactoryAccessToken, target: Target) -> None:
         """
@@ -49,12 +60,12 @@ class RemoteTarget:
                 "A remote target instance cannot be created directly. (Use factory method RemoteTarget.from_target(target) instead!)"
             )
         self._target = target
-        self._connection: Optional[Connection] = None
+        self._connection: Connection | None = None
 
     def _get_connection(
-        self: "RemoteTarget",
+        self: RemoteTarget,
         retry_count: int = 5,
-        backoff: ExponentialBackoff = ExponentialBackoff(factor=10),
+        backoff: ExponentialBackoff | None = None,
         timeout: float = 60,
         ignore_interrupted_error: bool = False,
         fresh: bool = False,
@@ -85,20 +96,21 @@ class RemoteTarget:
         RuntimeError
             The port must match the port in the corresponding SSH configuration entry
         """
+        if backoff is None:
+            backoff = ExponentialBackoff(factor=10)
+
         # connect_kwargs are forwarded to
         # https://docs.paramiko.org/en/latest/api/client.html#paramiko.client.SSHClient.connect
-        connect_kwargs = dict(
-            allow_agent=False,
-            look_for_keys=False,
-            banner_timeout=timeout,
-            auth_timeout=timeout,
-            channel_timeout=timeout,
-        )
+        connect_kwargs = {
+            "allow_agent": False,
+            "look_for_keys": False,
+            "banner_timeout": timeout,
+            "auth_timeout": timeout,
+            "channel_timeout": timeout,
+        }
         ssh_config = ssh.get_config()
         target_ssh_config = ssh_config.lookup(self._target.id)
-        host = (
-            target_ssh_config["hostname"] if "hostname" in target_ssh_config else None
-        )
+        host = target_ssh_config.get("hostname", None)
         if host != self._target.host:
             eprint(
                 f"Warning: HostName mismatch for {self._target.id}:",
@@ -115,18 +127,17 @@ class RemoteTarget:
             )
         config = Config(ssh_config=ssh_config)  # type: ignore[no-untyped-call]
         attempt = 0
-        if self._connection:
-            if self._connection.is_connected:
-                if fresh:
-                    self._connection.close()  # type: ignore[no-untyped-call]
-                    backoff.reset()
-                else:
-                    return self._connection
+        if self._connection and self._connection.is_connected:
+            if fresh:
+                self._connection.close()  # type: ignore[no-untyped-call]
+                backoff.reset()
+            else:
+                return self._connection
         self._connection = None
         while attempt < retry_count:
             try:
                 self._connection = Connection(  # type: ignore[no-untyped-call]
-                    self._target.id, # Alias from SSH configuration
+                    self._target.id,  # Alias from SSH configuration
                     config=config,
                     connect_kwargs=connect_kwargs,
                     connect_timeout=timeout,
@@ -154,11 +165,14 @@ class RemoteTarget:
                     ) from e
         raise RuntimeError("Unreachable code somehow reached")
 
-    def __enter__(self: "RemoteTarget") -> "RemoteTarget":
+    def __enter__(self) -> Self:
         return self
 
     def __exit__(
-        self: "RemoteTarget", exc_type: Any, exc_value: Any, traceback: Any
+        self: RemoteTarget,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: types.TracebackType | None,
     ) -> None:
         # Clean up any open connection
         if self._connection and self._connection.is_connected:
@@ -174,9 +188,9 @@ class RemoteTarget:
         DOWNLOAD = 1
 
     def transfer(
-        self: "RemoteTarget",
-        src: Union[str, PathLike[Any]],
-        dst: Union[str, PathLike[Any]],
+        self: RemoteTarget,
+        src: str | PathLike[Any],
+        dst: str | PathLike[Any],
         mode: TransferMode,
     ) -> None:
         """
@@ -184,9 +198,9 @@ class RemoteTarget:
 
         Parameters
         ----------
-        src : Union[str, PathLike[Any]]
+        src : str |  PathLike[Any]
             Source directory
-        std : Union[str, PathLike[Any]]
+        std : str |  PathLike[Any]
             Destination directory
         mode : TransferMode
             Direction in which data is transferred between submit host and target
@@ -214,7 +228,7 @@ class RemoteTarget:
         ssh_options_str = " ".join(f"-o {o}" for o in ssh_options)
         rsync_flags = [
             "--archive",
-            # Limit output (uncomment for debugging)
+            # Limited output (uncomment for debugging)
             # "--progress",
             # "--verbose",
             f'-e "ssh -p {self._target.port} {ssh_options_str}"',
@@ -262,17 +276,18 @@ class RemoteTarget:
         status = -1 if result is None else result.exited
         expect_ok(status)
 
-    def purge(self: "RemoteTarget") -> None:
+    def purge(self: RemoteTarget) -> None:
         """
         Delete all job files from the target.
         """
         expect_ok(
             self._run(
-                self._get_connection(), f"rm -rf {get_jobs_dir(hidden=True)}",
+                self._get_connection(),
+                f"rm -rf {get_jobs_dir(hidden=True)}",
             ).exited
         )
 
-    def clean_up(self: "RemoteTarget", job: Job) -> None:
+    def clean_up(self: RemoteTarget, job: Job) -> None:
         """
         Clean up job related files on the target.
 
@@ -282,11 +297,14 @@ class RemoteTarget:
             The job of which related files should be deleted on the target
         """
         expect_ok(
-            self._run(self._get_connection(), f"rm -rf {job.remote_output}",).exited
+            self._run(
+                self._get_connection(),
+                f"rm -rf {job.remote_output}",
+            ).exited
         )
 
     def _create_oe_files(
-        self: "RemoteTarget", connection: Connection, stream_contents: bool
+        self: RemoteTarget, connection: Connection, stream_contents: bool
     ) -> tuple[str, str]:
         """
         Create job output and error files and optionally stream their contents as they are appended.
@@ -320,16 +338,16 @@ class RemoteTarget:
         return oe
 
     def _run(
-        self: "RemoteTarget",
+        self: RemoteTarget,
         connection: Connection,
         cmd: str,
         warn: bool = True,
         hide: bool = False,
         asynchronous: bool = False,
-        env: dict[str, Any] = {},
-        out_stream: Union[TextIO, Any] = sys.stdout,
-        err_stream: Union[TextIO, Any] = sys.stderr,
-        modules: list[str] = [],
+        env: dict[str, Any] | None = None,
+        out_stream: TextIO | Any = sys.stdout,
+        err_stream: TextIO | Any = sys.stderr,
+        modules: list[str] | None = None,
     ) -> Result:
         """
         Prefix a shell command with commands to source target shell scripts and load environment modules before executing it.
@@ -346,13 +364,13 @@ class RemoteTarget:
             If true, both the standard output and standard error of the command will be suppressed (Defaults to False)
         asynchronous : bool
             If true, run the command in the background without blocking and return a Promise instead of a Result (Defaults to False)
-        env : Dict[str, Any]
+        env : dict[str, Any]
             Shell environment used for command execution
-        out_stream : Union[TextIO, Any]
+        out_stream : TextIO |  Any
             The target where the standard output of the command should be sent (Defaults to sys.stdout)
-        err_stream : Union[TextIO, Any]
+        err_stream : TextIO |  Any
             The target where the standard error of the command should be sent (Defaults to sys.stderr)
-        modules : List[str]
+        modules : list[str]
             Optional environment modules to be loaded before executing the command
 
         Returns
@@ -360,6 +378,10 @@ class RemoteTarget:
         Result
             The result of the command
         """
+        if env is None:
+            env = {}
+        if modules is None:
+            modules = []
         # Prefix command with source scripts and modules before execution
         specific_modules = [self._target.module_map[m] for m in modules]  # type: ignore[index]
         cmd = " && ".join(
@@ -391,19 +413,19 @@ class RemoteTarget:
 
         Returns
         -------
-        Dict[str, Any]
+        dict[str, Any]
             Environment variables for the job to be set on the target
         """
-        env = dict(
-            MS_ARRAY_ID=job.array_id,
-            MS_ARRAY_IDX=job.array_idx,
-            MS_INPUT=f"~/{job.remote_input}",
-            MS_OUTPUT=f"~/{job.remote_output}",
-            TERM="dumb",  # See man "term(7)"
-        )
+        env = {
+            "MS_ARRAY_ID": job.array_id,
+            "MS_ARRAY_IDX": job.array_idx,
+            "MS_INPUT": f"~/{job.remote_input}",
+            "MS_OUTPUT": f"~/{job.remote_output}",
+            "TERM": "dumb",  # See man "term(7)"
+        }
         return env
 
-    def setup(self: "RemoteTarget", job: Job) -> None:
+    def setup(self: RemoteTarget, job: Job) -> None:
         """
         Run the set up command of the job files on the target.
 
@@ -448,9 +470,9 @@ class RemoteTarget:
         on_end: Any = lambda *args, **kwargs: None
 
     def execute(
-        self: "RemoteTarget",
+        self: RemoteTarget,
         job: Job,
-        callbacks: JobExecutionCallbacks = JobExecutionCallbacks(),
+        callbacks: JobExecutionCallbacks | None = None,
     ) -> int:
         """
         Execute the job on the target.
@@ -467,14 +489,20 @@ class RemoteTarget:
         int
             The exit code of the job or -1 if it could not be determined
         """
+        if callbacks is None:
+            callbacks = RemoteTarget.JobExecutionCallbacks()
+        with self._get_connection() as connection:
+            # Create the job output folder (delete any existing one to avoid confusion)
+            expect_ok(self._run(connection, f"rm -rf {job.remote_output}").exited)
+            expect_ok(self._run(connection, f"mkdir -p {job.remote_output}").exited)
         return self._execute(job, callbacks, RemoteTarget.__get_job_env(job))
 
     @abc.abstractmethod
     def _execute(
-        self: "RemoteTarget",
+        self: RemoteTarget,
         job: Job,
         callbacks: JobExecutionCallbacks,
-        env: dict[str, Any] = {},
+        env: dict[str, Any] | None = None,
     ) -> int:
         """
         Execute the job on the remote target.
@@ -485,7 +513,7 @@ class RemoteTarget:
             The job to be executed on the target
         callbacks : JobExecutionCallbacks
             Callback functions for job state changes
-        env : Dict[str, Any]
+        env : dict[str, Any]
             Optional environment variables to be injected on the target before executing the job
 
         Returns
@@ -500,7 +528,7 @@ class RemoteTarget:
         """
         raise NotImplementedError()
 
-    def get_status(self: "RemoteTarget") -> TargetStatus:
+    def get_status(self: RemoteTarget) -> TargetStatus:
         """
         Get the status of the remote target.
 

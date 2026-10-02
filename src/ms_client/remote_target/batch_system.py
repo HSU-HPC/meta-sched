@@ -1,9 +1,11 @@
 """Module containing base class for executing jobs on a remote batch system."""
 
+from __future__ import annotations
+
 import abc
 import sys
 import time
-from typing import Any, Optional
+from typing import Any
 
 from fabric import Connection  # type: ignore[attr-defined]
 from ms_common.utils import eprint
@@ -20,7 +22,7 @@ class BatchSystemTarget(RemoteTarget):
 
     @abc.abstractmethod
     def _submit_job(
-        self: "BatchSystemTarget",
+        self: BatchSystemTarget,
         connection: Connection,
         job: Job,
         oe: tuple[str, str],
@@ -35,9 +37,9 @@ class BatchSystemTarget(RemoteTarget):
             The SSH connection to the remote target
         job : Job
             The job to be executed
-        oe : Tuple[str, str]
+        oe : tuple[str, str]
             The filename for the output and error files to be used by the job
-        env : Dict[str, Any]
+        env : dict[str, Any]
             Environment variables to be set
 
         Returns
@@ -54,7 +56,7 @@ class BatchSystemTarget(RemoteTarget):
 
     @abc.abstractmethod
     def _has_job_started(
-        self: "BatchSystemTarget", connection: Connection, local_job_id: str
+        self: BatchSystemTarget, connection: Connection, local_job_id: str
     ) -> bool:
         """
         Check if the job has started being executed by the batch system.
@@ -80,8 +82,8 @@ class BatchSystemTarget(RemoteTarget):
 
     @abc.abstractmethod
     def _get_job_start_time(
-        self: "BatchSystemTarget", connection: Connection, local_job_id: str
-    ) -> Optional[int]:
+        self: BatchSystemTarget, connection: Connection, local_job_id: str
+    ) -> int | None:
         """
         Get the timestamp of when the job started executing.
 
@@ -94,7 +96,7 @@ class BatchSystemTarget(RemoteTarget):
 
         Returns
         -------
-        Optional[int]
+        int | None
             The unix timestamp (seconds since epoch) of when the job has started or None if it could not be determined
 
         Raises
@@ -106,7 +108,7 @@ class BatchSystemTarget(RemoteTarget):
 
     @abc.abstractmethod
     def _has_job_ended(
-        self: "BatchSystemTarget", connection: Connection, local_job_id: str
+        self: BatchSystemTarget, connection: Connection, local_job_id: str
     ) -> bool:
         """
         Check if the job has stopped being executed by the batch system.
@@ -132,8 +134,8 @@ class BatchSystemTarget(RemoteTarget):
 
     @abc.abstractmethod
     def _get_job_end_time(
-        self: "BatchSystemTarget", connection: Connection, local_job_id: str
-    ) -> Optional[int]:
+        self: BatchSystemTarget, connection: Connection, local_job_id: str
+    ) -> int | None:
         """
         Get the timestamp of when the job stopped executing.
 
@@ -146,7 +148,7 @@ class BatchSystemTarget(RemoteTarget):
 
         Returns
         -------
-        Optional[int]
+        int | None
             The unix timestamp (seconds since epoch) of when the job has stopped executing or None if it could not be determined
 
         Raises
@@ -158,7 +160,7 @@ class BatchSystemTarget(RemoteTarget):
 
     @abc.abstractmethod
     def _cancel_job(
-        self: "BatchSystemTarget", connection: Connection, local_job_id: str
+        self: BatchSystemTarget, connection: Connection, local_job_id: str
     ) -> None:
         """
         Cancel the job submitted to the batch system.
@@ -179,8 +181,8 @@ class BatchSystemTarget(RemoteTarget):
 
     @abc.abstractmethod
     def _get_job_exit_code(
-        self: "BatchSystemTarget", connection: Connection, local_job_id: str
-    ) -> Optional[int]:
+        self: BatchSystemTarget, connection: Connection, local_job_id: str
+    ) -> int | None:
         """
         Check if the job has started being executed by the batch system.
 
@@ -193,7 +195,7 @@ class BatchSystemTarget(RemoteTarget):
 
         Returns
         -------
-        Optional[int]
+        int | None
             The exit code of the job or None if it could not be determined
 
         Raises
@@ -204,10 +206,10 @@ class BatchSystemTarget(RemoteTarget):
         raise NotImplementedError()
 
     def _execute(
-        self: "BatchSystemTarget",
+        self: BatchSystemTarget,
         job: Job,
         callbacks: RemoteTarget.JobExecutionCallbacks,
-        env: dict[str, Any] = {},
+        env: dict[str, Any] | None = None,
     ) -> int:
         """
         Execute the job directly on the target.
@@ -218,7 +220,7 @@ class BatchSystemTarget(RemoteTarget):
             The job to be executed on the target
         callbacks : RemoteTarget.JobExecutionCallbacks
             Callback functions for job state changes
-        env : Dict[str, Any]
+        env : dict[str, Any]
             Optional environment variables to be injected on the target before executing the job
 
         Returns
@@ -226,6 +228,8 @@ class BatchSystemTarget(RemoteTarget):
         int
             The exit code of the job or -1 if it could not be determined
         """
+        if env is None:
+            env = {}
         output_error_files: tuple[str, str]
         local_job_id: str
         stream_oe = False  # Must be false if not using long living connection
@@ -234,12 +238,12 @@ class BatchSystemTarget(RemoteTarget):
         requested_seconds = job.spec.get_target_seconds(self._target, job.array_idx)
         eprint(f"SECONDS_REQUESTED={requested_seconds}")
         # Use a fresh, ephemeral connection to ensure correct paths
-        with self._get_connection(fresh=True) as connection:
-            with connection.cd(job.remote_output):
-                output_error_files = self._create_oe_files(connection, stream_oe)
-                local_job_id = self._submit_job(
-                    connection, job, output_error_files, env
-                )
+        with (
+            self._get_connection(fresh=True) as connection,
+            connection.cd(job.remote_output),
+        ):
+            output_error_files = self._create_oe_files(connection, stream_oe)
+            local_job_id = self._submit_job(connection, job, output_error_files, env)
 
         def await_job_start() -> None:
             """
@@ -281,14 +285,14 @@ class BatchSystemTarget(RemoteTarget):
             )
 
         def clean_up_and_get_job_status(
-            interrupted_error: Optional[InterruptedError],
+            interrupted_error: InterruptedError | None,
         ) -> int:
             """
             Deletes temporary job output files (stdout, stderr) and determines job exit code.
 
             Parameters
             ----------
-            interrupted_error : Optional[InterruptedError]
+            interrupted_error : InterruptedError | None
                 The InterruptedError that may have occurred during the execution of the job
 
             Returns
@@ -304,9 +308,12 @@ class BatchSystemTarget(RemoteTarget):
             eprint("--- d. Cleaning up output/error files and getting exit code ---")
             sleep(1)  # Wait a bit for the output/error to be received when streaming
             # Use a fresh, ephemeral connection to ensure correct paths
-            with self._get_connection(
-                fresh=True, ignore_interrupted_error=True
-            ) as connection, connection.cd(job.remote_output):
+            with (
+                self._get_connection(
+                    fresh=True, ignore_interrupted_error=True
+                ) as connection,
+                connection.cd(job.remote_output),
+            ):
                 if not stream_oe:
                     eprint()  # Separate with blank line
                     for filename, stream in zip(
@@ -334,7 +341,8 @@ class BatchSystemTarget(RemoteTarget):
                 exit_code = -1
             return exit_code
 
-        interrupted_error: Optional[InterruptedError] = None
+        interrupted_error: InterruptedError | None = None
+        job_status: int = -1
         was_job_started = False
         try:
             await_job_start()
@@ -347,4 +355,5 @@ class BatchSystemTarget(RemoteTarget):
             with self._get_connection(ignore_interrupted_error=True) as connection:
                 self._cancel_job(connection, local_job_id)
         finally:
-            return clean_up_and_get_job_status(interrupted_error)
+            job_status = clean_up_and_get_job_status(interrupted_error)
+        return job_status

@@ -32,7 +32,7 @@ def get_config_paths() -> tuple[Path, Path]:
 
     Returns
     -------
-    Tuple[Path, Path]
+    tuple[Path, Path]
         the paths of the main and meta scheduler SSH configuration file of the current user
     """
     dir_path = Path.home() / ".ssh"
@@ -62,7 +62,7 @@ def update_config(include_targets_hostnames: dict[str, str]) -> int:
 
     Parameters
     ----------
-    include_targets_hostnames : Dict[str, str]
+    include_targets_hostnames : dict[str, str]
         The mapping of target identifiers to hostnames for the targets available for executing jobs through the meta scheduler
 
     Returns
@@ -74,16 +74,17 @@ def update_config(include_targets_hostnames: dict[str, str]) -> int:
     config_path, base_config_path = get_config_paths()
     config_path.parent.mkdir(parents=True, exist_ok=True)
     if not config_path.exists():
-        header = "\n".join([
+        header_rows = [
             "# === Meta Scheduler SSH configuration ===",
             "# This file must contain all targets to be used",
             "# AND any required proxy configurations.",
             "# (Entries in ~/.ssh/config are not used!)",
             "# Ensure non-interactiv connections are possible!",
-            "# (Test with: ssh <target> hostname)"
+            "# (Test with: ssh <target> hostname)",
             "",
             "",
-        ])
+        ]
+        header = "\n".join(header_rows)
         config_path.write_text(header)
     base_config = base_config_path.read_text() if base_config_path.is_file() else ""
     include = "Include config.d/meta-sched"

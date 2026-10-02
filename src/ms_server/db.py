@@ -1,11 +1,12 @@
 """Module containing database specific code for the Meta Scheduler server component."""
 
-from typing import Any, Dict, List, Optional, Set
+from __future__ import annotations
+
+from typing import Any
 
 import zmq
-from ms_common.schemas import JobKey, SchedulingDecisionType
+from ms_common.schemas import JobKey, SchedulingDecisionType, Target
 from ms_common.schemas import Spec as JobSpec
-from ms_common.schemas import Target
 from ms_common.schemas import TargetStatus as TargetStatusSchema
 from pydantic import BaseModel
 from sqlalchemy import JSON, Column, ForeignKey, Integer, String, delete, select, update
@@ -26,8 +27,6 @@ class _Base(AsyncAttrs, DeclarativeBase):
     """
     SQLAlchemy model base class.
     """
-
-    pass
 
 
 class TargetStatus(_Base):
@@ -112,7 +111,7 @@ class DataBase(Model):
     Database class containing the state of the Meta Scheduler server component which implements the model interface.
     """
 
-    def __init__(self: "DataBase", db_url: str, targets: List[Target]) -> None:
+    def __init__(self: DataBase, db_url: str, targets: list[Target]) -> None:
         """
         Connect to a database to use as the Meta Scheduler server model.
 
@@ -123,7 +122,7 @@ class DataBase(Model):
             For SQLite use sqlite://path/to/my.db
             For PostgreSQL use postgresql://username:password@host:port/dbname
             For an ephemeral in-memory database for testing use sqlite://
-        targets : List[Target]
+        targets : list[Target]
             The targets available to the Meta Scheduler
         """
         prefix, suffix = db_url.split("://")
@@ -134,9 +133,9 @@ class DataBase(Model):
         else:
             raise ValueError("Invalid db_url prefix", prefix)
         db_url = f"{prefix}://{suffix}"
-        connect_args = dict(
-            check_same_thread=False
-        )  # SQLite compatibility for SQLAlchemy
+        connect_args = {
+            "check_same_thread": False
+        }  # SQLite compatibility for SQLAlchemy
         self.__engine = create_async_engine(
             db_url,
             connect_args=connect_args,
@@ -151,25 +150,24 @@ class DataBase(Model):
 
         self.__targets = {t.id: t for t in targets}
 
-    async def init_models(self: "DataBase") -> None:
+    async def init_models(self: DataBase) -> None:
         """Create the tables for the model."""
         async with self.__engine.begin() as connection:
             await connection.run_sync(_Base.metadata.create_all)
 
-        async with self.__make_async_session() as session:
-            async with session.begin():
-                # Initially the status of all targets is unknown
-                await session.execute(delete(TargetStatus))
-                session.add_all(
-                    [TargetStatus(target_id=t, status=None) for t in self.__targets]
-                )
+        async with self.__make_async_session() as session, session.begin():
+            # Initially the status of all targets is unknown
+            await session.execute(delete(TargetStatus))
+            session.add_all(
+                [TargetStatus(target_id=t, status=None) for t in self.__targets]
+            )
 
-    async def dispose(self: "DataBase") -> None:
+    async def dispose(self: DataBase) -> None:
         """Disconnect cleanly from the database."""
         await self.__engine.dispose()
 
     async def create_job_array(
-        self: "DataBase", spec: JobSpec, available_targets: Set[str], token: str
+        self: DataBase, spec: JobSpec, available_targets: set[str], token: str
     ) -> int:
         """
         Create a new array of jobs for scheduling.
@@ -178,7 +176,7 @@ class DataBase(Model):
         ----------
         spec : job.Spec
             The job specification (also determines the number of jobs in the array)
-        available_targets: Set[str]
+        available_targets: set[str]
             The set of targets on which the jobs may be executed
         token: str
             The token to associate with the jobs (required to look them up in the database)
@@ -201,13 +199,13 @@ class DataBase(Model):
                 await session.refresh(job_array)
             return int(job_array.id)  # pyright: ignore[reportArgumentType]
 
-    async def get_pending_jobs(self: "DataBase") -> List[JobSchema]:
+    async def get_pending_jobs(self: DataBase) -> list[JobSchema]:
         """
         Get a list of jobs which are pending scheduling.
 
         Returns
         -------
-        List[Job]
+        list[Job]
             The list of pending jobs
         """
         async with self.__make_async_session() as session:
@@ -216,13 +214,13 @@ class DataBase(Model):
             )
             return [JobSchema.model_validate(s) for s in result.scalars().all()]
 
-    async def get_decided_jobs(self: "DataBase") -> List[JobSchema]:
+    async def get_decided_jobs(self: DataBase) -> list[JobSchema]:
         """
         Get a list of jobs for which a scheduling decision has been made.
 
         Returns
         -------
-        List[Job]
+        list[Job]
             The list of scheduled jobs
         """
         async with self.__make_async_session() as session:
@@ -235,7 +233,7 @@ class DataBase(Model):
             return [JobSchema.model_validate(s) for s in result.scalars().all()]
 
     async def __get_job(
-        self: "DataBase", job_key: JobKey, session: Optional[AsyncSession] = None
+        self: DataBase, job_key: JobKey, session: AsyncSession | None = None
     ) -> Job:
         """
         Get a job from the database by key.
@@ -244,7 +242,7 @@ class DataBase(Model):
         ----------
         job_key : JobKey
             The key of the job that should be looked up from the database
-        session : Optional[AsyncSession]
+        session : AsyncSession | None
             The existing database session to use (will not be closed)
 
         Returns
@@ -276,7 +274,7 @@ class DataBase(Model):
             if should_close_session:
                 await session.close()
 
-    async def get_job(self: "DataBase", job_key: JobKey) -> JobSchema:
+    async def get_job(self: DataBase, job_key: JobKey) -> JobSchema:
         """
         Get an existing job.
 
@@ -299,9 +297,7 @@ class DataBase(Model):
             job = await self.__get_job(job_key, session)
             return JobSchema.model_validate(job)
 
-    async def update_job(
-        self: "DataBase", job_key: JobKey, data: Dict[str, Any]
-    ) -> None:
+    async def update_job(self: DataBase, job_key: JobKey, data: dict[str, Any]) -> None:
         """
         Update an existing job.
 
@@ -309,7 +305,7 @@ class DataBase(Model):
         ----------
         job_key : JobKey
             The key of the job to be updated
-        data : Dict[str, Any]
+        data : dict[str, Any]
             The keys and corresponding values which should be updated at the job
 
         Raises
@@ -329,7 +325,7 @@ class DataBase(Model):
             job_json = JobSchema.model_validate(job).model_dump_json()
         self.__pub_socket.send_string(f"job:{job_key} {job_json}")
 
-    async def remove_job(self: "DataBase", job_key: JobKey) -> None:
+    async def remove_job(self: DataBase, job_key: JobKey) -> None:
         """
         Remove a job.
 
@@ -350,7 +346,7 @@ class DataBase(Model):
         self.__pub_socket.send_string(f"job:{job_key} null")
 
     async def await_scheduling_decision(
-        self: "DataBase", job_key: JobKey
+        self: DataBase, job_key: JobKey
     ) -> SchedulingDecisionType:
         """
         Await a scheduling decision for a specific job.
@@ -382,7 +378,7 @@ class DataBase(Model):
             return decision
 
     async def update_targets_status(
-        self: "DataBase", target_id: str, status: TargetStatusSchema
+        self: DataBase, target_id: str, status: TargetStatusSchema
     ) -> None:
         """
         Update the status of a target.
@@ -396,16 +392,15 @@ class DataBase(Model):
         """
         if target_id not in self.__targets:
             raise KeyError("No target with this ID: {target_id}")
-        async with self.__make_async_session() as session:
-            async with session.begin():
-                await session.execute(
-                    update(TargetStatus)
-                    .where(TargetStatus.target_id == target_id)
-                    .values(status=status.model_dump())
-                )
+        async with self.__make_async_session() as session, session.begin():
+            await session.execute(
+                update(TargetStatus)
+                .where(TargetStatus.target_id == target_id)
+                .values(status=status.model_dump())
+            )
 
     async def get_targets_status(
-        self: "DataBase",
+        self: DataBase,
     ) -> TargetsStatus:
         """
         Get all targets and their last known status.

@@ -9,7 +9,7 @@ from pathlib import Path
 
 if len(sys.argv) != 3:
     print(f"Usage: {sys.argv[0]} <filename> <shift-count>", file=sys.stderr)
-    exit(1)
+    sys.exit(1)
 
 input_file = Path(sys.argv[1])
 offset = int(sys.argv[2])
@@ -80,7 +80,6 @@ def encrypt(text: str) -> str:
     str
         The encrypted text
     """
-    global offset
     return "".join([shift(c, offset) for c in text])
 
 

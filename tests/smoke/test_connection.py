@@ -9,15 +9,27 @@
 # meta-sched-client = { path = "../../packages/ms_client", editable = true }
 # ///
 
+"""
+Script to test connection to a remote target.
+"""
+
 import argparse
 import sys
-from typing import List
 
 from ms_client.client import Client
 from ms_client.config import Config
 from ms_client.remote_target import RemoteTarget
 
-def test_connection(args: List[str]):
+def test_connection(args: list[str]):
+    """
+    Test the connection to a remote target.
+
+    Parameters
+    ----------
+    args : list[str]
+        Command line arguments to parse
+        (Expected exactly one: target_id)
+    """
     arg_parser = argparse.ArgumentParser()
     arg_parser.add_argument("target_id", type=str)
     args = arg_parser.parse_args()

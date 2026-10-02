@@ -71,8 +71,8 @@ class CLI:
         self.require_can_use_client()
         try:
             targets = self.__client.targets
-        except Exception:
-            eprint("Could not connect to scheduler")
+        except Exception as e:  # noqa: BLE001
+            eprint("Error connecting to scheduler:", e)
             return os.EX_UNAVAILABLE
         targets_missing_user = ssh.update_config({t.id: t.host for t in targets})
         print("Updated", ssh.get_config_paths()[0], end=".\n")
@@ -135,8 +135,8 @@ class CLI:
         if job_spec not in job_specs:
             eprint("No such job spec:", job_spec)
             eprint(f"\nAvailable under {get_jobs_dir().absolute()}:")
-            for job_spec in job_specs:
-                eprint("-", job_spec)
+            for js in job_specs:
+                eprint("-", js)
             return os.EX_NOINPUT
         try:
             # Validate job spec
@@ -348,10 +348,13 @@ class CLI:
         df = df.dropna()
         target: Target
         try:
-            target = [t for t in self.__client.targets if t.id == target_id][0]
-        except Exception:
+            target = next(t for t in self.__client.targets if t.id == target_id)
+        except StopIteration:
             eprint("Could not find target with this ID:", target_id)
             sys.exit(os.EX_USAGE)
+        except Exception as e:  # noqa: BLE001
+            eprint("Error fetching targets:", e)
+            sys.exit(os.EX_TEMPFAIL)
         jobs_using_target = df[df["status"].str.contains(target_id, na=False)][
             "job_id"
         ].values
@@ -372,8 +375,8 @@ class CLI:
         try:
             remote_target.purge()
             return os.EX_OK
-        except Exception:
-            eprint("Failed.")
+        except Exception as e:  # noqa: BLE001
+            eprint("Failed:", e)
             return os.EX_TEMPFAIL
 
     def run(self: "CLI") -> int:
@@ -411,7 +414,7 @@ class CLI:
                 dest = arg.replace("_", "-")
                 if dest == "self":
                     continue
-                kwargs: dict[str, Any] = dict()
+                kwargs: dict[str, Any] = {}
                 default = None
                 if i >= len(args) - len(defaults):
                     default = defaults[i - (len(args) - len(defaults))]

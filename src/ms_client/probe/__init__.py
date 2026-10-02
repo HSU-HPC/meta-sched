@@ -2,13 +2,14 @@
 
 """Module containing probe used to update remote target status at Meta Scheduler Server."""
 
+from __future__ import annotations
+
 import argparse
 import multiprocessing
 import os
 import sys
 import time
-from datetime import datetime
-from typing import Optional
+from datetime import UTC, datetime
 
 from ms_common.schemas import PowerForecast, Target, TargetStatus
 from ms_common.utils import eprint
@@ -16,21 +17,19 @@ from pydantic import ValidationError
 
 from ms_client.client import Client
 from ms_client.config import Config
-from ms_client.probe.datacenter_api_client import (
-    ApiArgs,
-    Forecast,
-    ForecastSource,
-)
+from ms_client.probe.datacenter_api_client import ApiArgs, Forecast, ForecastSource
 from ms_client.remote_target import RemoteTarget
 from ms_client.remote_target.factory import remote_target_from_target
 from ms_client.ssh import has_ssh_config_entry
 from ms_client.utils import sleep
 
+_tz = UTC
+
 
 def _get_target_status(
     target: Target,
     remote_target: RemoteTarget,
-    forecast_source: Optional[ForecastSource],
+    forecast_source: ForecastSource | None,
     verbose: bool = False,
 ) -> TargetStatus:
     """
@@ -42,14 +41,14 @@ def _get_target_status(
         The target to monitor for updates
     remote_target : RemoteTarget
         An instance of the remote target to execute commands (fetch status)
-    forecast_source : Optional[ForecastSource]
+    forecast_source : ForecastSource | None
         ForecastSource for the datacenter API of this target
         (Used to fetch additional data about the state of the target)
     verbose : bool
         Print some fetched information about the target (Defaults to False)
     """
     target_status: TargetStatus
-    print(f"===== Fetched state at {datetime.now()} =====")
+    print(f"===== Fetched state at {datetime.now(_tz)} ({_tz.tzname}) =====")
     try:
         target_status = remote_target.get_status()
     except NotImplementedError:
@@ -74,7 +73,7 @@ def _get_target_status(
             )
             for f in forecasts
         ]
-        df = Forecast.forecasts_to_dataframe(forecasts)
+        df = Forecast.forecasts_to_dataframe(forecasts, _tz)
         if verbose:
             print("\nPower Forecast:")
             print(df.head().to_string(index=False))
@@ -86,7 +85,7 @@ def _monitor_target(
     client: Client,
     target: Target,
     interval: float,
-    forecast_source: Optional[ForecastSource],
+    forecast_source: ForecastSource | None,
     verbose: bool = False,
 ) -> None:
     """
@@ -100,7 +99,7 @@ def _monitor_target(
         The target to monitor for updates
     interval : float
         The number of seconds between subsequent updates of the target status
-    forecast_source : Optional[ForecastSource]
+    forecast_source : ForecastSource | None
         Forecast source for the datacenter API of this target
         (Used to fetch additional data about the state of the target)
     verbose : bool
@@ -111,17 +110,17 @@ def _monitor_target(
     with remote_target_from_target(target) as remote_target:
         while True:
             start = time.perf_counter()
-            target_status: Optional[TargetStatus]
+            target_status: TargetStatus | None
             try:
                 target_status = _get_target_status(
                     target, remote_target, forecast_source, verbose
                 )
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 eprint("Error fetching target status:", e)
                 break
             try:
                 client.update_target_status(target.id, target_status, api_key)
-            except Exception as e:
+            except Exception as e:  # noqa: BLE001
                 eprint("Error sending target status to Meta Scheduler API:", e)
                 break
             sleep_for = max(0, interval - (time.perf_counter() - start))
@@ -162,13 +161,13 @@ def main() -> int:
         eprint(
             f"Add at least one target using msprobe -t <target ID> {' '.join(sys.argv[1:])}"
         )
-        exit(os.EX_USAGE)
+        sys.exit(os.EX_USAGE)
 
     if "MS_API_KEY" not in os.environ:
         eprint(
             f"API key missing!\n\nUsage:\n\tMS_API_KEY=someSecret msprobe {' '.join(sys.argv[1:])}"
         )
-        exit(os.EX_USAGE)
+        sys.exit(os.EX_USAGE)
 
     try:
         config = Config.load(raise_on_missing=True)
@@ -187,7 +186,7 @@ def main() -> int:
             if not has_ssh_config_entry(t.id):
                 raise RuntimeError(f"No SSH alias set up for target {t.id} ({t.host})")
             target_ids.remove(t.id)
-            datacenter_api_forecast_source: Optional[ForecastSource] = None
+            datacenter_api_forecast_source: ForecastSource | None = None
             if t.id in targets_config:
                 datacenter_api_endpoint = targets_config[t.id].datacenter_api_endpoint
                 datacenter_api_forecast_source_id = targets_config[

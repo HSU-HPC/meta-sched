@@ -1,10 +1,12 @@
 """Module for parsing config files."""
 
+from __future__ import annotations
+
 import importlib
 import importlib.util
 from os import PathLike
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Type, Union
+from typing import Any
 
 import tomli
 from ms_common.schemas import Target
@@ -25,11 +27,11 @@ class Config(BaseModel):
         The port of the API
     db_url : str
         The connection URL to the Postgres/SQLite database
-    scheduler_class : Optional[Type[Policy]]
+    scheduler_class : Type[Policy] | None
         The scheduling policy to be applied
     scheduling_loop_interval : float
         The interval period between applying the scheduling policy in seconds
-    targets : List[Target]
+    targets : list[Target]
         All targets available to execute jobs
     """
 
@@ -37,10 +39,10 @@ class Config(BaseModel):
     port: int
     db_url: str
     scheduler_class_name: str
-    _scheduler_class: Optional[Type[Policy]] = None
-    scheduler_parameter_overrides: Dict[str, Any] = {}
+    _scheduler_class: type[Policy] | None = None
+    scheduler_parameter_overrides: dict[str, Any] = {}
     scheduling_loop_interval: float
-    targets: List[Target]
+    targets: list[Target]
 
     @classmethod
     def get_default_config_path(cls) -> Path:
@@ -67,7 +69,7 @@ class Config(BaseModel):
         return (Path(__file__).parent / "example.toml").absolute()
 
     @property
-    def scheduler_class(self: "Config") -> Type[Policy]:
+    def scheduler_class(self: Config) -> type[Policy]:
         """
         Get the scheduling policy to be applied.
 
@@ -80,13 +82,13 @@ class Config(BaseModel):
         return self._scheduler_class
 
     @classmethod
-    def load(cls, path: Union[str, PathLike[Any]]) -> "Config":
+    def load(cls, path: str | PathLike[Any]) -> Config:
         """
         Load a configuration from a file.
 
         Parameters
         ----------
-        path : Union[str, PathLike[Any]]
+        path : str |  PathLike[Any]
             The path to the file containing the configuration
 
         Returns
@@ -136,8 +138,8 @@ class Config(BaseModel):
         except (ModuleNotFoundError, AttributeError, AssertionError):
             raise ValueError(f'Could not load scheduler "{config["scheduler_class"]}"')
         if not issubclass(scheduler_class, Policy):
-            raise ValueError(
-                f'"{config.scheduler_class_name}" is not a subclass of "{Policy.__class__.__qualname__}"' # pyright: ignore [reportAttributeAccessIssue]
+            raise TypeError(
+                f'"{config.scheduler_class_name}" is not a subclass of "{Policy.__qualname__}"'
             )
         config._scheduler_class = scheduler_class
         target_ids = set()

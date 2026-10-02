@@ -1,16 +1,18 @@
 """Module containing scheduling policy implementations which use randomness."""
 
+from __future__ import annotations
+
+import asyncio
 import json
-import os
 import random
 import time
-from typing import List
 
 from ms_common.schemas import Assigned, Target
-from ms_common.utils import deprecated_class, eprint
+from ms_common.utils import deprecated_class
 
 from ms_server.model import Job, TargetsStatus
 from ms_server.scheduling import GreedyPolicy, ScheduleJobCallback
+from ms_server.utils import write_policy_log
 
 
 class Uniform(GreedyPolicy):
@@ -20,9 +22,9 @@ class Uniform(GreedyPolicy):
     """
 
     async def schedule_job(
-        self: "Uniform",
+        self: Uniform,
         job: Job,
-        decided_jobs: List[Job],
+        decided_jobs: list[Job],
         targets_status: TargetsStatus,
     ) -> None:
         """
@@ -32,7 +34,7 @@ class Uniform(GreedyPolicy):
         ----------
         job : Job
             The job to be scheduled
-        decided_jobs : List[Job]
+        decided_jobs : list[Job]
             The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available
@@ -50,9 +52,9 @@ class WeightedByCores(GreedyPolicy):
     """
 
     async def schedule_job(
-        self: "WeightedByCores",
+        self: WeightedByCores,
         job: Job,
-        decided_jobs: List[Job],
+        decided_jobs: list[Job],
         targets_status: TargetsStatus,
     ) -> None:
         """
@@ -62,7 +64,7 @@ class WeightedByCores(GreedyPolicy):
         ----------
         job : Job
             The job to be scheduled
-        decided_jobs : List[Job]
+        decided_jobs : list[Job]
             The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available
@@ -93,7 +95,7 @@ class WeightedByCoresAvailabilityAbsolute(GreedyPolicy):
     """
 
     def __init__(
-        self: "WeightedByCoresAvailabilityAbsolute",
+        self: WeightedByCoresAvailabilityAbsolute,
         on_schedule_job: ScheduleJobCallback,
     ):
         """
@@ -104,15 +106,15 @@ class WeightedByCoresAvailabilityAbsolute(GreedyPolicy):
         on_schedule_job : ScheduleJobCallback
             Callback to apply scheduling decision to a job
         """
-        super(WeightedByCoresAvailabilityAbsolute, self).__init__(on_schedule_job)
+        super().__init__(on_schedule_job)
         self.weight_unavailable = 0.1
         self.amplification_renewable = 0.5
         self.threshold_reliability_renewable = 0.8
 
     async def schedule_job(
-        self: "WeightedByCoresAvailabilityAbsolute",
+        self: WeightedByCoresAvailabilityAbsolute,
         job: Job,
-        decided_jobs: List[Job],
+        decided_jobs: list[Job],
         targets_status: TargetsStatus,
     ) -> None:
         """
@@ -122,7 +124,7 @@ class WeightedByCoresAvailabilityAbsolute(GreedyPolicy):
         ----------
         job : Job
             The job to be scheduled
-        decided_jobs : List[Job]
+        decided_jobs : list[Job]
             The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available
@@ -182,22 +184,14 @@ class WeightedByCoresAvailabilityAbsolute(GreedyPolicy):
         weights = [targets_weights[t] for t in job.available_targets]
         target_id = random.choices(job.available_targets, weights, k=1)[0]
 
-        log_data = dict(
-            timestamp_ns=int(time.time_ns()),
-            job=dict(array_id=job.array_id, array_idx=job.array_idx),
-            targets_weights=targets_weights,
-            selected_target_id=target_id,
-        )
+        log_data = {
+            "timestamp_ns": int(time.time_ns()),
+            "job": {"array_id": job.array_id, "array_idx": job.array_idx},
+            "targets_weights": targets_weights,
+            "selected_target_id": target_id,
+        }
         jsonl_line = json.dumps(log_data)
-        eprint(jsonl_line)
-
-        # TODO use propper logging library
-        # e.g. /var/log/meta-sched-policy.log
-        filename = os.getenv("MS_POLICY_LOG")
-        if filename:
-            with open(filename, "a") as file:
-                file.write(jsonl_line)
-                file.write("\n")
+        await asyncio.to_thread(write_policy_log, jsonl_line)
 
         decision = Assigned(target_id=target_id)
         await self.on_schedule_job(job.key, decision)
@@ -218,7 +212,7 @@ class WeightedByCoresAvailability(GreedyPolicy):
     """
 
     def __init__(
-        self: "WeightedByCoresAvailability", on_schedule_job: ScheduleJobCallback
+        self: WeightedByCoresAvailability, on_schedule_job: ScheduleJobCallback
     ):
         """
         Create a new instance of the scheduling policy
@@ -228,15 +222,15 @@ class WeightedByCoresAvailability(GreedyPolicy):
         on_schedule_job : ScheduleJobCallback
             Callback to apply scheduling decision to a job
         """
-        super(WeightedByCoresAvailability, self).__init__(on_schedule_job)
+        super().__init__(on_schedule_job)
         self.epsilon = 1e-9
         self.amplification_renewable = 0.1
         self.threshold_reliability_renewable = 0.8
 
     async def schedule_job(
-        self: "WeightedByCoresAvailability",
+        self: WeightedByCoresAvailability,
         job: Job,
-        decided_jobs: List[Job],
+        decided_jobs: list[Job],
         targets_status: TargetsStatus,
     ) -> None:
         """
@@ -246,7 +240,7 @@ class WeightedByCoresAvailability(GreedyPolicy):
         ----------
         job : Job
             The job to be scheduled
-        decided_jobs : List[Job]
+        decided_jobs : list[Job]
             The jobs for which are scheduling decision has already been made
         targets_status : TargetsStatus
             A mapping from target IDs to the corresponding status if available
@@ -309,21 +303,14 @@ class WeightedByCoresAvailability(GreedyPolicy):
         weights = [targets_weights[t] for t in job.available_targets]
         target_id = random.choices(job.available_targets, weights, k=1)[0]
 
-        log_data = dict(
-            timestamp_ns=int(time.time_ns()),
-            job=dict(array_id=job.array_id, array_idx=job.array_idx),
-            targets_weights=targets_weights,
-            selected_target_id=target_id,
-        )
+        log_data = {
+            "timestamp_ns": int(time.time_ns()),
+            "job": {"array_id": job.array_id, "array_idx": job.array_idx},
+            "targets_weights": targets_weights,
+            "selected_target_id": target_id,
+        }
         jsonl_line = json.dumps(log_data)
-        eprint(jsonl_line)
-
-        # e.g. /var/log/meta-sched-policy.log
-        filename = os.getenv("MS_POLICY_LOG")
-        if filename:
-            with open(filename, "a") as file:
-                file.write(jsonl_line)
-                file.write("\n")
+        await asyncio.to_thread(write_policy_log, jsonl_line)
 
         decision = Assigned(target_id=target_id)
         await self.on_schedule_job(job.key, decision)

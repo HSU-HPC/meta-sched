@@ -39,9 +39,7 @@ if "MS_INPUT" not in os.environ:
 input_path = Path(os.environ["MS_INPUT"])
 mardyn_path = (input_path / "MarDyn").absolute()
 
-try:
-    assert mardyn_path.exists()
-except Exception:
+if not mardyn_path.exists():
     print(
         f"MarDyn executable not found at {mardyn_path}",
         file=sys.stderr,
@@ -65,11 +63,11 @@ if not scenario_path.is_dir():
 y_lower = 290.946 - 10 * (args.width / 2)
 y_upper = y_lower + 10 * args.width
 
-substitutions = dict(
-    Y_LOWER=y_lower,
-    Y_UPPER=y_upper,
-    STEPS=args.steps,
-)
+substitutions = {
+    "Y_LOWER": y_lower,
+    "Y_UPPER": y_upper,
+    "STEPS": args.steps,
+}
 
 # 4. Apply substitution for config template file
 config_template_path = scenario_path / "config.xml.template"

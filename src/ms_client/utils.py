@@ -1,27 +1,27 @@
 """Module containing general purpose utility classes and functions for the submit component."""
 
+from __future__ import annotations
+
 import errno
 import fcntl
 import os
 import sys
 import time
+import types
 from io import TextIOWrapper
 from os import PathLike
 from pathlib import Path
-from typing import Any, Optional, TypeVar, Union
-
-from ms_common.schemas import Target
-from ms_common.utils import eprint, is_env_flag_set
+from typing import Any, Self
 
 from fabric import Connection  # type: ignore[attr-defined]
 from invoke.runners import Result
+from ms_common.schemas import Target
+from ms_common.utils import eprint, is_env_flag_set
 
-E = TypeVar("E", bound=BaseException)
 
-
-def unwrap_error(
+def unwrap_error[E](
     error: BaseException, target_type: type[E], max_depth: int = 10
-) -> Optional[E]:
+) -> E | None:
     """
     Traverse the exception chain to find an exception of a specific type.
 
@@ -36,7 +36,7 @@ def unwrap_error(
 
     Returns
     -------
-    Optional[BaseException]
+    BaseException | None
         The first matching exception of the specified type, or None if not found.
     """
     seen: set[int] = set()
@@ -45,9 +45,9 @@ def unwrap_error(
         if isinstance(error, target_type):
             return error
         # Traverse __cause__, __context__, or args
-        next_error: Optional[BaseException] = getattr(
-            error, "__cause__", None
-        ) or getattr(error, "__context__", None)
+        next_error: BaseException | None = getattr(error, "__cause__", None) or getattr(
+            error, "__context__", None
+        )
         if not next_error and hasattr(error, "args"):
             for arg in error.args:
                 if isinstance(arg, BaseException):
@@ -65,14 +65,17 @@ class SuppressStderr:
     NOTE: This is NOT thread safe.
     """
 
-    def __enter__(self: "SuppressStderr") -> "SuppressStderr":
+    def __enter__(self) -> Self:
         self._stderr = sys.stderr
         self._devnull = open(os.devnull, "w")
         sys.stderr = self._devnull
         return self
 
     def __exit__(
-        self: "SuppressStderr", exc_type: Any, exc_value: Any, traceback: Any
+        self: SuppressStderr,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: types.TracebackType | None,
     ) -> None:
         sys.stderr = self._stderr
         self._devnull.close()
@@ -82,18 +85,18 @@ class RedirectOutputToFile:
     """Context manager for redirecting sys.stdout/sys.stderr (e.g. the output of all calls to print) to a file."""
 
     def __init__(
-        self: "RedirectOutputToFile",
-        stdout: Optional[Union[str, PathLike[Any]]] = None,
-        stderr: Optional[Union[str, PathLike[Any]]] = None,
+        self: RedirectOutputToFile,
+        stdout: str | PathLike[Any] | None = None,
+        stderr: str | PathLike[Any] | None = None,
     ) -> None:
         """
         Create a new instance to redirect stdout/stderr.
 
         Parameters
         ----------
-        stdout : Optional[Union[str, PathLike[Any]]]
+        stdout : str |  PathLike[Any] | None
             Path to redirect sys.stdout to (default None does not redirect output)
-        stderr : Optional[Union[str, PathLike[Any]]]
+        stderr : str |  PathLike[Any] | None
             Path to redirect sys.stderr to (default None does not redirect output)
         """
         self.__stdout_redirect = stdout
@@ -101,7 +104,7 @@ class RedirectOutputToFile:
         self.__stdout = sys.stdout
         self.__stderr = sys.stderr
 
-    def __enter__(self: "RedirectOutputToFile") -> "RedirectOutputToFile":
+    def __enter__(self) -> Self:
         if self.__stdout_redirect:
             sys.stdout = open(self.__stdout_redirect, "a")
         if self.__stderr_redirect:
@@ -109,7 +112,10 @@ class RedirectOutputToFile:
         return self
 
     def __exit__(
-        self: "RedirectOutputToFile", exc_type: Any, exc_value: Any, traceback: Any
+        self: RedirectOutputToFile,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: types.TracebackType | None,
     ) -> None:
         if self.__stdout_redirect:
             sys.stdout.flush()
@@ -139,7 +145,7 @@ class LockFile:
         """
         return Path("/tmp/meta-sched")
 
-    def __init__(self: "LockFile", name: str) -> None:
+    def __init__(self: LockFile, name: str) -> None:
         """
         Create a new instance to guard a critical section.
 
@@ -151,9 +157,9 @@ class LockFile:
         self.__path = LockFile.get_base_path() / name
         self.__path.parent.mkdir(parents=True, exist_ok=True)
         self.__path.touch()
-        self.__file: Optional[TextIOWrapper[Any]] = None
+        self.__file: TextIOWrapper[Any] | None = None
 
-    def __enter__(self: "LockFile") -> "LockFile":
+    def __enter__(self) -> Self:
         if self.__file:
             raise RuntimeError("Re-entry not allowed")
         self.__file = open(self.__path)
@@ -161,7 +167,10 @@ class LockFile:
         return self
 
     def __exit__(
-        self: "LockFile", exc_type: Any, exc_value: Any, traceback: Any
+        self: LockFile,
+        exc_type: type[BaseException] | None,
+        exc_value: BaseException | None,
+        traceback: types.TracebackType | None,
     ) -> None:
         if self.__file:
             fcntl.flock(self.__file.fileno(), fcntl.LOCK_UN)
@@ -173,11 +182,11 @@ class ExponentialBackoff:
     """(Clamped) exponential backoff function."""
 
     def __init__(
-        self: "ExponentialBackoff",
+        self: ExponentialBackoff,
         offset: float = 0,
         factor: float = 1,
         base: float = 2,
-        maximum: Optional[float] = 60,
+        maximum: float | None = 60,
     ) -> None:
         """
         Create a new instance of the exponential backoff function:
@@ -191,7 +200,7 @@ class ExponentialBackoff:
             The factor to be applied to the exponential function (1 by default)
         base : float
             The base of the exponential function (2 by default)
-        maximum : Optional[float]
+        maximum : float | None
             The maximum value of the backoff function (60 by default) or None if it is unclamped
         """
         self.count = 0
@@ -200,7 +209,7 @@ class ExponentialBackoff:
         self.base = base
         self.maximum = maximum
 
-    def __call__(self: "ExponentialBackoff") -> float:
+    def __call__(self: ExponentialBackoff) -> float:
         """Get the current backoff function value.
 
         Returns
@@ -213,7 +222,7 @@ class ExponentialBackoff:
             delay = min(delay, self.maximum)
         return delay
 
-    def __iadd__(self: "ExponentialBackoff", other: int) -> "ExponentialBackoff":
+    def __iadd__(self, other: int) -> Self:
         """Increment the internal counter (e.g., backoff += 1).
 
         Parameters
@@ -228,7 +237,7 @@ class ExponentialBackoff:
         self.count += other
         return self
 
-    def reset(self: "ExponentialBackoff") -> None:
+    def reset(self: ExponentialBackoff) -> None:
         """Reset the backoff function."""
         self.count = 0
 
@@ -238,7 +247,7 @@ class StatusException(Exception):
     Exception for an exit code of a process.
     """
 
-    def __init__(self, status: int, details: Optional[str] = None) -> None:
+    def __init__(self, status: int, details: str | None = None) -> None:
         """
         Create a new instance of the exception.
 
@@ -246,14 +255,14 @@ class StatusException(Exception):
         ----------
         status : int
             The exit code of the corresponding process
-        details : Optional[str]
+        details : str | None
             Additional information about the error
         """
         self.status = status
         self.details = details
 
 
-def expect_ok(status: int, details: Optional[str] = None) -> None:
+def expect_ok(status: int, details: str | None = None) -> None:
     """
     Assert that status is exit code for success.
 
@@ -261,7 +270,7 @@ def expect_ok(status: int, details: Optional[str] = None) -> None:
     ----------
     status : int
         The exit code of a previously executed process
-    details : Optional[str]
+    details : str | None
         Additional information about the (possible) error
 
     Raises
@@ -273,7 +282,12 @@ def expect_ok(status: int, details: Optional[str] = None) -> None:
         raise StatusException(status, details)
 
 
-def debug_print_cmd(cmd: str, result: Optional[Result], connection: Optional[Connection] = None, target: Optional[Target] = None) -> None:
+def debug_print_cmd(
+    cmd: str,
+    result: Result | None,
+    connection: Connection | None = None,
+    target: Target | None = None,
+) -> None:
     """
     Print executed command and output if the environment variable MS_DEBUG_CMD is set.
 
@@ -281,11 +295,11 @@ def debug_print_cmd(cmd: str, result: Optional[Result], connection: Optional[Con
     ----------
     cmd : str
         The command that was executed
-    result : Optional[Result]
+    result : Result | None
         The result of the command, if it was executed
-    connection : Optional[Connection]
+    connection : Connection | None
         The corresponding connection object, if the command is executed remotely
-    target : Optional[Target]
+    target : Target | None
         The corresponding target object, if the command is executed remotely
     """
     if not is_env_flag_set("MS_DEBUG_CMD"):

@@ -1,12 +1,13 @@
 """Module implementing job execution."""
 
+from __future__ import annotations
+
 import os
 import signal
 import sys
 import time
 import traceback
 from types import FrameType
-from typing import Optional
 
 import invoke
 import ms_common.schemas
@@ -15,7 +16,7 @@ from ms_common.schemas import Spec as JobSpec
 from ms_common.utils import eprint, is_env_flag_set, time_to_seconds
 
 from ms_client import job, ssh
-from ms_client.config import TargetAdditionalConfigs
+from ms_client.config import Config, TargetAdditionalConfigs
 from ms_client.job import Instance as Job
 from ms_client.remote_target import RemoteTarget
 from ms_client.remote_target.factory import remote_target_from_target
@@ -37,7 +38,7 @@ class Executor:
     """
 
     def __init__(
-        self: "Executor",
+        self: Executor,
         job: Job,
         job_token: str,
         scheduler: SchedulerClientInterface,
@@ -64,7 +65,7 @@ class Executor:
         self.__redirect_output = redirect_output
 
     def __signal_handler(
-        self: "Executor", signal_number: int, frame: Optional[FrameType]
+        self: Executor, signal_number: int, frame: FrameType | None
     ) -> None:
         """
         Handle a signal sent to the process.
@@ -73,7 +74,7 @@ class Executor:
         ----------
         signalnum : int
             The signal that was received
-        frame : Optional[FrameType]
+        frame : FrameType | None
             (Unused)
 
         Raises
@@ -93,7 +94,7 @@ class Executor:
     def is_target_suitable(
         target: Target,
         job_spec: JobSpec,
-        additional_configs: Optional[TargetAdditionalConfigs] = None,
+        additional_configs: TargetAdditionalConfigs | None = None,
     ) -> tuple[bool, str]:
         """
         Check if the target is suitable for executing a specific job.
@@ -102,12 +103,12 @@ class Executor:
         ----------
         job_spec : Spec
             The specification of the job considered for execution on the target
-        additional_configs : Optional[TargetAdditionalConfigs]
+        additional_configs : TargetAdditionalConfigs | None
             Additional user configurations by which to evaluate the target
 
         Returns
         -------
-        Tuple[bool, str]
+        tuple[bool, str]
             Suitability of the target for executing the job and reason
         """
 
@@ -126,9 +127,8 @@ class Executor:
         )
         if job_spec.nodes > max_nodes:
             return False, "Too many nodes required"
-        min_nodes = target.min_nodes if target.min_nodes else 1
-        if job_spec.nodes < min_nodes:
-            return False, "Too few nodes required"
+        if target.min_nodes and job_spec.nodes < target.min_nodes:
+            return False, "Too few nodes requested"
         cores_per_node = (
             target.cores_per_node
             if job_spec.ranks_per_node is None
@@ -162,18 +162,18 @@ class Executor:
             The job specification on which to filter the targets
         scheduler : SchedulerInterface
             The scheduler from which to obtain the targets to be filtered
-        targets_additional_configs : List[TargetAdditionalConfigs]
+        targets_additional_configs : list[TargetAdditionalConfigs]
             Additional user configurations by which to filter the targets
 
         Returns
         -------
-        Set[Target]
+        set[Target]
             All targets on which the job could be executed
         """
         available_targets: set[str] = set()
         try:
             targets = scheduler.targets
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             interrupted_error = unwrap_error(e, InterruptedError)
             if interrupted_error:
                 raise interrupted_error
@@ -194,7 +194,7 @@ class Executor:
                 available_targets.add(t.id)
         return available_targets
 
-    def __setup(self: "Executor") -> None:
+    def __setup(self: Executor) -> None:
         """
         Run the set up command of the job files on the submit host.
         """
@@ -202,12 +202,12 @@ class Executor:
         setup_cwd = self.__job.local_dir.absolute()
         env = {
             k: str(v)
-            for k, v in dict(
-                MS_ARRAY_ID=self.__job.array_id,
-                MS_ARRAY_IDX=self.__job.array_idx,
-                MS_INPUT=self.__job.local_input.absolute().relative_to(setup_cwd),
-                TERM="dumb",  # See man "term(7)"
-            ).items()
+            for k, v in {
+                "MS_ARRAY_ID": self.__job.array_id,
+                "MS_ARRAY_IDX": self.__job.array_idx,
+                "MS_INPUT": self.__job.local_input.absolute().relative_to(setup_cwd),
+                "TERM": "dumb",  # See man "term(7)"
+            }.items()
         }
         if self.__job.spec.cmd_setup_local:
             try:
@@ -228,7 +228,7 @@ class Executor:
             finally:
                 os.chdir(cwd)
 
-    def __run(self: "Executor") -> int:
+    def __run(self: Executor) -> int:
         """
         Execute the job (blocking the calling thread).
 
@@ -253,7 +253,7 @@ class Executor:
         target: Target
         try:
             decision = self.__scheduler.poll_scheduling_decision(self.__job_key)
-        except Exception as e:
+        except Exception as e:  # noqa: BLE001
             interrupted_error = unwrap_error(e, InterruptedError)
             if interrupted_error:
                 raise interrupted_error
@@ -261,11 +261,13 @@ class Executor:
                 os.EX_UNAVAILABLE, "Could not get scheduling decision"
             )
         if isinstance(decision, ms_common.schemas.Impossible):
-            raise Exception(f"Can't schedule job spec {self.__job.spec.name} anywhere.")
+            raise Exception(  # noqa: TRY002, TRY004
+                f"Can't schedule job spec {self.__job.spec.name} anywhere."
+            )
         elif isinstance(decision, ms_common.schemas.Assigned):
-            target = [
+            target = next(
                 t for t in self.__scheduler.targets if t.id == decision.target_id
-            ][0]
+            )
             wait_seconds = max(0, decision.timestamp_start - int(time.time()))
             eprint(
                 f"Scheduler assigned {target.id} ({target.host}) in T minus {wait_seconds} seconds (at {decision.timestamp_start})"
@@ -273,7 +275,17 @@ class Executor:
             eprint(f"MS_TARGET={target.id}")
             self.__job.set_status(job.Status.Scheduled(target.id))
         else:
-            raise ValueError("Unknown scheduling decision type")
+            raise TypeError("Unknown scheduling decision type")
+        # Consider additional source scrips
+        targets_additional_configs = {t.id: t for t in Config.load().targets}
+        if target.id in targets_additional_configs:
+            additional_configs = targets_additional_configs[target.id]
+            target = target.model_copy(
+                update={
+                    "source_scripts": target.source_scripts
+                    + additional_configs.source_scripts
+                }
+            )
         with remote_target_from_target(target) as remote_target:
             eprint(
                 f"=== 2. Copying input files to target {target.id} and run optional target setup step ==="
@@ -291,13 +303,13 @@ class Executor:
                 remote_target.setup(self.__job)
             eprint(f"=== 3. Executing job on target {target.id} ===")
 
-            def callback_job_started(timestamp: Optional[int] = None) -> None:
+            def callback_job_started(timestamp: int | None = None) -> None:
                 """
                 Callback to update the Meta Scheduler server that the job has started executing on the target.
 
                 Parameters
                 ----------
-                timestamp : Optional[int]
+                timestamp : int | None
                     The timestamp of when the job was started (Defaults to current timestamp)
                 """
                 if timestamp is None:
@@ -306,16 +318,16 @@ class Executor:
                 self.__job.set_status(job.Status.Running(target.id))
                 try:
                     self.__scheduler.update_job_started(self.__job_key, timestamp)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     eprint("Error updating job state:", e)
 
-            def callback_job_ended(timestamp: Optional[int] = None) -> None:
+            def callback_job_ended(timestamp: int | None = None) -> None:
                 """
                 Callback to update the Meta Scheduler server that the job has finished executing on the target.
 
                 Parameters
                 ----------
-                timestamp : Optional[int]
+                timestamp : int | None
                     The timestamp of when the job has ended (Defaults to current timestamp)
                 """
                 if timestamp is None:
@@ -324,7 +336,7 @@ class Executor:
                 self.__job.set_status(job.Status.Completing())
                 try:
                     self.__scheduler.update_job_ended(self.__job_key, timestamp)
-                except Exception as e:
+                except Exception as e:  # noqa: BLE001
                     eprint("Error updating job state:", e)
 
             callbacks = RemoteTarget.JobExecutionCallbacks(
@@ -352,7 +364,7 @@ class Executor:
             eprint(f"MS_EPOCH_DONE={int(time.time())}")
             return job_exit_code
 
-    def run(self: "Executor") -> None:
+    def run(self: Executor) -> None:
         """
         Execute the job (blocking the calling thread) and manage output files.
         """
@@ -361,10 +373,10 @@ class Executor:
         pid_file.write_text(str(os.getpid()))
         self.__job.set_status(job.Status.Pending())
         kwargs = (
-            dict(
-                stdout=self.__job.local_output / "stdout",
-                stderr=self.__job.local_output / "stderr",
-            )
+            {
+                "stdout": self.__job.local_output / "stdout",
+                "stderr": self.__job.local_output / "stderr",
+            }
             if self.__redirect_output
             else {}
         )
@@ -374,11 +386,9 @@ class Executor:
                 status = self.__run()
                 final_job_status = job.Status.Completed(status)
             except InterruptedError:
-                # FIXME (temporary debug code for more transparency)
-                traceback.print_exc()
                 self.__scheduler.cancel_job(self.__job_key)
                 final_job_status = job.Status.Canceled()
-            except Exception:
+            except Exception:  # noqa: BLE001
                 self.__scheduler.cancel_job(self.__job_key)
                 status = -1
                 eprint(traceback.format_exc())

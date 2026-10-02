@@ -22,6 +22,8 @@ SCRIPT_PATH="$(readlink -f "$0")"
 cd "$(dirname "$(dirname "$SCRIPT_PATH")")"
 BASE_DIR=$(pwd)
 
+PYTHON_VERSION=$(cat .python-version)
+
 cd "$BASE_DIR/packages/$PACKAGE"
 
 echo "--- Update project ---"
@@ -31,14 +33,22 @@ uv lock --upgrade
 cd "$BASE_DIR/src/$PACKAGE"
 echo "--- Apply formatting ---"
 cd "$BASE_DIR/packages/$PACKAGE"
-uv add ruff --dev # Make sure formatter is installed as development dependencies
+# Make sure formatters is installed as development dependencies
+uv add ruff --dev
 # shellcheck source=/dev/null
 source .venv/bin/activate
 # Workaround for virtual environment not activating correctly in some cases
 PYTHON=$(pwd)/.venv/bin/python
 $PYTHON --version
-$PYTHON -m ruff check --fix
-$PYTHON -m ruff format
+cd "$BASE_DIR/src/$PACKAGE"
+RUFF_PYTHON_VERSION="py${PYTHON_VERSION//./}"
+$PYTHON -m ruff check --target-version "$RUFF_PYTHON_VERSION" --fix .
+$PYTHON -m ruff format --target-version "$RUFF_PYTHON_VERSION" .
+cd -
+cd "$BASE_DIR/src/ms_common"
+$PYTHON -m ruff check --target-version "$RUFF_PYTHON_VERSION" --fix .
+$PYTHON -m ruff format --target-version "$RUFF_PYTHON_VERSION" .
+cd -
 
 echo "--- Perform static type checking for modules ---"
 uv add mypy pyright --dev # Make sure type checkers are installed as development dependencies
@@ -47,12 +57,12 @@ echo -n "mypy " && $PYTHON -m mypy --package "$PACKAGE" --package ms_common \
     --strict \
     --follow-untyped-imports \
     --platform linux \
-    --python-version 3.12
+    --python-version "$PYTHON_VERSION"
 echo -n "pyright " && PYRIGHT_PYTHON_FORCE_VERSION=latest $PYTHON -m pyright --project "$PACKAGE"
 
 check-coverage-and-annotations() {
     echo "... Check docstring coverage ..."
-    uvx docstr-coverage . --skip-magic
+    uvx --python "$PYTHON_VERSION" docstr-coverage . --skip-magic
 
     echo "... Check WIP annotations ..."
     TC=$(grep --binary-files=without-match --exclude="*.pyc" -rni todo ./*  | wc -l)

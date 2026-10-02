@@ -16,7 +16,7 @@ import sys
 from collections.abc import Iterator
 from contextlib import contextmanager
 from pathlib import Path
-from typing import Any, cast
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -44,19 +44,19 @@ if not benchmark_path.is_file():
     sys.exit(1)
 df = pd.read_csv(benchmark_path)
 assert len(df["steps"].unique()) == 1, "Some experiments ran for different lenghts."
-experiment_steps = cast(float, df["steps"].values[0])
+experiment_steps = int(df["steps"].astype(int).iloc[0])
 df = pd.DataFrame(df.groupby(["cores", "film_width"], as_index=False)["seconds"].mean())
 df.sort_values(["film_width", "cores"], inplace=True)
 print("Benchmarks Mean:")
 film_widths = df["film_width"].unique()
-data: dict[str, Any] = dict(
-    film_width=film_widths,
-)
+data: dict[str, Any] = {
+    "film_width": film_widths,
+}
 for cores in df["cores"].unique()[::-1]:
     mask_cores = df["cores"] == cores
     column_seconds = []
     for film_width in film_widths:
-        seconds = df[mask_cores & (df["film_width"] == film_width)]["seconds"].values 
+        seconds = df[mask_cores & (df["film_width"] == film_width)]["seconds"].values
         column_seconds.append(seconds[0] if len(seconds) == 1 else np.nan)
     data[f"{cores} cores"] = column_seconds
 print(pd.DataFrame(data).to_string(index=False), end="\n\n")
@@ -94,7 +94,8 @@ def surface(xy, a, b, c, d):  # type: ignore[no-untyped-def]
     -------
     The value of the function evaluation
     """
-    x, y = xy
+    # Unpack variables for use in the expression evaluation
+    x, y = xy  # noqa: RUF059
     with suppress_stderr():
         return eval(surface_expr)
 
@@ -167,10 +168,10 @@ def eval_expression_z(xy):  # type: ignore[no-untyped-def]
     The value of the expression evaluation
     """
     x, y = xy
-    substitution = dict(
-        i=(x - MIN_FILM_WIDTH) / FILM_WIDTH_STEP,
-        p=y,
-    )
+    substitution = {
+        "i": (x - MIN_FILM_WIDTH) / FILM_WIDTH_STEP,
+        "p": y,
+    }
     return eval(expression_z, None, substitution)
 
 
@@ -211,7 +212,7 @@ for mask, label, color in [
             y=Y[mask],
             z=Z_sample[mask],
             mode="markers",
-            marker=dict(size=3, color=color, opacity=1),
+            marker={"size": 3, "color": color, "opacity": 1},
             name=label,
             showlegend=True,
         )
@@ -242,11 +243,11 @@ fig.add_trace(
 )
 fig.update_layout(
     title="Experimental Time Required by Simulation",
-    scene=dict(
-        xaxis_title="Film Width [nm]",
-        yaxis_title="Cores",
-        zaxis_title="Time/1000 Steps [sec]",
-    ),
+    scene={
+        "xaxis_title": "Film Width [nm]",
+        "yaxis_title": "Cores",
+        "zaxis_title": "Time/1000 Steps [sec]",
+    },
 )
 fig.show()
 # endregion visualization
