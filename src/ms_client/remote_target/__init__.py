@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import abc
 import enum
+import shlex
 import sys
 import time
 import types
@@ -337,6 +338,31 @@ class RemoteTarget:
         assert len(oe) == 2
         return oe
 
+    def _get_ranks_and_cores(self, job: Job) -> tuple[int, int]:
+        """
+        Get the number of ranks and the number of cores per rank for a given job on this target.
+
+        Parameters
+        ----------
+        job : Job
+            The job to be executed on the target
+
+        Returns
+        -------
+        tuple[int, int]
+            The number of ranks and the number of cores per rank
+        """
+        ranks_per_node = job.spec.ranks_per_node
+        if ranks_per_node is None:
+            if job.spec.cores_per_rank is None:
+                ranks_per_node = 1
+            else:
+                ranks_per_node = self._target.cores_per_node // job.spec.cores_per_rank
+        cores_per_rank = job.spec.cores_per_rank
+        if cores_per_rank is None:
+            cores_per_rank = self._target.cores_per_node // ranks_per_node
+        return ranks_per_node, cores_per_rank
+
     def _run(
         self: RemoteTarget,
         connection: Connection,
@@ -389,6 +415,8 @@ class RemoteTarget:
             + [f"module load {module}" for module in specific_modules]
             + [cmd]
         )
+        # Ensure similar behaviour to interactive SSH session
+        cmd = f"bash -lc {shlex.quote(cmd)}"
         result: Result = connection.run(
             cmd,
             warn=warn,
@@ -401,8 +429,7 @@ class RemoteTarget:
         debug_print_cmd(cmd, result, connection, self._target)
         return result
 
-    @staticmethod
-    def __get_job_env(job: Job) -> dict[str, Any]:
+    def __get_job_env(self, job: Job) -> dict[str, Any]:
         """
         Get the environment variables for a job to be set on the target.
 
@@ -416,13 +443,18 @@ class RemoteTarget:
         dict[str, Any]
             Environment variables for the job to be set on the target
         """
+        ranks_per_node, cores_per_node = self._get_ranks_and_cores(job)
         env = {
             "MS_ARRAY_ID": job.array_id,
             "MS_ARRAY_IDX": job.array_idx,
             "MS_INPUT": f"~/{job.remote_input}",
             "MS_OUTPUT": f"~/{job.remote_output}",
-            "TERM": "dumb",  # See man "term(7)"
+            "MS_NODES": job.spec.nodes,
+            "MS_NODE_RANKS": ranks_per_node,
+            "MS_RANK_CORES": cores_per_node,
+            "TERM": "dumb",  # See man "term(7)",
         }
+        env |= {f"MS_VARS_{k}": v for k, v in job.spec.vars.items()}
         return env
 
     def setup(self: RemoteTarget, job: Job) -> None:
@@ -446,7 +478,7 @@ class RemoteTarget:
                         connection,
                         cmd,
                         warn=True,
-                        env=RemoteTarget.__get_job_env(job),
+                        env=self.__get_job_env(job),
                         modules=job.spec.required_modules,
                     )
                     eprint(result.stdout)
@@ -495,7 +527,7 @@ class RemoteTarget:
             # Create the job output folder (delete any existing one to avoid confusion)
             expect_ok(self._run(connection, f"rm -rf {job.remote_output}").exited)
             expect_ok(self._run(connection, f"mkdir -p {job.remote_output}").exited)
-        return self._execute(job, callbacks, RemoteTarget.__get_job_env(job))
+        return self._execute(job, callbacks, self.__get_job_env(job))
 
     @abc.abstractmethod
     def _execute(

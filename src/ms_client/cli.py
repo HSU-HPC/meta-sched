@@ -97,17 +97,45 @@ class CLI:
         int
             The exit status of the operation
         """
+
+        def recurse_job_templates(path: Path) -> list[Path]:
+            """
+            Find the paths to all job template directories (containing spec.toml)
+
+            Parameters
+            ----------
+            path : Path
+                The directory which to search for job templates
+
+            Returns
+            -------
+            list[Path]
+                A list of paths to job templates
+            """
+            job_templates: list[Path] = []
+            if (path / "spec.toml").is_file():
+                job_templates.append(path)
+            else:
+                for p in path.iterdir():
+                    job_templates += [path / s for s in recurse_job_templates(p)]
+            return job_templates
+
         os.chdir(Path.home())
-        examples = {p.name: p for p in (data.get_examples_dir() / "jobs").iterdir()}
-        if template not in examples:
+        job_templates_path = data.get_data_dir() / "job_templates"
+        job_template_paths = recurse_job_templates(job_templates_path)
+        job_templates = [
+            str(p.relative_to(job_templates_path)) for p in job_template_paths
+        ]
+        if template not in job_templates:
             eprint("No such job spec template:", template)
             eprint("\nAvailable:")
-            for job_spec in examples:
-                eprint("-", job_spec)
+            for t in sorted(job_templates):
+                assert (job_templates_path / t).exists()
+                eprint("-", t)
             return os.EX_NOINPUT
         get_jobs_dir().mkdir(parents=True, exist_ok=True)
         try:
-            path = shutil.copytree(examples[template], get_jobs_dir() / name)
+            path = shutil.copytree(job_templates_path / template, get_jobs_dir() / name)
             print(
                 f'Created job spec "{name}" based on template "{template}".\n\n{path.absolute()}'
             )

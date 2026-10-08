@@ -129,11 +129,11 @@ class Executor:
             return False, "Too many nodes required"
         if target.min_nodes and job_spec.nodes < target.min_nodes:
             return False, "Too few nodes requested"
-        cores_per_node = (
-            target.cores_per_node
-            if job_spec.ranks_per_node is None
-            else (job_spec.ranks_per_node * job_spec.cores_per_rank)
-        )
+        cores_per_node = 1
+        if job_spec.ranks_per_node is not None:
+            cores_per_node *= job_spec.ranks_per_node
+        if job_spec.cores_per_rank is not None:
+            cores_per_node *= job_spec.cores_per_rank
         if cores_per_node > target.cores_per_node:
             return False, "Too many cores required"
         tags = target.tags

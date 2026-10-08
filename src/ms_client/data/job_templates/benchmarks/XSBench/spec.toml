@@ -1,0 +1,15 @@
+cmd_main = "bash $MS_INPUT/run_benchmark.sh $MS_VARS_particle_histories"
+array_size = 1
+nodes = 2
+vars = { particle_histories = 5_000_000 }
+# Found with fit_time.py
+time       = "=6.578+45.096*(particle_histories/1_000_000)"
+required_tags    = [
+    # XSBench available
+    # (s. https://github.com/HSU-HPC/ProxyAppsSetup/)
+    "proxy-apps",
+    # Energy measurement (Optional in run_benchmark.sh)
+    # (s. https://github.com/HSU-HPC/praplr/)
+    "praplr", 
+]
+required_modules = ["MPI"] # NOTE: run_benchmark.sh actually requires OpenMPI 

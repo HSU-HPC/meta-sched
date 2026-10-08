@@ -3,7 +3,7 @@
 from pathlib import Path
 
 
-def get_examples_dir() -> Path:
+def get_data_dir() -> Path:
     """
     Get the path to the data directory contained in this module.
 
@@ -12,7 +12,7 @@ def get_examples_dir() -> Path:
     Path
         The path to the data directory.
     """
-    return Path(__file__).parent / "examples"
+    return Path(__file__).parent
 
 
 def get_default_config_path() -> Path:

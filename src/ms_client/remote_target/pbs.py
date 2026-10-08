@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import shlex
 import sys
 import time
 from typing import Any
@@ -51,10 +52,7 @@ class PBSRemoteTarget(BatchSystemTarget):
             argv += ["-q", self._target.queue]
         if job.spec.exclusive:
             argv += ["-l", "place=excl"]
-        ranks_per_node = job.spec.ranks_per_node
-        if ranks_per_node is None:
-            ranks_per_node = self._target.cores_per_node // job.spec.cores_per_rank
-        cores_per_node = job.spec.cores_per_rank * ranks_per_node
+        ranks_per_node, cores_per_node = self._get_ranks_and_cores(job)
         argv += [
             "-l",
             f"select={job.spec.nodes}:ncpus={cores_per_node}:mpiprocs={ranks_per_node}:ompthreads={job.spec.cores_per_rank}",
@@ -66,7 +64,7 @@ class PBSRemoteTarget(BatchSystemTarget):
         argv += ["-o", oe[0]]
         argv += ["-e", oe[1]]
         argv += ["-koed"]  # Stream output files from execution host
-        argv += ["-N", job.spec.name]
+        argv += ["-N", shlex.quote(job.spec.name)]
         # argv += ["-v", ",".join(f"{k}={v}" for k,v in env.items())]
         argv += ["-V"]  # Just export all environment variables instead
         # For non-script jobs, the directory is always $HOME
@@ -74,7 +72,7 @@ class PBSRemoteTarget(BatchSystemTarget):
             "--",
             "$(command -v sh)",
             "-c",
-            f"'cd {job.remote_output} && {job.spec.cmd_main}'",
+            shlex.quote(f"cd {job.remote_output} && {job.spec.cmd_main}"),
         ]
         cmd = " ".join(argv)
         result = self._run(

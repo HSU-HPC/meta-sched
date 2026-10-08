@@ -101,6 +101,7 @@ class Client(SchedulerClientInterface):
         content = response.json()
         return [Target.model_validate(o) for o in content]
 
+    # TODO handle HTTPException
     def submit_job_array(
         self: "Client", job_spec: Spec, available_targets: set[str]
     ) -> ScheduleResponse:

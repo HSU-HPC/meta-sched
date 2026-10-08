@@ -20,7 +20,7 @@ max_time = "72:00:00"
 max_nodes = 5
 tags = ["x86", "slurm"]
 [targets.module_map]
-MPI = "intel-oneapi-mpi"
+MPI = "openmpi"
 
 # vvv========== WindHPC Project ==========vvv
 
@@ -79,7 +79,7 @@ max_time = "2-00:00:00"
 max_nodes = 256
 tags = ["x86", "nhr", "slurm"]
 [targets.module_map]
-MPI = "gcc/14.2.0 openmpi/4.1.7" # Hierarchical module system
+MPI = "gcc/14.2.0 openmpi/5.0.6" # Hierarchical module system
 
 
 [[targets]]

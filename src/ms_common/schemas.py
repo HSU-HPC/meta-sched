@@ -104,6 +104,8 @@ class Target(BaseModel):
         The batch system used by the target, e.g. "slurm", "pbs", "none" (default, direct execution)
     queue : str | None
         The name of the queue/partition used by the target (if applicable, e.g. for Slurm or PBS)
+    constraints : str | None
+        Constraints expression to be used by Slurm (ignore by others)
     host : str
         The hostname used to connect to the target
     nodes : int
@@ -130,6 +132,7 @@ class Target(BaseModel):
     id: str
     batch_system: str = "none"
     queue: str | None = None
+    constraints: str | None = None
     host: str
     nodes: int
     cores_per_node: int
@@ -249,6 +252,8 @@ class Spec(BaseModel):
         The name of the job specification corresponding to the containing folder
     cmd_main : str
         The main shell command to be executed as the jobs on the batch system of the target
+    vars : dict[str, str|float|int]
+        Arbitrary job variables which are available to the time expression or the commands using the environment (MS_VARS_<key>)
     time : str
         The maximum runtime of a job in the array or unrestricted if None (default)
         May be given as formatted duration ("d-hh:MM:SS") or SymPy expression for seconds starting with "=" where p is the total number of cores
@@ -264,8 +269,8 @@ class Spec(BaseModel):
         The number of nodes required (defaults to 1)
     ranks_per_node : int
         The number of ranks required per node (defaults to 1)
-    cores_per_rank : int
-        The number of cores required per rank (defaults to 1)
+    cores_per_rank : int | None
+        The number of cores required per rank (defaults to all)
     required_modules : list[str]
         The list of required abstract environment modules (e.g. "MPI" instead of "openmpi" or "mpi/openmpi")
     required_tags : list[str]
@@ -276,6 +281,7 @@ class Spec(BaseModel):
 
     name: str
     cmd_main: str
+    vars: dict[str, str | float | int]
     time: str | None = None
     seconds: int = 0
     cmd_setup_local: str | None = None
@@ -283,7 +289,7 @@ class Spec(BaseModel):
     array_size: int = 1
     nodes: int = 1
     ranks_per_node: int | None = None
-    cores_per_rank: int = 1
+    cores_per_rank: int | None = None
     required_modules: list[str] = []
     required_tags: list[str] = []
     exclusive: bool = False
@@ -311,7 +317,7 @@ class Spec(BaseModel):
             # Expression based value
             assert self.time is not None
             total_cores, idx = sympy.symbols("p,i")
-            substitutions = {
+            substitutions: dict[sympy.Symbol, float | int] = {
                 total_cores: self.nodes
                 * (
                     self.ranks_per_node
@@ -319,6 +325,10 @@ class Spec(BaseModel):
                     else target.cores_per_node
                 ),
                 idx: array_idx,
+            }
+            substitutions |= {
+                sympy.Symbol(k): float(v)  # type: ignore[no-untyped-call]
+                for k, v in self.vars.items()
             }
             try:
                 expression = sympy_parser.parse_expr(self.time[1:].strip()).subs(

@@ -76,6 +76,7 @@ id             = "hsuper-small"
 host           = "hsuper-login01.hsu-hh.de"
 batch_system   = "slurm" # Alternative: pbs, none
 queue          = "small" # (The Slurm partition)
+constraints    = "cpu8360Y&ram256" # Constraints expression used by Slurm (ignore by others)
 nodes          = 571
 cores_per_node = 72
 max_time       = "72:00:00" # Formated as d-hh:MM:ss
@@ -187,7 +188,7 @@ cmd_setup_local  = "git clone --depth 1 https://example.org/repo.git $MS_INPUT"
 cmd_setup_target = "mpicxx $MS_INPUT/example.cpp -o example"
 # Run the example three times on two nodes through the batch system.
 # (Each job in the array may run on a different target.)
-cmd_main         = "mpiexec ./example --seed $MS_ARRAY_IDX"
+cmd_main         = "mpiexec ./example --seed $MS_ARRAY_IDX $MS_VARS_scenario"
 array_size       = 3
 nodes            = 2
 ranks_per_node   = 1
@@ -196,8 +197,10 @@ ranks_per_node   = 1
 # exclusive        = False
 # Only use targets providing an MPI implementation module like OpenMPI or MPICH. (Will be loaded.)
 required_modules = ["MPI"]
+# Provide additional variables to the job environment (MS_VARS_<key>) or the time expression below. (Numeric only.)
+vars = { scenario = "small" }
 # Provide required wall time in the format d-hh:MM:ss or as 'seconds = <seconds>'.
-# To determine the number of seconds dynamically with SymPy, use 'time = "= <expression>" where p is the total number of cores available.
+# To determine the number of seconds dynamically with SymPy, use 'time = "= <expression>" where p is the total number of cores available and i is the job index in the array.
 time             = "0-00:05:00" 
 # Only consider a subset of targets (e.g. using renewable energy).
 required_tags    = ["green"]

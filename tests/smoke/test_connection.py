@@ -20,7 +20,7 @@ from ms_client.client import Client
 from ms_client.config import Config
 from ms_client.remote_target import RemoteTarget
 
-def test_connection(args: list[str]):
+def test_connection(args: list[str]) -> None:
     """
     Test the connection to a remote target.
 
